@@ -1,6 +1,6 @@
 import { Suspense, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, type ThreeEvent } from "@react-three/fiber";
-import { ContactShadows, Html, OrbitControls, Sparkles, Stars } from "@react-three/drei";
+import { ContactShadows, OrbitControls, Sparkles, Stars } from "@react-three/drei";
 import { Bloom, EffectComposer, Vignette } from "@react-three/postprocessing";
 import * as THREE from "three";
 import type { Structure, TerrainSpec, Tile } from "@/ops/types";
@@ -38,6 +38,33 @@ function tileHeight(t: Tile, theme: BoardTheme): number {
   if (theme === "station") return t.terrain === "external" ? 0.25 : 0.4;
   if (theme === "earth") return t.terrain === "ocean" ? 0.18 : t.terrain === "coast" ? 0.26 : 0.34 + Math.max(0, t.elevationM) / 400;
   return Math.max(0.06, 0.2 + t.elevationM / 420);
+}
+
+/** A pulsing beacon over a tile tied to a live NASA event (EONET, FIRMS). */
+function LiveBeacon({ height }: { height: number }) {
+  const ref = useRef<THREE.Mesh>(null);
+  const calm = useMemo(prefersCalm, []);
+  useFrame(({ clock }) => {
+    if (!ref.current || calm) return;
+    const k = 1 + 0.35 * Math.sin(clock.elapsedTime * 4);
+    ref.current.scale.set(k, 1, k);
+  });
+  return (
+    <group position={[0, height, 0]}>
+      <mesh position={[0, 0.7, 0]}>
+        <cylinderGeometry args={[0.025, 0.025, 1.4, 6]} />
+        <meshBasicMaterial color="#fb923c" toneMapped={false} />
+      </mesh>
+      <mesh position={[0, 1.45, 0]}>
+        <sphereGeometry args={[0.12, 12, 12]} />
+        <meshBasicMaterial color="#fdba74" toneMapped={false} />
+      </mesh>
+      <mesh ref={ref} position={[0, 0.03, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[0.35, 0.5, 24]} />
+        <meshBasicMaterial color="#fb923c" transparent opacity={0.7} toneMapped={false} />
+      </mesh>
+    </group>
+  );
 }
 
 function HexTile({ tile, theme, color, valid, selected, onClick }: { tile: Tile; theme: BoardTheme; color: string; valid: boolean; selected: boolean; onClick?: (t: Tile) => void }) {
@@ -80,11 +107,7 @@ function HexTile({ tile, theme, color, valid, selected, onClick }: { tile: Tile;
       {isPsr && tile.iceKgPerTurn > 0 && theme === "moon" && (
         <Sparkles count={10} scale={[1.4, 0.4, 1.4]} position={[0, h + 0.2, 0]} size={2.2} speed={0.2} color="#9bd5ff" />
       )}
-      {tile.liveEvent && (
-        <Html position={[0, h + 0.9, 0]} center distanceFactor={9} zIndexRange={[10, 0]}>
-          <span className="pointer-events-none whitespace-nowrap rounded-full border border-line bg-[rgba(8,10,25,0.75)] px-2 py-0.5 text-[10px] text-tight">● {tile.liveEvent.category}</span>
-        </Html>
-      )}
+      {tile.liveEvent && <LiveBeacon height={h} />}
     </group>
   );
 }

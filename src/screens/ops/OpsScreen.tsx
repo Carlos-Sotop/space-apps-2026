@@ -40,6 +40,7 @@ function Meter({ label, value, max, color, text }: { label: string; value: numbe
 }
 
 function EnvStrip({ s, turnLabel }: { s: OpsState; turnLabel: string }) {
+  const link = s.missionId === "orbital-lab" ? "Relay" : s.missionId === "earth-guardian" ? "Ground" : "DSN";
   const items = [s.env, ...s.forecast];
   return (
     <div className="flex gap-1.5 overflow-x-auto pb-1" aria-label="Forecast">
@@ -51,7 +52,7 @@ function EnvStrip({ s, turnLabel }: { s: OpsState; turnLabel: string }) {
             <span title={e.earthUp ? "Earth in view" : "Earth below the horizon"} style={{ color: e.earthUp ? "#60a5fa" : "#334155" }}>◐</span>
             {e.storm && <span title={e.storm.note} className="text-over">⚡</span>}
           </div>
-          <div className="num mt-0.5 text-faint">DSN {pct(e.dsnFactor)}</div>
+          <div className="num mt-0.5 text-faint" title="Share of the downlink network free for us">{link} {pct(e.dsnFactor)}</div>
         </div>
       ))}
     </div>
@@ -292,7 +293,7 @@ export default function OpsScreen() {
               </div>
             ) : (
               <Button variant="primary" className="w-full" disabled={!!ops.pendingEvent} onClick={() => act({ type: "advance" })}>
-                Advance {DAYS_PER_TURN} days <Icon name="play" size={15} />
+                {sc.turnLabel === "Turn" ? `Advance ${DAYS_PER_TURN} days` : `Next ${sc.turnLabel.toLowerCase()}`} <Icon name="play" size={15} />
               </Button>
             )}
           </div>

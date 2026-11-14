@@ -119,6 +119,8 @@ const sideProgress: Record<string, (s: Parameters<OpsScenario["goalProgress"]>[1
 };
 
 const isExperiment = (kind: string) => kind === "experiment" || kind === "dosimeter" || kind === "plant";
+/** experiments the design flies; quest targets never ask for more than that */
+const flownExperiments = (design: { moduleIds: string[] }) => design.moduleIds.filter((id) => isExperiment(station.moduleKinds[id] ?? "")).length;
 
 export const station: OpsScenario = {
   missionId: "orbital-lab",
@@ -229,11 +231,13 @@ export const station: OpsScenario = {
   makeGoals(design, catalog) {
     const maxTurns = maxTurnsFor(design, catalog);
     const target = returnTarget(design, catalog, station, maxTurns, 0.9);
+    const dock = Math.max(1, Math.min(2, flownExperiments(design)));
+    const busy = Math.max(1, Math.min(3, flownExperiments(design)));
     const side = design.secondaryObjectiveIds.map((id) => sideDefs[id]).filter((x): x is OpsGoal => !!x);
     return [
-      goal({ id: "main-dock", kind: "main", step: 1, title: "Dock and unload: deploy 2 experiments", target: 2, unit: "experiments", points: 10 }),
+      goal({ id: "main-dock", kind: "main", step: 1, title: `Dock and unload: deploy ${dock} experiment${dock > 1 ? "s" : ""}`, target: dock, unit: "experiments", points: 10 }),
       goal({ id: "main-first", kind: "main", step: 2, title: "First results reach Earth", target: 1, unit: "link", points: 15 }),
-      goal({ id: "main-run", kind: "main", step: 3, title: "Run the lab 6 turns with 3+ experiments on", target: 6, unit: "turns", points: 25 }),
+      goal({ id: "main-run", kind: "main", step: 3, title: `Run the lab 6 turns with ${busy}+ experiment${busy > 1 ? "s" : ""} on`, target: 6, unit: "turns", points: 25 }),
       goal({ id: "main-data", kind: "main", step: 4, title: `Return ${target} Gb of results`, target, unit: "Gb", points: 30 }),
       ...side,
       goal({ id: "grow-lettuce", kind: "side", title: "Grow lettuce in the plant chamber", target: 3, unit: "turns", points: 20 }),
@@ -290,8 +294,8 @@ export const station: OpsScenario = {
     for (const st of s.structures) if (st.kind === "dosimeter" && isActive(st)) s.science += 4 * storm.severity; // game value
   },
 
-  onTurn(s, _ctx, info) {
+  onTurn(s, ctx, info) {
     for (const id of Object.keys(info.produced)) bump(s, `run:${id}`);
-    if (s.structures.filter((st) => isExperiment(st.kind) && info.produced[st.id] > 0).length >= 3) bump(s, "labTurns");
+    if (s.structures.filter((st) => isExperiment(st.kind) && info.produced[st.id] > 0).length >= Math.max(1, Math.min(3, flownExperiments(ctx.design)))) bump(s, "labTurns");
   },
 };
