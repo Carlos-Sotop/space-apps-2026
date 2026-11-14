@@ -90,7 +90,7 @@ export const launchVehicles: LaunchVehicle[] = [
     reliability: 0.85, // game value
     reusable: true,
     status: "in-development",
-    blurb: "Super-heavy and reusable. Needs refilling in orbit to reach the Moon.",
+    blurb: "Must refill in orbit before it can reach the Moon.",
     sources: [
       wiki("SpaceX Starship (payload by block, status)", "SpaceX_Starship"),
       { title: "NASA: NASA, SpaceX illustrate key moments of Artemis lunar lander mission (propellant loading in Earth orbit)", url: "https://www.nasa.gov/directorates/esdmd/artemis-campaign-development-division/human-landing-system-program/nasa-spacex-illustrate-key-moments-of-artemis-lunar-lander-mission/" },
