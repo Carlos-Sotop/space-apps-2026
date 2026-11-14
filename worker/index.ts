@@ -2,7 +2,7 @@
 // see chain.ts); everything else is static assets.
 import type { LiveContext, LiveEarthEvent, LiveSpaceWeather } from "../src/engine/types.ts";
 import type { LiveApod, LiveDsn, LiveIss, LiveMoon } from "../src/live/types.ts";
-import { isoDay, normalizeApod, normalizeCme, normalizeEonet, normalizeFlr, normalizeGst, parseDsn, parseHorizons, parseSsc, sscStamp } from "./normalize.ts";
+import { isoDay, normalizeApod, normalizeCme, normalizeEonet, normalizeGst, parseDsn, parseHorizons, parseSsc, sscStamp } from "./normalize.ts";
 import spaceWeatherSnap from "../src/data/snapshots/space-weather.json";
 import earthEventsSnap from "../src/data/snapshots/earth-events.json";
 import moonSnap from "../src/data/snapshots/moon.json";
@@ -20,6 +20,14 @@ type Result<T> = { data: T; snapshot: boolean };
 
 const DAY = 86_400_000;
 const UPSTREAM_TIMEOUT_MS = 8000;
+/**
+ * api.nasa.gov routes (DONKI, APOD) share one key. Without NASA_API_KEY the Worker uses DEMO_KEY, which
+ * allowed 10 calls per hour when measured on 2026-11-14 (x-ratelimit-limit). A failed keyed route serves
+ * its snapshot for this long before it calls NASA again, so a rate limit can recover.
+ */
+export const KEYED_SNAPSHOT_TTL_S = 1800;
+/** keyless routes retry a failed upstream soon, so a recovered service shows up quickly */
+const SNAPSHOT_TTL_S = 60;
 
 async function upstream(url: string): Promise<Response> {
   const res = await fetch(url, { signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS), headers: { "user-agent": "spacedao-worker" } });
@@ -37,16 +45,15 @@ async function spaceWeather(env: Env): Promise<Result<LiveSpaceWeather[]>> {
   const now = new Date();
   const range = `startDate=${isoDay(new Date(now.getTime() - 30 * DAY))}&endDate=${isoDay(now)}&api_key=${key}`;
   try {
-    const [cme, gst, flr] = await Promise.allSettled([
+    // DONKI/FLR answered 404 on 2026-11-14 (docs/DATA_SOURCES.md), so it is not called: each call spends key quota.
+    const [cme, gst] = await Promise.allSettled([
       upstreamJson(`https://api.nasa.gov/DONKI/CME?${range}`),
       upstreamJson(`https://api.nasa.gov/DONKI/GST?${range}`),
-      upstreamJson(`https://api.nasa.gov/DONKI/FLR?${range}`), // currently 404s upstream: ignored when it fails
     ]);
     if (cme.status === "rejected" && gst.status === "rejected") throw new Error("DONKI unavailable");
     const items = [
       ...(cme.status === "fulfilled" ? normalizeCme(cme.value).sort(byTime).slice(0, 12) : []),
       ...(gst.status === "fulfilled" ? normalizeGst(gst.value).sort(byTime).slice(0, 6) : []),
-      ...(flr.status === "fulfilled" ? normalizeFlr(flr.value).sort(byTime).slice(0, 6) : []),
     ];
     return { data: items, snapshot: false };
   } catch {
@@ -115,27 +122,33 @@ async function apod(env: Env): Promise<Result<LiveApod>> {
   return { data: { title, url, mediaType, date }, snapshot: true };
 }
 
-async function context(env: Env): Promise<Result<LiveContext>> {
-  const [sw, ee, mn] = await Promise.all([spaceWeather(env), earthEvents(), moon()]);
-  const snapshot = sw.snapshot || ee.snapshot || mn.snapshot;
-  return {
-    snapshot,
-    data: { fetchedAt: new Date().toISOString(), snapshot, spaceWeather: sw.data, earthEvents: ee.data, moonDistanceKm: mn.data.moonDistanceKm },
-  };
+type Body = Record<string, unknown>;
+/** reads another live route through its own cache entry, so the context never calls NASA a second time */
+type Sub = (path: string) => Promise<Body>;
+
+async function context(_env: Env, sub: Sub): Promise<Result<LiveContext>> {
+  const [sw, ee, mn] = await Promise.all([sub("/api/live/space-weather"), sub("/api/live/earth-events"), sub("/api/live/moon")]);
+  const spaceWeather = Array.isArray(sw.items) ? (sw.items as LiveSpaceWeather[]) : (spaceWeatherSnap.items as LiveSpaceWeather[]);
+  const earthEvents = Array.isArray(ee.items) ? (ee.items as LiveEarthEvent[]) : (earthEventsSnap.items as LiveEarthEvent[]);
+  const moonDistanceKm = typeof mn.moonDistanceKm === "number" ? mn.moonDistanceKm : moonSnap.moonDistanceKm;
+  const snapshot = sw.snapshot !== false || ee.snapshot !== false || mn.snapshot !== false;
+  return { snapshot, data: { fetchedAt: new Date().toISOString(), snapshot, spaceWeather, earthEvents, moonDistanceKm } };
 }
 
 interface Route {
   ttlS: number;
-  run: (env: Env) => Promise<Result<unknown>>;
+  /** calls api.nasa.gov with the shared key: a failure backs off for KEYED_SNAPSHOT_TTL_S */
+  keyed?: boolean;
+  run: (env: Env, sub: Sub) => Promise<Result<unknown>>;
 }
 
 const ROUTES: Record<string, Route> = {
-  "/api/live/space-weather": { ttlS: 3600, run: spaceWeather },
+  "/api/live/space-weather": { ttlS: 3600, keyed: true, run: spaceWeather },
   "/api/live/earth-events": { ttlS: 1800, run: () => earthEvents() },
   "/api/live/moon": { ttlS: 21_600, run: () => moon() },
   "/api/live/iss": { ttlS: 120, run: () => iss() },
   "/api/live/dsn": { ttlS: 60, run: () => dsn() },
-  "/api/live/apod": { ttlS: 21_600, run: apod },
+  "/api/live/apod": { ttlS: 21_600, keyed: true, run: apod },
   "/api/live/context": { ttlS: 1800, run: context },
 };
 
@@ -156,12 +169,16 @@ async function handleLive(request: Request, env: Env, ctx: ExecutionContext, rou
     // cache unavailable (local dev): continue without it
   }
   try {
-    const { data, snapshot } = await route.run(env);
+    const sub: Sub = async (path) => {
+      const subRoute = ROUTES[path];
+      if (!subRoute) return {};
+      return (await (await handleLive(new Request(new URL(path, request.url).toString()), env, ctx, subRoute)).json()) as Body;
+    };
+    const { data, snapshot } = await route.run(env, sub);
     const payload = Array.isArray(data) || typeof data !== "object" || data === null
       ? { items: data, snapshot, fetchedAt: new Date().toISOString() }
       : { ...(data as object), snapshot, fetchedAt: (data as { fetchedAt?: string }).fetchedAt ?? new Date().toISOString() };
-    // snapshots are re-tried soon so a recovered upstream shows up quickly
-    const res = json(payload, snapshot ? 60 : route.ttlS);
+    const res = json(payload, snapshot ? (route.keyed ? KEYED_SNAPSHOT_TTL_S : SNAPSHOT_TTL_S) : route.ttlS);
     try {
       ctx.waitUntil(cache.put(cacheKey, res.clone()));
     } catch {
