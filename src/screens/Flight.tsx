@@ -7,6 +7,7 @@ import { getMission } from "@/lib/catalog";
 import { fmtGb, fmtW } from "@/lib/format";
 import { useGame } from "@/store/game";
 import { FlightScene } from "./FlightScene";
+import { FlightHud } from "./FlightHud";
 import { Sparkline } from "./FlightTelemetry";
 import { buildTimeline, dayAt, endProgress, phaseAt, type Outcome } from "./flightTimeline";
 
@@ -92,9 +93,9 @@ export default function Flight() {
         </ol>
         <div className="grid gap-4 lg:grid-cols-[1fr_340px]">
           <div className="min-w-0 space-y-4">
-            <div className="glass relative aspect-[2/1] overflow-hidden">
+            <div className="glass relative aspect-[4/3] overflow-hidden sm:aspect-[2/1]">
               <FlightScene timeline={timeline} p={p} lunar={lunar} lostAt={result.lostAt} ended={ended} />
-              <div className="num absolute left-3 top-3 text-xs text-muted">Day {Math.floor(day)}</div>
+              <FlightHud timeline={timeline} index={index} p={p} day={day} ended={ended} lost={!!result.lostAt && ended} calm={calm} />
             </div>
             <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
               <Sparkline label="Power" values={seen.map((s) => s.powerW)} now={fmtW(last?.powerW ?? 0)} color="var(--tight)" />
