@@ -35,6 +35,17 @@ Intro ─► (Story) ─► Mission Select ─► Coalition ─► Mission Contr
 6. **Flight.** 20-30 s animated timeline: phase strip, trajectory visualization (launch plume, transfer, docking or landing), telemetry mini-charts (power, battery, data queued/returned, link up/down), event feed. Events triggered by live NASA data are badged "LIVE · NASA DONKI" with a link to the real record. Skip and x4 speed.
 7. **Debrief.** Grade (S/A/B/C/F), score breakdown, objectives met, **"Why it went this way"** lessons, council signatures and manifest hash, actions: publish design to the registry, fly again (new seed), redesign, new mission.
 
+## Operations (after arrival, all missions)
+
+When the spacecraft arrives, the player takes command on site (`src/ops/`, screen `src/screens/ops/OpsScreen.tsx`). Turn-based, Age of Empires-lite: 1 turn = 3 days (Earth Guardian labels turns as months).
+
+- **Map:** 19 hexes. Moon: south-pole ridges, rims, slopes and permanently shadowed craters with ice. Orbital Lab: station racks, external platforms and nodes. Earth Guardian: Global South regions; live NASA EONET events become high-value tiles.
+- **Actions (action points):** deploy delivered modules on valid tiles, build on site (greenhouse, regolith berm, antenna mast...), research upgrades with science points, scout/inspect for hidden discoveries, move (rover, imaging campaigns), repair, switch structures on and off.
+- **Each turn resolves:** power (Sun height × tile light), storage, the consumable (water ice, crew supplies, propellant), data produced and downlinked (Earth visibility, DSN load), wear, storms.
+- **Quests:** a main quest in ordered steps, side quests from the secondary objectives the council chose, hidden discoveries, and 6-8 event cards per mission with two choices each.
+- **Live NASA data changes the run:** DONKI storms land on specific turns (shelter or keep working), DSN Now load scales downlink, EONET events mark Earth targets.
+- **Score:** final = 40% flight + 60% operations (0-1000, same letter grades). The Worker replays the run before it enters the global ranking.
+
 ## Core rules
 
 - **Six resources** (challenge list): mass, power, budget, data, comms, lifetime. Each gauge shows used vs available, turns amber under 10% margin ("real missions keep margins") and red when over. Hover shows what uses and provides it.
