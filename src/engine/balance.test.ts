@@ -92,6 +92,31 @@ describe("rule: on-board screening shrinks the downlink, not the science", () =>
 /* The real catalog                                                    */
 /* ------------------------------------------------------------------ */
 
+describe("rule: power over the station allocation is a blocker", () => {
+  const everything = ["ol-cargo-dragon", "ol-combustion", "ol-biomonitor", "ol-dosimetry", "ol-plant-chamber", "ol-protein-crystal", "ol-bioprinter", "ol-fiber", "ol-cold-atom", "ol-iss-power", "ol-iss-link"];
+  it("blocks a payload over the 2 kW rack and names the biggest draw", () => {
+    const d = design("orbital-lab", { destinationId: "ol-iss", launchVehicleId: "falcon-9", moduleIds: everything });
+    const issue = validateDesign(d, catalog).find((i) => i.id === "power-over");
+    expect(issue?.severity).toBe("blocker");
+    expect(issue?.text).toContain("the station allocates 2,000 W");
+    expect(issue?.fix).toContain("Flame chamber (-600 W)");
+    // the station powers payloads through eclipse, so no battery warning on top
+    expect(validateDesign(d, catalog).some((i) => i.id === "battery-small")).toBe(false);
+  });
+  it("stays a warning away from the station, where instruments throttle", () => {
+    const d = design("earth-guardian", { destinationId: "eg-sso-1030", launchVehicleId: "falcon-9", moduleIds: ["eg-bus-medium", "eg-lsar", "eg-ssar", "eg-array-small", "eg-kaband", "eg-ground-network"] });
+    expect(validateDesign(d, catalog).find((i) => i.id === "power-over")?.severity).toBe("warning");
+  });
+});
+
+describe("data: Cold Atom Lab", () => {
+  it("draws its published 565 W, so the full experiment set cannot share one rack", () => {
+    const cal = catalog.modules.find((m) => m.id === "ol-cold-atom")!;
+    expect(cal.powerW).toBe(565);
+    expect(cal.sources.some((s) => s.url.includes("2305.13285"))).toBe(true);
+  });
+});
+
 const EQUAL = { science: 1 / 3, safety: 1 / 3, cost: 1 / 3 };
 // NASA leads with the "Mission specialists" partners the Coalition screen recommends for each mission.
 const COALITIONS: Record<MissionId, Coalition> = {
@@ -127,6 +152,7 @@ const mb = (destinationId: string, launchVehicleId: string, moduleIds: string[],
 const GOOD: { name: string; design: () => MissionDesign }[] = [
   { name: "Orbital Lab: crew health on Cygnus", design: () => ol(["ol-cygnus", "ol-biomonitor", "ol-dosimetry", "ol-plant-chamber", "ol-protein-crystal", "ol-iss-power", "ol-iss-link"], { secondaryObjectiveIds: ["ol-health", "ol-plants"] }) },
   { name: "Orbital Lab: fire and fiber on Dragon", design: () => ol(["ol-cargo-dragon", "ol-combustion", "ol-fiber", "ol-biomonitor", "ol-protein-crystal", "ol-iss-power", "ol-iss-link"], { secondaryObjectiveIds: ["ol-fire-safety", "ol-manufacturing"] }) },
+  { name: "Orbital Lab: the most science that fits the 2 kW rack, on Dragon", design: () => ol(["ol-cargo-dragon", "ol-cold-atom", "ol-combustion", "ol-fiber", "ol-plant-chamber", "ol-dosimetry", "ol-biomonitor", "ol-iss-power", "ol-iss-link"], { secondaryObjectiveIds: ["ol-fire-safety", "ol-plants"] }) },
   { name: "Orbital Lab: cold atoms and tissue on HTV-X (H3)", design: () => ol(["ol-htv-x", "ol-cold-atom", "ol-bioprinter", "ol-plant-chamber", "ol-dosimetry", "ol-iss-power", "ol-iss-link"], { launchVehicleId: "h3", secondaryObjectiveIds: ["ol-plants", "ol-health"] }) },
   { name: "Earth Guardian: fire watch on PSLV", design: () => eg("eg-sso-dawn-dusk", "pslv", ["eg-bus-medium", "eg-thermal-ir", "eg-array-small", "eg-batt-small", "eg-kaband", "eg-ground-network", "eg-adcs-basic", "eg-obc-basic"], { secondaryObjectiveIds: ["eg-wildfire"] }) },
   { name: "Earth Guardian: crops and fires at 10:30", design: () => eg("eg-sso-1030", "falcon-9", ["eg-bus-medium", "eg-msi", "eg-thermal-ir", "eg-array-large", "eg-batt-large", "eg-kaband", "eg-ground-network", "eg-adcs-adv", "eg-obc-edge-ai"], { secondaryObjectiveIds: ["eg-crops", "eg-wildfire"] }) },
@@ -140,6 +166,7 @@ const GOOD: { name: string; design: () => MissionDesign }[] = [
 /** Designs that should fail, each for a reason the player can see. */
 const BAD: { name: string; design: () => MissionDesign; blocker?: string; warning?: string; event?: string }[] = [
   { name: "Orbital Lab: flame chamber with no station power", design: () => ol(["ol-cygnus", "ol-combustion", "ol-iss-link"]), blocker: "missing-category-power" },
+  { name: "Orbital Lab: every experiment at once", design: () => ol(["ol-cargo-dragon", "ol-combustion", "ol-biomonitor", "ol-dosimetry", "ol-plant-chamber", "ol-protein-crystal", "ol-bioprinter", "ol-fiber", "ol-cold-atom", "ol-iss-power", "ol-iss-link"]), blocker: "power-over" },
   { name: "Orbital Lab: experiments with no data link", design: () => ol(["ol-cygnus", "ol-plant-chamber", "ol-iss-power"]), blocker: "missing-category-comms" },
   { name: "Earth Guardian: L-band SAR on an X-band radio", design: () => eg("eg-sso-dawn-dusk", "falcon-9", ["eg-bus-medium", "eg-lsar", "eg-array-large", "eg-batt-small", "eg-xband", "eg-ground-network", "eg-adcs-basic"], { secondaryObjectiveIds: ["eg-flood"] }), warning: "data-over", event: "Mission fell short" },
   { name: "Earth Guardian: imager with no ground network", design: () => eg("eg-sso-1030", "falcon-9", ["eg-bus-medium", "eg-msi", "eg-array-large", "eg-batt-large", "eg-xband", "eg-adcs-basic"]), warning: "comms-under", event: "Mission fell short" },
