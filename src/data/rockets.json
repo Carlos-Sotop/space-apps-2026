@@ -1,0 +1,16 @@
+[
+  {
+    "id": "rocket-a",
+    "name": "Example rocket A",
+    "launchSuccess": 0.97,
+    "sources": [],
+    "verified": false
+  },
+  {
+    "id": "rocket-b",
+    "name": "Example rocket B",
+    "launchSuccess": 0.9,
+    "sources": [],
+    "verified": false
+  }
+]
