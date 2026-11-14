@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Badge, Button, Icon, MonogramBadge, Slider } from "@/components/ui";
 import { toast } from "@/components/ui/Toast";
-import type { Actor, Stake } from "@/engine/types";
+import type { Actor } from "@/engine/types";
 import { getActor } from "@/lib/catalog";
 import { fmtPct } from "@/lib/format";
 import { useGame } from "@/store/game";
 import {
-  designKey, marketPrices, runMarketSteps, useLedger, winner,
-  type MarketOption, type MarketRecord, type MarketState, type OptionKind,
+  designKey, lmsrTrade, runMarketSteps, trade, useLedger, winner,
+  type MarketOption, type MarketRecord, type MarketState, type OptionKind, type Side, type Trade,
 } from "./market";
 import { useDesign } from "./useDesign";
 
@@ -17,7 +17,12 @@ const KIND: Record<OptionKind, { label: string; tone: "neutral" | "ok" | "violet
   upgrade: { label: "Upgrade", tone: "violet" },
 };
 
-const signedCredits = (n: number) => `${n >= 0 ? "+" : "-"}${Math.abs(n)}`;
+const signedCredits = (n: number) => `${n >= 0 ? "+" : "-"}${Math.abs(Math.round(n))}`;
+const name = (id: string) => getActor(id)?.shortName ?? id;
+
+function SideArrow({ side, size = 12 }: { side: Side; size?: number }) {
+  return <Icon name="arrow" size={size} style={{ transform: `rotate(${side === "higher" ? -90 : 90}deg)` }} />;
+}
 
 /* ------------------------------------------------------------------ */
 /* Settle after the flight: the flight result settles the open market  */
@@ -25,11 +30,11 @@ const signedCredits = (n: number) => `${n >= 0 ? "+" : "-"}${Math.abs(n)}`;
 
 function playerPayoutText(r: MarketRecord): string | undefined {
   const s = r.settlement;
-  const mine = s?.payouts.find((p) => p.actorId === r.playerId);
   if (!s) return undefined;
-  if (!s.sameDesign || mine?.refunded) return "Market settled: your stake came back";
+  const mine = s.payouts.find((p) => p.actorId === r.playerId);
+  if (!s.sameDesign || mine?.refunded) return "Market settled: your play credits came back";
   if (!mine) return `Market settled at a score of ${s.actualScore}`;
-  return `Market settled: ${signedCredits(mine.net)} play credits for your forecast`;
+  return `Market settled: ${signedCredits(mine.net)} play credits for your call`;
 }
 
 let unsubscribe: (() => void) | undefined;
@@ -41,7 +46,8 @@ function wireSettlement() {
       const last = useLedger.getState().records.at(-1);
       if (!last?.settlement || last.announced || last.settlement.seed !== s.result?.seed) return;
       const text = playerPayoutText(last);
-      if (text) toast(text, (last.settlement.payouts.find((p) => p.actorId === last.playerId)?.net ?? 0) >= 0 ? "ok" : "warn");
+      const mine = last.settlement.payouts.find((p) => p.actorId === last.playerId);
+      if (text) toast(text, (mine?.net ?? 0) >= 0 ? "ok" : "warn");
       useLedger.getState().markAnnounced(last.marketId);
     }
   });
@@ -49,29 +55,33 @@ function wireSettlement() {
 wireSettlement();
 if (import.meta.hot) import.meta.hot.dispose(() => unsubscribe?.());
 
-/** How the last market settled: the real score against the forecasts, and what each stake brought back. */
+/** How a market settled: the real score against the market's price, and what each trade brought back. */
 export function SettlementView({ record }: { record: MarketRecord }) {
+  const reputation = useLedger((s) => s.reputation);
   const s = record.settlement;
   if (!s) return null;
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm">
         <span>Flight scored <span className="num text-fg">{s.actualScore}</span></span>
-        <span className="text-muted">Market said <span className="num">{Math.round(record.price)}</span> for {record.adoptedLabel}</span>
+        <span className="text-muted">Market said <span className="num">{Math.round(record.prices[record.adoptedId] ?? 0)}</span> for {record.adoptedLabel}</span>
       </div>
-      <ul className="flex flex-wrap gap-2">
-        {s.payouts.map((p) => {
-          const a = getActor(p.actorId);
-          const tone = p.refunded ? "text-muted" : p.net >= 0 ? "text-ok" : "text-over";
-          return (
-            <li key={p.actorId} className="flex items-center gap-2 rounded-full border border-line bg-glass px-2 py-1" title={`${a?.shortName ?? p.actorId} staked ${p.credits} credits predicting ${Math.round(p.predictedScore)}`}>
-              <MonogramBadge actor={a} fallbackName={p.actorId} size={22} showFlag={false} />
-              <span className={`num text-xs ${tone}`}>{p.refunded ? "back" : signedCredits(p.net)}</span>
-            </li>
-          );
-        })}
-      </ul>
-      {!s.sameDesign && <p className="text-xs text-muted">The design changed after the market closed, so every stake came back.</p>}
+      {s.payouts.length > 0 && (
+        <ul className="flex flex-wrap gap-2">
+          {s.payouts.map((p, i) => {
+            const tone = p.refunded ? "text-muted" : p.net >= 0 ? "text-ok" : "text-over";
+            const rep = reputation[p.actorId];
+            return (
+              <li key={`${p.actorId}-${i}`} className="flex items-center gap-2 rounded-full border border-line bg-glass px-2 py-1"
+                title={`${name(p.actorId)} paid ${Math.round(p.credits)} credits on "${p.side}"${rep ? `. Record ${signedCredits(rep.net)} over ${rep.markets} market${rep.markets > 1 ? "s" : ""}` : ""}`}>
+                <MonogramBadge actor={getActor(p.actorId)} fallbackName={p.actorId} size={22} showFlag={false} />
+                <span className={`num text-xs ${tone}`}>{p.refunded ? "back" : signedCredits(p.net)}</span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {!s.sameDesign && <p className="text-xs text-muted">The design changed after the market closed, so every trade was refunded.</p>}
     </div>
   );
 }
@@ -92,18 +102,30 @@ export function MarketSettlement() {
   );
 }
 
-/* ------------------------------------------------------------------ */
-/* The market                                                          */
-/* ------------------------------------------------------------------ */
-
-function Bar({ label, value, max, text, color }: { label: string; value: number; max: number; text: string; color: string }) {
+/** Each council member's forecasting record: credits won or lost over settled markets. */
+function RecordRow({ ids }: { ids: string[] }) {
+  const reputation = useLedger((s) => s.reputation);
+  const known = ids.filter((id) => reputation[id]);
+  if (!known.length) return null;
   return (
-    <div>
-      <div className="mb-1 flex justify-between text-xs text-muted"><span>{label}</span><span className="num text-fg">{text}</span></div>
-      <div className="h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full transition-[width] duration-500" style={{ width: `${Math.min(1, value / max) * 100}%`, background: color }} /></div>
+    <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
+      <span className="uppercase tracking-wider text-faint">Forecasting record</span>
+      {known.map((id) => {
+        const r = reputation[id];
+        return (
+          <span key={id} className="flex items-center gap-1" title={`${name(id)}: ${signedCredits(r.net)} credits over ${r.markets} market${r.markets > 1 ? "s" : ""}. Better records trade bigger.`}>
+            <MonogramBadge actor={getActor(id)} fallbackName={id} size={20} showFlag={false} />
+            <span className={`num ${r.net >= 0 ? "text-ok" : "text-over"}`}>{signedCredits(r.net)}</span>
+          </span>
+        );
+      })}
     </div>
   );
 }
+
+/* ------------------------------------------------------------------ */
+/* The market                                                          */
+/* ------------------------------------------------------------------ */
 
 function Simulating({ progress }: { progress: number }) {
   return (
@@ -114,8 +136,18 @@ function Simulating({ progress }: { progress: number }) {
   );
 }
 
-function OptionCard({ o, stakes, picked, adopted, price, locked, onPick }: {
-  o: MarketOption; stakes: Stake[]; picked: boolean; adopted: boolean; price?: number; locked: boolean; onPick: () => void;
+/** Market price as a bar, with a tick where the simulation alone put it. */
+function PriceBar({ price, forecast }: { price: number; forecast: number }) {
+  return (
+    <div className="relative h-2 rounded-full bg-white/10">
+      <div className="h-full rounded-full transition-[width] duration-500" style={{ width: `${Math.min(100, price / 10)}%`, background: "var(--violet-bright)" }} />
+      <span className="absolute -top-1 h-4 w-0.5 rounded-full bg-fg/70" style={{ left: `calc(${Math.min(100, forecast / 10)}% - 1px)` }} title={`Forecast ${Math.round(forecast)}`} />
+    </div>
+  );
+}
+
+function OptionCard({ o, price, trades, picked, adopted, locked, onPick }: {
+  o: MarketOption; price: number; trades: Trade[]; picked: boolean; adopted: boolean; locked: boolean; onPick: () => void;
 }) {
   const k = KIND[o.kind];
   return (
@@ -126,20 +158,26 @@ function OptionCard({ o, stakes, picked, adopted, price, locked, onPick }: {
         {adopted ? <Badge tone="ok">Adopted</Badge> : <span className="num truncate text-[11px] text-muted">{o.delta}</span>}
       </div>
       <div className="mb-3 truncate text-sm font-medium" title={o.label}>{o.label}</div>
-      <div className="space-y-3">
-        <Bar label="Predicted score" value={o.forecast.expectedScore} max={1000} text={String(Math.round(o.forecast.expectedScore))} color="var(--violet-bright)" />
-        <Bar label="Success" value={o.forecast.successProbability} max={1} text={fmtPct(o.forecast.successProbability)} color="var(--ok)" />
+      <div className="mb-1 flex items-baseline justify-between gap-2">
+        <span className="text-xs text-muted">Market score</span>
+        <span className="flex items-baseline gap-2">
+          <span className="num text-[11px] text-faint">forecast {Math.round(o.forecast.expectedScore)}</span>
+          <span className="num text-lg leading-none text-fg">{Math.round(price)}</span>
+        </span>
       </div>
-      <div className="mt-3 flex min-h-7 flex-wrap items-center gap-2">
-        {stakes.map((s) => {
-          const a = getActor(s.actorId);
-          return (
-            <span key={s.actorId} className="flex items-center gap-1" title={`${a?.shortName ?? s.actorId} stakes ${s.credits} credits, predicts ${Math.round(s.predictedScore)}`}>
-              <MonogramBadge actor={a} fallbackName={s.actorId} size={22} showFlag={false} /><span className="num text-[11px] text-muted">{s.credits}</span>
-            </span>
-          );
-        })}
-        {price !== undefined && <span className="num ml-auto text-[11px] text-violet-bright">market {Math.round(price)}</span>}
+      <PriceBar price={price} forecast={o.forecast.expectedScore} />
+      <div className="mt-3 flex items-center justify-between text-xs text-muted">
+        <span>Success</span><span className="num text-fg">{fmtPct(o.forecast.successProbability)}</span>
+      </div>
+      <div className="mt-3 flex min-h-6 flex-wrap items-center gap-2">
+        {trades.map((t, i) => (
+          <span key={`${t.actorId}-${i}`} className={`flex items-center gap-1 ${t.side === "higher" ? "text-ok" : "text-over"}`}
+            title={`${name(t.actorId)} paid ${Math.round(t.credits)} credits on ${t.side}: ${Math.round(t.from)} to ${Math.round(t.to)}`}>
+            <MonogramBadge actor={getActor(t.actorId)} fallbackName={t.actorId} size={22} showFlag={false} />
+            <SideArrow side={t.side} />
+            <span className="num text-[11px]">{Math.round(t.credits)}</span>
+          </span>
+        ))}
       </div>
     </button>
   );
@@ -152,17 +190,18 @@ export function MarketPanel({ onClosed }: { onClosed: () => void }) {
   const close = useLedger((s) => s.close);
   const last = useLedger((s) => s.records.at(-1));
   // The market is about the design the council opened it on; later edits reopen the step.
-  const opened = useRef({ design, catalog, live });
+  const opened = useRef({ design, catalog, live, record: useLedger.getState().reputation });
   const [state, setState] = useState<MarketState | null>(null);
   const [progress, setProgress] = useState(0);
   const [pick, setPick] = useState<string>("current");
+  const [side, setSide] = useState<Side>("higher");
   const [credits, setCredits] = useState(100);
-  const [result, setResult] = useState<{ win: MarketOption; prices: Record<string, number> } | null>(null);
+  const [closed, setClosed] = useState<{ win: MarketOption; prices: Record<string, number>; trades: Trade[] } | null>(null);
 
   useEffect(() => {
-    const { design: d, catalog: c, live: l } = opened.current;
+    const { design: d, catalog: c, live: l, record } = opened.current;
     const partners = d.coalition.partnerIds.map((id) => c.actors.find((a) => a.id === id)).filter((a): a is Actor => !!a);
-    const steps = runMarketSteps(d, partners, c, l ?? undefined);
+    const steps = runMarketSteps(d, partners, c, l ?? undefined, undefined, record);
     let alive = true;
     let timer = 0;
     const pump = () => {
@@ -172,7 +211,7 @@ export function MarketPanel({ onClosed }: { onClosed: () => void }) {
       while (!r.done && performance.now() - t0 < 12) r = steps.next();
       if (r.done) {
         setState(r.value);
-        setPick([...r.value.options].sort((a, b) => b.forecast.expectedScore - a.forecast.expectedScore)[0].id);
+        setPick(winner(r.value.options, r.value.book.prices).id);
       } else {
         setProgress(r.value);
         timer = window.setTimeout(pump, 0);
@@ -182,25 +221,30 @@ export function MarketPanel({ onClosed }: { onClosed: () => void }) {
     return () => { alive = false; window.clearTimeout(timer); };
   }, []);
 
-  const playerStake: Stake | undefined = useMemo(() => {
-    const o = state?.options.find((x) => x.id === pick);
-    return state && o ? { marketId: state.market.id, optionId: o.id, actorId: design.coalition.leadId, credits, predictedScore: o.forecast.expectedScore } : undefined;
-  }, [state, pick, credits, design.coalition.leadId]);
+  const preview = useMemo(() => {
+    const price = state?.book.prices[pick];
+    return price === undefined ? undefined : lmsrTrade(price, side === "higher" ? 1000 : 0, credits);
+  }, [state, pick, side, credits]);
+
+  const playerId = design.coalition.leadId;
+  const prices = closed?.prices ?? state?.book.prices ?? {};
+  const trades = closed?.trades ?? state?.book.trades ?? [];
 
   const closeMarket = () => {
-    if (!state || !playerStake) return;
-    const prices = marketPrices(state, playerStake);
-    const win = winner(state, prices);
-    setResult({ win, prices });
+    if (!state) return;
+    const final = trade(state.book, playerId, pick, side === "higher" ? 1000 : 0, credits);
+    const win = winner(state.options, final.prices);
+    setClosed({ win, prices: final.prices, trades: final.trades });
     close({
       marketId: state.market.id, missionId: win.design.missionId, designKey: designKey(win.design), adoptedId: win.id, adoptedLabel: win.label,
-      price: prices[win.id], stakes: [...state.botStakes, playerStake], playerId: playerStake.actorId,
+      prices: final.prices, trades: final.trades, playerId,
     });
     if (win.id !== "current") { adopt(win.design); toast(`Council adopted: ${win.label}`, "ok"); }
     onClosed();
   };
 
   const previous = last?.settlement && last.missionId === design.missionId ? last : undefined;
+  const pickedOption = state?.options.find((o) => o.id === pick);
 
   return (
     <div className="glass space-y-5 p-5">
@@ -208,33 +252,50 @@ export function MarketPanel({ onClosed }: { onClosed: () => void }) {
         <h3 className="font-display text-base">Decision market</h3>
         <span className="rounded-full border border-violet/40 bg-violet/10 px-3 py-0.5 text-xs text-violet-bright">Bet on beliefs</span>
       </div>
-      {previous && !result && (
+      {previous && !closed && (
         <div className="rounded-2xl border border-line p-4">
           <p className="mb-2 text-xs uppercase tracking-wider text-faint">Last flight settled the last market</p>
           <SettlementView record={previous} />
         </div>
       )}
+      <RecordRow ids={[design.coalition.leadId, ...design.coalition.partnerIds]} />
       <p className="text-sm text-muted">{state?.market.question ?? "Which design should the council fly?"}</p>
       {!state ? <Simulating progress={progress} /> : (
         <>
           <div className="grid gap-3 md:grid-cols-3">
             {state.options.map((o) => (
-              <OptionCard key={o.id} o={o} locked={!!result}
-                stakes={[...state.botStakes, ...(playerStake ? [playerStake] : [])].filter((s) => s.optionId === o.id && s.credits > 0)}
-                picked={pick === o.id} adopted={result?.win.id === o.id} price={result?.prices[o.id]} onPick={() => setPick(o.id)} />
+              <OptionCard key={o.id} o={o} price={prices[o.id] ?? o.forecast.expectedScore} locked={!!closed}
+                trades={trades.filter((t) => t.optionId === o.id)}
+                picked={pick === o.id} adopted={closed?.win.id === o.id} onPick={() => setPick(o.id)} />
             ))}
           </div>
-          {!result ? (
-            <div className="grid items-end gap-4 sm:grid-cols-[1fr_auto]">
-              <Slider id="stake" label="Your stake" value={credits} min={0} max={200} step={10} display={`${credits} credits`} onChange={setCredits} />
-              <Button variant="primary" onClick={closeMarket}>Close the market</Button>
+          {!closed ? (
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center gap-2 text-sm">
+                <span className="text-muted">Your call on <span className="text-fg">{pickedOption?.label}</span></span>
+                <div className="flex gap-1.5" role="group" aria-label="Your call">
+                  {(["higher", "lower"] as Side[]).map((sd) => (
+                    <Button key={sd} size="sm" variant={side === sd ? "primary" : "ghost"} aria-pressed={side === sd} onClick={() => setSide(sd)}>
+                      <SideArrow side={sd} size={14} /> {sd === "higher" ? "Higher" : "Lower"}
+                    </Button>
+                  ))}
+                </div>
+                <span className="text-muted">than <span className="num text-fg">{Math.round(state.book.prices[pick] ?? 0)}</span></span>
+              </div>
+              <div className="grid items-end gap-4 sm:grid-cols-[1fr_auto]">
+                <div>
+                  <Slider id="stake" label="Your stake" value={credits} min={0} max={200} step={10} display={`${credits} credits`} onChange={setCredits} />
+                  <p className="num mt-1 min-h-4 text-[11px] text-muted">{preview ? `Moves the price ${Math.round(preview.from)} to ${Math.round(preview.to)}` : ""}</p>
+                </div>
+                <Button variant="primary" onClick={closeMarket}>Close the market</Button>
+              </div>
             </div>
           ) : (
-            <p className="flex items-start gap-2 text-sm text-ok"><Icon name="check" size={16} className="mt-0.5 shrink-0" /><span>The council adopts {result.win.label.toLowerCase() === "fly as designed" ? "the design as it is" : result.win.label} at a market score of <span className="num">{Math.round(result.prices[result.win.id])}</span>. Stakes settle after the flight.</span></p>
+            <p className="flex items-start gap-2 text-sm text-ok"><Icon name="check" size={16} className="mt-0.5 shrink-0" /><span>The council adopts {closed.win.id === "current" ? "the design as it is" : closed.win.label} at a market score of <span className="num">{Math.round(closed.prices[closed.win.id])}</span>. Trades settle after the flight.</span></p>
           )}
         </>
       )}
-      <p className="text-xs text-faint">Each option is priced from {state ? state.options[0].forecast.runs : 120} simulated flights. Play credits only, nothing here is real money.</p>
+      <p className="text-xs text-faint">Prices start at {state ? state.options[0].forecast.runs : 120} simulated flights per option; a market maker (LMSR) moves them as members trade. Play credits only, nothing here is real money.</p>
     </div>
   );
 }
