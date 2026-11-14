@@ -1,0 +1,142 @@
+{
+ "snapshot": true,
+ "fetchedAt": "2026-11-14T18:17:14.350Z",
+ "stations": [
+  {
+   "name": "gdscc",
+   "friendlyName": "Goldstone",
+   "dishes": [
+    {
+     "name": "DSS14",
+     "activity": "Engineering Upgrades",
+     "targets": [],
+     "downlinkActive": false
+    },
+    {
+     "name": "DSS24",
+     "activity": "Spacecraft Telemetry, Tracking, and Command",
+     "targets": [
+      "M20"
+     ],
+     "downlinkActive": false
+    },
+    {
+     "name": "DSS26",
+     "activity": "Spacecraft Telemetry, Tracking, and Command",
+     "targets": [
+      "SOHO"
+     ],
+     "downlinkActive": true
+    },
+    {
+     "name": "DSS25",
+     "activity": "Spacecraft Telemetry, Tracking, and Command",
+     "targets": [
+      "IMAP"
+     ],
+     "downlinkActive": true
+    },
+    {
+     "name": "DSS23",
+     "activity": "Spacecraft Telemetry, Tracking, and Command",
+     "targets": [
+      "SPP"
+     ],
+     "downlinkActive": false
+    }
+   ]
+  },
+  {
+   "name": "mdscc",
+   "friendlyName": "Madrid",
+   "dishes": [
+    {
+     "name": "DSS55",
+     "activity": "Engineering Upgrades",
+     "targets": [],
+     "downlinkActive": false
+    },
+    {
+     "name": "DSS53",
+     "activity": "Spacecraft Telemetry, Tracking, and Command",
+     "targets": [
+      "LRO"
+     ],
+     "downlinkActive": false
+    },
+    {
+     "name": "DSS63",
+     "activity": "Engineering DEMO",
+     "targets": [
+      "NHPC"
+     ],
+     "downlinkActive": false
+    },
+    {
+     "name": "DSS54",
+     "activity": "Spacecraft Telemetry, Tracking, and Command",
+     "targets": [
+      "KPLO"
+     ],
+     "downlinkActive": true
+    },
+    {
+     "name": "DSS65",
+     "activity": "Spacecraft Telemetry, Tracking, and Command",
+     "targets": [
+      "RST"
+     ],
+     "downlinkActive": true
+    },
+    {
+     "name": "DSS56",
+     "activity": "Spacecraft Telemetry, Tracking, and Command",
+     "targets": [
+      "SPP"
+     ],
+     "downlinkActive": false
+    }
+   ]
+  },
+  {
+   "name": "cdscc",
+   "friendlyName": "Canberra",
+   "dishes": [
+    {
+     "name": "DSS36",
+     "activity": "Spacecraft Telemetry, Tracking, and Command",
+     "targets": [
+      "JNO"
+     ],
+     "downlinkActive": true
+    },
+    {
+     "name": "DSS34",
+     "activity": "Spacecraft Telemetry, Tracking, and Command",
+     "targets": [
+      "ESCB"
+     ],
+     "downlinkActive": true
+    },
+    {
+     "name": "DSS43",
+     "activity": "Science Radar Astronomy",
+     "targets": [
+      "GBRA"
+     ],
+     "downlinkActive": false
+    },
+    {
+     "name": "DSS35",
+     "activity": "Spacecraft Telemetry, Tracking, and Command",
+     "targets": [
+      "M01O",
+      "MRO",
+      "TGO"
+     ],
+     "downlinkActive": true
+    }
+   ]
+  }
+ ]
+}
