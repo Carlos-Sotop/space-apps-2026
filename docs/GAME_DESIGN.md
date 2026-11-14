@@ -22,7 +22,7 @@ Intro ─► (Story) ─► Mission Select ─► Coalition ─► Mission Contr
 
 1. **Intro.** Network globe (nodes = real agency headquarters, arcs between them), logo, one line: *"Space is too big for any one nation."* `Begin mission` / `What is SpaceDAO?`
 2. **Story (optional, 3 panels, skippable).** Everyone builds alone → SpaceDAO links agencies and companies → decisions are signed, science is open.
-3. **Mission Select.** Three cards: Orbital Lab (●○○), Earth Guardian (●●○), Moon Base Zero (●●●, "Commissioned by MoonDAO"). A locked "Mars Outpost · Season 2" card teases the roadmap.
+3. **Mission Select.** Three cards: Orbital Lab (●○○), Earth Guardian (●●○), Moon Base Zero (●●●; "Commissioned by MoonDAO" only in the partner edition). A locked "Mars Outpost · Season 2" card teases the roadmap.
 4. **Coalition.** "Who do you represent?" then "Choose 3 partners". Cards: monogram + flag, tagline, capability pips, perk chip. A coverage strip shows how well the four cover launch, spacecraft, science, comms and funding, and the pooled treasury. Three recommended coalitions per mission for one-click picks (and to teach synergy).
 5. **Mission Control.** Top HUD with the six gauges, always visible. Left step rail:
    - **Values vote** ("vote on values"): sliders for Science / Safety / Cost. Each bot shows its preference and vote weight (its treasury share). The agreed weights become the scoring weights.
@@ -60,7 +60,7 @@ Sub-scores 0-100: **science** (returned science vs the design's maximum), **safe
 | Core trade-off | Up-mass and station power/data allocation | SAR and imagers produce huge data: downlink, laser comms, edge processing | Power through darkness, Earth link at the pole, landing risk |
 | Linked 2026 challenges | Flame in Freefall, Astronaut Health Monitoring | Dancing with the SARs, MODIS/VIIRS Hot Spots, Field Shift, Earth Trend Detective | Lunar Landing Site Navigator, Moon Base Analogs, Abandoned but not Forgotten |
 | Live NASA data | DONKI (space weather), SSCWeb (ISS position) | EONET events, DONKI storms (drag) | DONKI CMEs, JPL Horizons (Earth–Moon distance, light delay) |
-| Web3 hook | Rideshare cubesats for small agencies | Open data for the Global South | MoonDAO base; quantum-safe link; surface mesh for local transactions during Earth blackout |
+| Web3 hook | Rideshare cubesats for small agencies | Open data for the Global South | Coalition lunar base; quantum-safe link; surface mesh for local transactions during Earth blackout |
 
 ### Moon Base Zero comms (Manuel's area)
 

@@ -55,4 +55,4 @@ Bare verbs and nouns for controls ("Fly", "Adopt", "Sign"). Numbers with units (
 
 ## Assets
 
-Logo: `public/brand/`. No NASA, agency or company logos or mission patches. NASA imagery from images.nasa.gov is public domain but check it shows no logos. AI-generated images must carry a visible "AI-generated" watermark.
+Logo: drawn in code (`src/components/brand/Logo.tsx`, `public/brand/favicon.svg`), so it is not an AI image and needs no watermark. No NASA, agency or company logos or mission patches. NASA imagery from images.nasa.gov is public domain but check it shows no logos. AI-generated images must carry a visible "AI-generated" watermark.

@@ -35,7 +35,7 @@ The challenge asks for a game where players design, manage and simulate a comple
 2. **Real data, live.** NASA DONKI space weather and EONET Earth events feed the simulation the day you play. JPL Horizons gives the real Earth–Moon distance for comms delay.
 3. **Inclusion as a mechanic.** Spare capacity lets small space nations fly their payloads and fund the mission. Collaboration is literally part of the score.
 4. **Quantum-safe by design.** Council signatures are hybrid classical + post-quantum (NIST FIPS 204 ML-DSA). The Moon mission's comms make the threat model concrete.
-5. **Moon Base Zero with MoonDAO.** Our hardest mission builds the first module of MoonDAO's planned lunar south-pole base, linking the game to a real decentralized space community.
+5. **Moon Base Zero.** Our hardest mission builds the first module of a lunar south-pole base run by an international coalition. NASA refuses entries that promote commercial products, so the NASA build names no client; the partner edition (`VITE_EDITION=moondao`) shows it as commissioned by MoonDAO for that track.
 
 ## Awards we aim at
 

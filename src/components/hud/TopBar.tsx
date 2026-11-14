@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Icon } from "@/components/ui/Icon";
+import { LogoMark } from "@/components/brand/Logo";
 
 interface Props {
   title?: string;
@@ -17,7 +18,7 @@ export function TopBar({ title, onBack, backLabel = "Back", right }: Props) {
             <Icon name="back" size={17} />
           </button>
         )}
-        <img src="/brand/spacedao-mark-256.webp" alt="" width={32} height={32} className="h-8 w-8 shrink-0" />
+        <LogoMark size={32} className="shrink-0" />
         {title && <h1 className="font-display truncate text-sm sm:text-base">{title}</h1>}
       </div>
       <div className="flex shrink-0 items-center gap-2">{right}</div>

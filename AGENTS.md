@@ -8,7 +8,7 @@ Four people build this at NASA Space Apps 2026 (Founder House, Florianópolis), 
 
 SpaceDAO is a web game for the challenge [Space Mission Design Game](https://www.spaceappschallenge.org/2026/challenges/space-mission-design-game/). The player represents a space agency or company, forms a 4-member council with 3 bot partners, and designs a real mission: objectives, launch vehicle, orbit, spacecraft modules, budget, power, mass, data, comms, lifetime. The council governs it like a DAO: a values vote, a futarchy decision market, open-tech sharing (DeSci), a spare-capacity rideshare market, and a 4-of-4 quantum-safe signature before launch. Then the flight is simulated with live NASA data and the debrief explains why it succeeded or failed.
 
-Three missions: **Orbital Lab** (ISS, easy), **Earth Guardian** (Earth observation for the Global South, medium), **Moon Base Zero** (lunar south pole, commissioned by MoonDAO, hard). Single player first. The judge is the main user: it must be clear, fast and beautiful within 5 minutes.
+Three missions: **Orbital Lab** (ISS, easy), **Earth Guardian** (Earth observation for the Global South, medium), **Moon Base Zero** (lunar south pole, hard; the NASA build names no commercial client, `VITE_EDITION=moondao` builds the partner edition). Single player first. The judge is the main user: it must be clear, fast and beautiful within 5 minutes.
 
 Read next: `docs/VISION.md` (why), `docs/GAME_DESIGN.md` (what the player does), `docs/ARCHITECTURE.md` (how), `docs/DESIGN_SYSTEM.md` (look), `docs/GOVERNANCE.md` (web3 mechanics), `docs/DATA_SOURCES.md` (NASA APIs and sourcing), `docs/TEAM.md` (who owns what, timeline, git flow).
 
