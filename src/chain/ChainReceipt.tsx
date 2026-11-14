@@ -1,4 +1,5 @@
 import { Icon } from "@/components/ui";
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import type { MissionDesign, Ratification } from "@/engine/types";
 import type { AnchorFailure } from "./types";
 import { useChainAnchor } from "./useChainAnchor";
@@ -23,8 +24,19 @@ interface Props {
   className?: string;
 }
 
-/** One line: "Recorded on Solana devnet" with the explorer link. Renders nothing when the council did not sign. */
-export function ChainReceipt({ design, ratification, className = "" }: Props) {
+/**
+ * One line: "Recorded on Solana devnet" with the explorer link. Renders nothing when the council did not sign.
+ * The record is optional: the game never waits on it, and any error inside renders nothing instead of breaking the page.
+ */
+export function ChainReceipt(props: Props) {
+  return (
+    <ErrorBoundary fallback={null}>
+      <Receipt {...props} />
+    </ErrorBoundary>
+  );
+}
+
+function Receipt({ design, ratification, className = "" }: Props) {
   const state = useChainAnchor(design, ratification);
   if (state.status === "unsigned") return null;
   return (
