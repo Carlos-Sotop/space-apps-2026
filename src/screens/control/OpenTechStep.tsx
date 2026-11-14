@@ -24,10 +24,19 @@ export function OpenTechStep() {
   const modCats = new Set(mission.moduleIds.map((id) => catalog.modules.find((m) => m.id === id)?.category));
   const list = catalog.blueprints.filter((b) => modCats.has(b.category));
   const byId = new Map(catalog.blueprints.map((b) => [b.id, b]));
+  const adopted = design.blueprintIds.map((id) => byId.get(id)).filter((b): b is Blueprint => !!b);
+  // credit flows up the fork chain: adopting a fork also credits the authors it was built on
+  const credited = new Set<string>();
+  adopted.forEach((b) => { for (let cur: Blueprint | undefined = b, n = 0; cur && n < 8; cur = cur.parentId ? byId.get(cur.parentId) : undefined, n++) credited.add(cur.authorId); });
 
   return (
     <div>
       <StepTitle title="Open Tech Registry" chip="Share designs, credit authors" />
+      <p className="mb-4 text-sm text-muted" aria-live="polite">
+        {adopted.length
+          ? <><span className="text-fg">{adopted.length} design{adopted.length > 1 ? "s" : ""} adopted</span>, crediting <span className="text-fg">{[...credited].map((id) => actorName(id)).join(", ")}</span>. +{10 * adopted.length} collaboration score.</>
+          : "Adopt an open design to use it for free, credit its author and raise your collaboration score."}
+      </p>
       <div className="grid gap-5 xl:grid-cols-[1fr_340px]">
         <div className="grid gap-3 sm:grid-cols-2">
           {list.map((b) => {
@@ -39,7 +48,7 @@ export function OpenTechStep() {
                   <MonogramBadge actor={getActor(b.authorId)} fallbackName={b.authorId} size={38} />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-2">
-                      <h3 className="truncate text-[15px]">{b.name}</h3>
+                      <h3 className="line-clamp-2 text-[15px] leading-snug">{b.name}</h3>
                       <InfoButton title={b.name} body={<BlueprintInfo b={b} parent={parent} />} />
                     </div>
                     <p className="flex items-center gap-1 truncate text-xs text-muted">
@@ -47,10 +56,13 @@ export function OpenTechStep() {
                     </p>
                   </div>
                 </div>
-                <p className="num mt-3 truncate text-[13px] text-violet-bright">{describeModifiers(b.modifiers)}</p>
+                <p className="num mt-3 line-clamp-2 text-[13px] text-violet-bright">{describeModifiers(b.modifiers)}</p>
                 <div className="mt-2 flex items-center justify-between">
-                  <Badge>{b.adoptions + (on ? 1 : 0)} adoptions</Badge>
-                  <span className={`flex items-center gap-1 text-xs ${on ? "text-ok" : "text-faint"}`}>{on ? <><Icon name="check" size={14} /> Adopted</> : "Adopt"}</span>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <Badge>{b.adoptions + (on ? 1 : 0)} adoptions</Badge>
+                    <Badge tone={parent ? "neutral" : "ok"}>{parent ? "Fork" : "Original"}</Badge>
+                  </div>
+                  <span className={`flex shrink-0 items-center gap-1 rounded-full border px-3 py-1 text-xs ${on ? "border-ok/50 bg-ok/10 text-ok" : "border-white/15 text-muted"}`}>{on ? <><Icon name="check" size={14} /> Adopted</> : "Adopt"}</span>
                 </div>
               </GlassCard>
             );
@@ -59,6 +71,7 @@ export function OpenTechStep() {
         <aside className="glass h-fit p-4">
           <div className="mb-3 text-xs uppercase tracking-widest text-faint">Lineage</div>
           <LineageTree blueprints={list} adopted={design.blueprintIds} onToggle={(id) => toggle("blueprintIds", id)} />
+          <p className="mt-3 text-xs text-faint">Lines point from an original to the fork built on it. Click a circle to adopt.</p>
         </aside>
       </div>
     </div>
