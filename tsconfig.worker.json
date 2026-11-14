@@ -16,5 +16,5 @@
     "baseUrl": ".",
     "paths": { "@/*": ["src/*"] }
   },
-  "include": ["worker", "src/engine/types.ts", "src/data/snapshots"]
+  "include": ["worker", "src/engine/types.ts", "src/data/snapshots", "src/leaderboard/verify.ts"]
 }

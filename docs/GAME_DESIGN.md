@@ -22,7 +22,7 @@ Intro ─► (Story) ─► Mission Select ─► Coalition ─► Mission Contr
 
 1. **Intro.** Network globe (nodes = real agency headquarters, arcs between them), logo, one line: *"Space is too big for any one nation."* `Begin mission` / `What is SpaceDAO?`
 2. **Story (optional, 3 panels, skippable).** Everyone builds alone → SpaceDAO links agencies and companies → decisions are signed, science is open.
-3. **Mission Select.** Three cards: Orbital Lab (●○○), Earth Guardian (●●○), Moon Base Zero (●●●, "Commissioned by MoonDAO"). A locked "Mars Outpost · Season 2" card teases the roadmap.
+3. **Mission Select.** Three cards: Orbital Lab (●○○), Earth Guardian (●●○), Moon Base Zero (●●●; "Commissioned by MoonDAO" only in the partner edition). A locked "Mars Outpost · Season 2" card teases the roadmap.
 4. **Coalition.** "Who do you represent?" then "Choose 3 partners". Cards: monogram + flag, tagline, capability pips, perk chip. A coverage strip shows how well the four cover launch, spacecraft, science, comms and funding, and the pooled treasury. Three recommended coalitions per mission for one-click picks (and to teach synergy).
 5. **Mission Control.** Top HUD with the six gauges, always visible. Left step rail:
    - **Values vote** ("vote on values"): sliders for Science / Safety / Cost. Each bot shows its preference and vote weight (its treasury share). The agreed weights become the scoring weights.
@@ -34,6 +34,17 @@ Intro ─► (Story) ─► Mission Select ─► Coalition ─► Mission Contr
    - **Council review:** each bot posts approve / concern / veto in a chat feed, with numbers and a fix. Then the **decision market** ("bet on beliefs"): the bots forecast the score of the current design vs an alternative, stake play credits, the player stakes too, and the council adopts the option with the higher market forecast. Finally **Sign & launch**: four signature slots fill as each member signs (real ed25519 + ML-DSA-65), with a "Quantum-safe" badge.
 6. **Flight.** 20-30 s animated timeline: phase strip, trajectory visualization (launch plume, transfer, docking or landing), telemetry mini-charts (power, battery, data queued/returned, link up/down), event feed. Events triggered by live NASA data are badged "LIVE · NASA DONKI" with a link to the real record. Skip and x4 speed.
 7. **Debrief.** Grade (S/A/B/C/F), score breakdown, objectives met, **"Why it went this way"** lessons, council signatures and manifest hash, actions: publish design to the registry, fly again (new seed), redesign, new mission.
+
+## Operations (after arrival, all missions)
+
+When the spacecraft arrives, the player takes command on site (`src/ops/`, screen `src/screens/ops/OpsScreen.tsx`). Turn-based, Age of Empires-lite: 1 turn = 3 days (Earth Guardian labels turns as months).
+
+- **Map:** 19 hexes. Moon: south-pole ridges, rims, slopes and permanently shadowed craters with ice. Orbital Lab: station racks, external platforms and nodes. Earth Guardian: Global South regions; live NASA EONET events become high-value tiles.
+- **Actions (action points):** deploy delivered modules on valid tiles, build on site (greenhouse, regolith berm, antenna mast...), research upgrades with science points, scout/inspect for hidden discoveries, move (rover, imaging campaigns), repair, switch structures on and off.
+- **Each turn resolves:** power (Sun height × tile light), storage, the consumable (water ice, crew supplies, propellant), data produced and downlinked (Earth visibility, DSN load), wear, storms.
+- **Quests:** a main quest in ordered steps, side quests from the secondary objectives the council chose, hidden discoveries, and 6-8 event cards per mission with two choices each.
+- **Live NASA data changes the run:** DONKI storms land on specific turns (shelter or keep working), DSN Now load scales downlink, EONET events mark Earth targets.
+- **Score:** final = 40% flight + 60% operations (0-1000, same letter grades). The Worker replays the run before it enters the global ranking.
 
 ## Core rules
 
@@ -60,7 +71,7 @@ Sub-scores 0-100: **science** (returned science vs the design's maximum), **safe
 | Core trade-off | Up-mass and station power/data allocation | SAR and imagers produce huge data: downlink, laser comms, edge processing | Power through darkness, Earth link at the pole, landing risk |
 | Linked 2026 challenges | Flame in Freefall, Astronaut Health Monitoring | Dancing with the SARs, MODIS/VIIRS Hot Spots, Field Shift, Earth Trend Detective | Lunar Landing Site Navigator, Moon Base Analogs, Abandoned but not Forgotten |
 | Live NASA data | DONKI (space weather), SSCWeb (ISS position) | EONET events, DONKI storms (drag) | DONKI CMEs, JPL Horizons (Earth–Moon distance, light delay) |
-| Web3 hook | Rideshare cubesats for small agencies | Open data for the Global South | MoonDAO base; quantum-safe link; surface mesh for local transactions during Earth blackout |
+| Web3 hook | Rideshare cubesats for small agencies | Open data for the Global South | Coalition lunar base; quantum-safe link; surface mesh for local transactions during Earth blackout |
 
 ### Moon Base Zero comms (Manuel's area)
 

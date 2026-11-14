@@ -24,6 +24,15 @@ Known gaps, by owner (start here):
 - **Eric:** `src/screens/FlightScene.tsx` is a 2D SVG arc (upgrade to 3D); telemetry shows zeros during transfer; Open Tech and Rideshare steps are functional but plain; Supabase not started.
 - **Everyone:** most data sources are Wikipedia or search snippets and many numbers are marked `// estimate`. Verify your area against primary sources on Sunday and flip `verified`.
 
+## Saturday night: branch `dayon/next-level` (Dayon + Claude)
+
+New, all inside new folders so nothing collides with your work; review and merge by PR:
+- **Operations phase for all 3 missions** (`src/ops/` pure engine + tests, `src/screens/ops/`, `src/scene/ops/`): after arrival the player runs the site turn by turn with quests, research and live NASA events. Flight's end button now says "Take command on site" (one-line change in `Flight.tsx`, Eric).
+- **3D look experiment** (`src/scene/`): intro hero with NASA Blue Marble Earth, city lights, LRO Moon, live ISS and bloom (`@react-three/postprocessing`). Eric: compare with your flight scene; we keep the best of both.
+- **Global ranking** (`src/leaderboard/`, `worker/scores.ts`, `supabase/migrations/0001_leaderboard.sql`, `src/screens/Leaderboard.tsx`): the Worker replays flight + operations before saving to Supabase. Needs `SUPABASE_URL` and `SUPABASE_SECRET_KEY` (Worker secrets) and the SQL run once.
+- **Web3 primers** (`src/components/learn/`): DAO, weighted vote, decision market, fingerprint, 4-of-4 signature, post-quantum, open science, rideshare; two live demos.
+- **NASA rules:** logo now drawn in code (no AI image on the home page); Moon Base Zero names no commercial client unless built with `VITE_EDITION=moondao`. Demo video must follow the 2026 guide (check the length limit before recording).
+
 ## Backlog by priority
 
 P0 = must ship for the demo. P1 = makes it win. P2 = only if P0/P1 are done.

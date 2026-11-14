@@ -4,6 +4,7 @@ import { MissionArt } from "@/components/MissionArt";
 import { useCatalog, useGame } from "@/store/game";
 import { useLiveRoute } from "@/live/useLive";
 import { fmtDays, fmtKm } from "@/lib/format";
+import { missionClient } from "@/lib/edition";
 import type { Mission } from "@/engine/types";
 
 function MissionLive({ id }: { id: string }) {
@@ -79,7 +80,7 @@ export default function MissionSelect() {
                   <span className="num text-xs text-muted">{fmtDays(m.durationDays)}</span>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  {m.client && <Badge tone="violet">Commissioned by {m.client}</Badge>}
+                  {missionClient(m.id) && <Badge tone="violet">Commissioned by {missionClient(m.id)}</Badge>}
                   <MissionLive id={m.id} />
                 </div>
                 {line && <p className="num truncate text-[11px] text-faint">{line}</p>}

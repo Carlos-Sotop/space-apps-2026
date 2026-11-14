@@ -318,7 +318,7 @@ export interface Mission extends Sourced {
   tagline: string;
   /** 1 easy · 2 medium · 3 hard */
   difficulty: 1 | 2 | 3;
-  /** who commissions it, e.g. "MoonDAO" for Moon Base Zero */
+  /** who commissions it (partner editions only; the NASA build leaves it empty) */
   client?: string;
   /** two or three sentences for the briefing card */
   briefing: string;

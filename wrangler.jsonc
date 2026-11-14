@@ -3,6 +3,8 @@
   "name": "spacedao",
   "main": "worker/index.ts",
   "compatibility_date": "2026-11-01",
+  // Public config only; secrets (NASA_API_KEY, SOLANA_RELAYER_SECRET, SUPABASE_SECRET_KEY) are Worker secrets.
+  "vars": { "SUPABASE_URL": "https://qkzgubwmqriglpzblfmo.supabase.co" },
   "assets": {
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",

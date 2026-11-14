@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect } from "react";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import { InfoDrawerHost, Starfield, ToastHost } from "@/components/ui";
+import { PrimerHost } from "@/components/learn/Primer";
 import { useLive } from "@/live/useLive";
 import { useGame } from "@/store/game";
 import type { Screen } from "@/store/steps";
@@ -12,6 +13,8 @@ import Debrief from "@/screens/Debrief";
 
 const MissionControl = lazy(() => import("@/screens/control/MissionControl"));
 const Flight = lazy(() => import("@/screens/Flight"));
+const Leaderboard = lazy(() => import("@/screens/Leaderboard"));
+const OpsScreen = lazy(() => import("@/screens/ops/OpsScreen"));
 
 function ScreenView({ screen }: { screen: Screen }) {
   switch (screen) {
@@ -22,6 +25,8 @@ function ScreenView({ screen }: { screen: Screen }) {
     case "control": return <MissionControl />;
     case "flight": return <Flight />;
     case "debrief": return <Debrief />;
+    case "leaderboard": return <Leaderboard />;
+    case "ops": return <OpsScreen />;
   }
 }
 
@@ -52,6 +57,7 @@ export default function App() {
         </AnimatePresence>
       </main>
       <InfoDrawerHost />
+      <PrimerHost />
       <ToastHost />
     </MotionConfig>
   );
