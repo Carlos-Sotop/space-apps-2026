@@ -90,9 +90,10 @@ export default function Flight() {
             );
           })}
         </ol>
+        <div className="text-xs uppercase tracking-wider text-muted sm:hidden" aria-live="polite">{timeline.phases[index].label}</div>
         <div className="grid gap-4 lg:grid-cols-[1fr_340px]">
           <div className="min-w-0 space-y-4">
-            <div className="glass relative aspect-[2/1] overflow-hidden">
+            <div className="glass relative aspect-[4/3] overflow-hidden sm:aspect-[2/1]">
               <FlightScene timeline={timeline} p={p} lunar={lunar} lostAt={result.lostAt} ended={ended} />
               <div className="num absolute left-3 top-3 text-xs text-muted">Day {Math.floor(day)}</div>
             </div>

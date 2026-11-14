@@ -1,5 +1,5 @@
 import { useMemo, useRef } from "react";
-import { Canvas, useFrame } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Line, Stars } from "@react-three/drei";
 import * as THREE from "three";
 import type { FlightSceneProps } from "@/screens/FlightSceneSvg";
@@ -191,7 +191,11 @@ function Scene({ timeline, p, lunar, lostAt, ended }: FlightSceneProps) {
 
   const lost = ended && !!lostAt;
   const burning = !ended && !inOps && (phaseId === "launch" || phaseId === "ascent" || phaseId === "orbit-insertion" || (phaseId === "transfer" && frac < 0.12) || (lunar && phaseId === "arrival" && frac > 0.4));
-  const rocketScale = lunar ? 1.7 : 1.2;
+  // narrow screens (phones): back the camera off so the whole scene fits across, and draw the rocket bigger
+  const { width, height } = useThree((st) => st.size);
+  const aspect = width / Math.max(1, height);
+  const fit = (need: number, base: number) => Math.max(base, need / (Math.tan((22.5 * Math.PI) / 180) * aspect));
+  const rocketScale = (lunar ? 1.7 : 1.2) * Math.max(1, Math.min(2, 1.6 / aspect));
 
   const trail = useMemo(() => {
     if (inOps && !lunar) return [] as THREE.Vector3[];
@@ -201,7 +205,8 @@ function Scene({ timeline, p, lunar, lostAt, ended }: FlightSceneProps) {
   }, [Math.round(g * 400), lunar, inOps]);
 
   // camera: wide by default, close during launch and the Moon landing
-  const wide = lunar ? new THREE.Vector3(0, 2.2, 10.8) : new THREE.Vector3(0, 1.3, 4.8);
+  const dist = lunar ? fit(6.2, 10.8) : fit(2.0, 4.8);
+  const wide = lunar ? new THREE.Vector3(0, dist * 0.2, dist) : new THREE.Vector3(0, dist * 0.27, dist);
   const wideLook = lunar ? new THREE.Vector3(0, 0, 0) : new THREE.Vector3(0, 0.1, 0);
   const atMoon = lunar && (phaseId === "arrival" || inOps);
   const near = pos.clone().add(atMoon ? new THREE.Vector3(-0.4, -0.1, 2.6) : new THREE.Vector3(0.7, 0.35, 1.3));
