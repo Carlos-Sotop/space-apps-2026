@@ -325,4 +325,79 @@ describe("ops core (Moon)", () => {
   });
 });
 
-export { getScenario };
+/* ------------------------------------------------------------------ */
+/* Orbital Lab                                                         */
+/* ------------------------------------------------------------------ */
+
+const STATION_MODULES = [
+  "ol-cargo-dragon", "ol-iss-link", "ol-iss-power", "ol-combustion", "ol-biomonitor", "ol-dosimetry",
+  "ol-plant-chamber", "ol-protein-crystal", "ol-bioprinter", "ol-cold-atom",
+];
+const stationDesign = () => design("orbital-lab", "ol-iss", STATION_MODULES, ["ol-plants", "ol-health", "ol-fire-safety"]);
+
+const stationPlan: Plan = {
+  deploy: ["ol-dosimetry", "ol-biomonitor", "ol-plant-chamber", "ol-combustion", "ol-bioprinter", "ol-protein-crystal", "ol-cold-atom"],
+  pick(s, moduleId, tiles) {
+    if (moduleId === "ol-dosimetry") {
+      const ext = tiles.find((id) => s.tiles.find((t) => t.id === id)?.terrain === "external");
+      if (ext) return ext;
+    }
+    return tiles[0];
+  },
+  build: [],
+  scout: true,
+};
+
+describe("Orbital Lab scenario", () => {
+  const d = stationDesign();
+  const ctx = ctxOf(d);
+
+  it("sets up the station: 19 locations, 10 turns, crew hours", () => {
+    const s = createOps(d, catalog, init());
+    expect(s.tiles).toHaveLength(19);
+    expect(s.tiles[0].label).toBe("Harmony docking port");
+    expect(s.maxTurns).toBe(10);
+    expect(s.apPerTurn).toBe(3);
+    expect(getScenario("orbital-lab").consumable.label).toBe("Crew time supplies");
+    expect(s.structures.map((x) => x.id).sort()).toEqual(["ol-cargo-dragon", "ol-iss-link", "ol-iss-power"]);
+  });
+
+  it("keeps experiments in racks and is deterministic", () => {
+    const s = createOps(d, catalog, init());
+    const node = s.tiles.find((t) => t.terrain === "node" && t.id !== s.tiles[0].id) as OpsState["tiles"][number];
+    expect(whyNot(s, { type: "deploy", moduleId: "ol-combustion", tileId: node.id }, ctx)).toMatch(/Experiment/);
+    const end = play(d, stationPlan, init(5));
+    expect(replay(d, catalog, init(5), end.actions)).toEqual(end);
+  });
+
+  it("makes dosimeters work better outside", () => {
+    let s = createOps(d, catalog, init());
+    const ext = s.tiles.find((t) => t.terrain === "external") as OpsState["tiles"][number];
+    const rack = s.tiles.find((t) => t.terrain === "rack") as OpsState["tiles"][number];
+    const once = (tileId: string) => {
+      const t = applyAction(s, { type: "deploy", moduleId: "ol-dosimetry", tileId }, ctx);
+      const n = applyAction({ ...t, ap: 0 }, { type: "advance" }, ctx);
+      return n.dataStoredGb + n.dataReturnedGb;
+    };
+    s = { ...s, ap: 3 };
+    expect(once(ext.id)).toBeGreaterThan(once(rack.id));
+  });
+
+  it("lets the crew shelter in a node for one crew hour", () => {
+    let s = createOps(d, catalog, init());
+    for (let i = 0; i < 20 && !s.pendingEvent?.id.startsWith("storm-"); i++) s = idleTurn(s, ctx);
+    const card = s.pendingEvent;
+    if (!card) throw new Error("no storm");
+    const before = s.ap;
+    const t = applyAction(s, { type: "choose", eventId: card.id, optionId: "shelter" }, ctx);
+    expect(t.ap).toBe(Math.max(0, before - 1));
+  });
+
+  it("scores a scripted good play above 60 and above idle play", () => {
+    const good = play(d, stationPlan);
+    const bad = idle(createOps(d, catalog, init()), ctx);
+    expect(good.status).toBe("ended");
+    expect(opsScore(good).total).toBeGreaterThanOrEqual(60);
+    expect(opsScore(bad).total).toBeLessThan(opsScore(good).total);
+  });
+});

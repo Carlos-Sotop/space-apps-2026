@@ -606,7 +606,7 @@ function advance(s: OpsState, sc: OpsScenario, ctx: OpsCtx): void {
   // 5. storm
   if (env.storm) {
     if (choice === 2 && sc.stormMode !== "downlink") {
-      const hit = s.structures.filter((st) => st.health > 0 && !shielded(s, sc, st));
+      const hit = s.structures.filter((st) => st.health > 0 && !shielded(s, sc, st) && (sc.stormMode !== "crew" || trait(st, "instrument")));
       for (const st of hit) st.health = Math.max(0, st.health - sc.stormDamage * env.storm.severity);
       sc.onStormWork?.(s, env.storm);
       addLog(s, "warning", `The storm hurt ${hit.length} structure${hit.length === 1 ? "" : "s"}.`);
