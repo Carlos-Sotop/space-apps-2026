@@ -11,7 +11,8 @@ const COUNCILS: Coalition["partnerIds"][] = [
   ["ula", "rocket-lab", "conae"],
 ];
 
-const FIX = /\b(Add|Drop|Swap to|Launch on|No part on offer|Pick|Choose|Deselect|Room for)\b|stays in reserve/;
+const FIX = /\b(Add|Drop|Swap to|Launch on|No part on offer|No room for|Agree with|Pick|Choose|Deselect|Room for)\b|stays in reserve/;
+const lowerFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
 
 /** Designs a player really makes: the default, a loaded one, one missing comms, one on a rocket that is too small. */
 function variants(d: MissionDesign): MissionDesign[] {
@@ -26,7 +27,7 @@ function variants(d: MissionDesign): MissionDesign[] {
 }
 
 describe("council lines", () => {
-  it("every line names a number, offers one fix and stays one short line", () => {
+  it("every line names a number, offers one fix and stays one short line (150 characters, a two-step fix included)", () => {
     for (const m of game.missions)
       for (const partnerIds of COUNCILS)
         for (const d of variants(defaultDesign(m.id, { leadId: "nasa", partnerIds }, game)))
@@ -34,7 +35,7 @@ describe("council lines", () => {
             const where = `${m.id} ${r.actorId}: ${r.message}`;
             expect(r.message, where).toMatch(/\d/);
             expect(r.message, where).not.toMatch(/undefined|NaN|\n/);
-            expect(r.message.length, where).toBeLessThanOrEqual(140);
+            expect(r.message.length, where).toBeLessThanOrEqual(150);
             expect(r.message, where).toMatch(/\.$/);
             if (r.verdict !== "approve") expect(r.message, where).toMatch(FIX);
           }
@@ -58,12 +59,45 @@ describe("council lines", () => {
     expect(new Set(lines.map((r) => r.message)).size).toBe(3);
   });
 
-  it("members who share a domain raise different issues or offer different fixes", () => {
+  it("members who share a domain raise different issues, offer different fixes, or agree with the member who spoke first", () => {
+    for (const m of game.missions)
+      for (const partnerIds of COUNCILS)
+        for (const d of variants(defaultDesign(m.id, { leadId: "nasa", partnerIds }, game))) {
+          const lines = councilReview(d, game);
+          const names = lines.map((r) => game.actors.find((a) => a.id === r.actorId)!.shortName);
+          lines.forEach((r, i) => {
+            const agree = r.message.match(/Agree with ([^:.]+)(?::|\.$)/);
+            if (agree) expect(names.slice(0, i), r.message).toContain(agree[1]);
+            for (const earlier of lines.slice(0, i)) expect(r.message, `${m.id}: ${r.message}`).not.toBe(earlier.message);
+          });
+        }
+  });
+
+  it("a battery the lander can't carry is named, never 'fixed' by swapping the radio or the lander alone", () => {
     for (const partnerIds of COUNCILS) {
       const d = defaultDesign("moon-base-zero", { leadId: "nasa", partnerIds }, game);
-      const lines = councilReview(d, game).filter((r) => r.verdict !== "approve");
-      const fixes = lines.map((r) => r.message.slice(r.message.indexOf(". ") + 2));
-      expect(new Set(fixes).size, fixes.join(" | ")).toBe(fixes.length);
+      const lines = councilReview(d, game).filter((r) => r.issueIds[0] === "battery-small");
+      for (const r of lines) expect(r.message).not.toMatch(/Swap to (Post-quantum|Surface mesh|Lunar relay|Nova-C)|first \(/);
+      if (lines.length) expect(lines[0].message).toMatch(/No room for|, add |\bAdd /);
+    }
+  });
+
+  it("with a bigger rocket, a bigger lander plus the fuel cell is offered, and it works", () => {
+    const d = { ...defaultDesign("moon-base-zero", { leadId: "nasa", partnerIds: ["esa", "jaxa", "csa"] }, game), launchVehicleId: "falcon-heavy" };
+    const line = councilReview(d, game).find((r) => r.issueIds[0] === "battery-small");
+    expect(line?.message).toMatch(/Swap to .+, add .+ \(\+\$\d+M\)\.$/);
+    const first = designMoves(d, game).find((mv) => line!.message.includes(`${mv.label}, `))!;
+    const second = designMoves(first.design, game).find((mv) => line!.message.includes(`, ${lowerFirst(mv.label)} (`))!;
+    const after = validateDesign(second.design, game);
+    expect(after.map((i) => i.id)).not.toContain("battery-small");
+    expect(after.filter((i) => i.severity === "blocker")).toEqual([]);
+  });
+
+  it("a fix that clears more problems wins: a missing radio is fixed with a radio, not a crypto board", () => {
+    for (const partnerIds of COUNCILS) {
+      const d = defaultDesign("moon-base-zero", { leadId: "nasa", partnerIds }, game);
+      const noComms = { ...d, moduleIds: d.moduleIds.filter((id) => game.modules.find((x) => x.id === id)?.category !== "comms") };
+      for (const r of councilReview(noComms, game)) expect(r.message).not.toMatch(/Add Post-quantum secure link/);
     }
   });
 

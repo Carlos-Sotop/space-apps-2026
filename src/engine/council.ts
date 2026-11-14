@@ -154,7 +154,8 @@ function issueFact(issue: Issue, rep: ResourceReport, design: MissionDesign, cat
   if (id === "launch-cannot-reach") {
     const vehicle = catalog.launchVehicles.find((v) => v.id === design.launchVehicleId);
     const dest = getMission(catalog, design.missionId).destinations.find((d) => d.id === design.destinationId);
-    if (vehicle && dest) return `${vehicle.name} can't reach ${dest.orbitClass}`;
+    const carrier = design.moduleIds.map((m) => catalog.modules.find((x) => x.id === m)).find(isCarrier);
+    if (vehicle && dest) return `${vehicle.name} can't lift ${fmt(rep.mass.used + (carrier?.massKg ?? 0))} kg to ${dest.orbitClass}`;
   }
   if (id === "primary-unmet") return "the main objective can't be met";
   if (id.startsWith("secondary-unmet-")) {
@@ -170,6 +171,8 @@ function issueFact(issue: Issue, rep: ResourceReport, design: MissionDesign, cat
 
 interface Tried {
   move: DesignMove;
+  /** the changes applied, in order: one, or a carrier or rocket swap followed by one more */
+  steps: DesignMove[];
   issues: Issue[];
   rep: ResourceReport;
   /** stored energy, Wh */
@@ -181,26 +184,54 @@ const SCIENCE_CATEGORIES: ModuleCategory[] = ["instrument", "experiment", "isru"
 const moduleOf = (catalog: Catalog, id?: string): Module | undefined => (id ? catalog.modules.find((m) => m.id === id) : undefined);
 const storageOf = (d: MissionDesign, catalog: Catalog) => d.moduleIds.reduce((s, id) => s + (moduleOf(catalog, id)?.storageWh ?? 0), 0);
 
+const isCarrier = (m?: Module) => !!m && (m.category === "lander" || m.category === "bus") && m.payloadCapacityKg !== undefined;
+const lowerFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
+
+function tried(steps: DesignMove[], catalog: Catalog): Tried {
+  const last = steps[steps.length - 1];
+  const move = steps.length === 1 ? last : { ...last, id: steps.map((x) => x.id).join("+"), label: `${steps[0].label}, ${lowerFirst(last.label)}` };
+  return { move, steps, issues: validateDesign(last.design, catalog), rep: computeResources(last.design, catalog), storage: storageOf(last.design, catalog) };
+}
+
 function tryMoves(design: MissionDesign, catalog: Catalog): Tried[] {
-  return designMoves(design, catalog).map((move) => ({
-    move,
-    issues: validateDesign(move.design, catalog),
-    rep: computeResources(move.design, catalog),
-    storage: storageOf(move.design, catalog),
-  }));
+  return designMoves(design, catalog).map((move) => tried([move], catalog));
 }
 
-/** Science points a move removes (positive) or adds (negative). */
+/**
+ * Two-step changes for issues no single change clears: a bigger carrier or rocket first, then one
+ * part added or swapped (a fuel cell only a bigger lander can carry). About 300 designs, run only when needed.
+ */
+function tryTwoSteps(singles: Tried[], catalog: Catalog): Tried[] {
+  const out: Tried[] = [];
+  for (const first of singles) {
+    const m = first.move;
+    if (m.kind !== "vehicle" && !(m.kind === "swap" && isCarrier(moduleOf(catalog, m.outId)))) continue;
+    for (const second of designMoves(m.design, catalog)) {
+      if (second.kind !== "add" && second.kind !== "swap") continue;
+      if (second.kind === "swap" && isCarrier(moduleOf(catalog, second.outId))) continue;
+      out.push(tried([m, second], catalog));
+    }
+  }
+  return out;
+}
+
+/** Science points the changes remove (positive) or add (negative). */
 function scienceLost(t: Tried, catalog: Catalog): number {
-  const out = moduleOf(catalog, t.move.kind === "drop" || t.move.kind === "swap" ? t.move.outId : undefined);
-  const inn = moduleOf(catalog, t.move.kind === "add" || t.move.kind === "swap" ? t.move.inId : undefined);
-  return (out?.scienceValue ?? 0) - (inn?.scienceValue ?? 0);
+  return t.steps.reduce((sum, step) => {
+    const out = moduleOf(catalog, step.kind === "drop" || step.kind === "swap" ? step.outId : undefined);
+    const inn = moduleOf(catalog, step.kind === "add" || step.kind === "swap" ? step.inId : undefined);
+    return sum + (out?.scienceValue ?? 0) - (inn?.scienceValue ?? 0);
+  }, 0);
 }
 
-/** "(+40% link)", "(-36 kg)", "(+$23M)": the number that shows why the move helps. */
+/** "(+40% link)", "(-36 kg)", "(+$23M)": the number that shows why the move helps; two steps show what they cost. */
 function moveDelta(issue: Issue, before: ResourceReport, beforeStorage: number, t: Tried): string {
-  const key = issue.resource;
   const cost = t.rep.budget.used - before.budget.used;
+  return t.steps.length > 1 ? signedMoney(cost) : singleDelta(issue, before, beforeStorage, t, cost);
+}
+
+function singleDelta(issue: Issue, before: ResourceReport, beforeStorage: number, t: Tried, cost: number): string {
+  const key = issue.resource;
   if (issue.id === "battery-small" && t.storage !== beforeStorage) return signed(t.storage - beforeStorage, " Wh");
   if (key === "mass" && t.move.kind === "vehicle") return `${fmt(t.rep.mass.capacity)} kg limit, ${signedMoney(cost)}`;
   if (!key || t.move.kind === "vehicle" || key === "budget") return signedMoney(cost);
@@ -238,16 +269,18 @@ function gap(issue: Issue, issues: Issue[], rep: ResourceReport): number | undef
   return issue.resource ? rep[issue.resource].used - rep[issue.resource].capacity : undefined;
 }
 
-/** How much reliability a move gives up: a cheaper rocket or carrier that fails more often. */
+/** How much reliability the changes give up: a cheaper rocket or carrier that fails more often. */
 function reliabilityDrop(t: Tried, design: MissionDesign, catalog: Catalog): number {
-  if (t.move.kind === "vehicle") {
-    const now = catalog.launchVehicles.find((v) => v.id === design.launchVehicleId)?.reliability ?? 1;
-    const next = catalog.launchVehicles.find((v) => v.id === t.move.inId)?.reliability ?? 0;
-    return Math.max(0, now - next);
-  }
-  if (t.move.kind === "swap")
-    return Math.max(0, (moduleOf(catalog, t.move.outId)?.reliability ?? 1) - (moduleOf(catalog, t.move.inId)?.reliability ?? 1));
-  return 0;
+  return t.steps.reduce((sum, step) => {
+    if (step.kind === "vehicle") {
+      const now = catalog.launchVehicles.find((v) => v.id === design.launchVehicleId)?.reliability ?? 1;
+      const next = catalog.launchVehicles.find((v) => v.id === step.inId)?.reliability ?? 0;
+      return sum + Math.max(0, now - next);
+    }
+    if (step.kind === "swap")
+      return sum + Math.max(0, (moduleOf(catalog, step.outId)?.reliability ?? 1) - (moduleOf(catalog, step.inId)?.reliability ?? 1));
+    return sum;
+  }, 0);
 }
 
 interface Fix {
@@ -257,17 +290,19 @@ interface Fix {
 
 /**
  * Changes that clear the issue without a new blocker, best first for this member: fewest new issues,
- * then science lost, money spent and reliability given up, weighted by what the member cares about.
- * When no single change clears it, the changes that get closest, marked "first".
+ * then fewest problems left, then science lost, money spent and reliability given up, weighted by what
+ * the member cares about. When no single change clears it, a bigger carrier or rocket plus one part;
+ * failing that, single changes that get closer without adding any problem, marked "first".
  */
 function rankedFixes(issue: Issue, ctx: ReviewContext, who: Actor): Fix[] {
-  const { tried, issues, rep, storage, design, catalog } = ctx;
+  const { tried: singles, issues, rep, storage, design, catalog } = ctx;
   const known = new Set(issues.map((i) => i.id));
   const p = who.priorities;
   const newBlocker = (t: Tried) => t.issues.some((i) => i.severity === "blocker" && !known.has(i.id));
   const label = (t: Tried, partial = false) => `${t.move.label}${partial ? " first" : ""} (${moveDelta(issue, rep, storage, t)})`;
   const rankOf = (t: Tried) =>
     t.issues.filter((i) => !known.has(i.id)).length * 1000 +
+    t.issues.filter((i) => known.has(i.id) && i.id !== issue.id).length * 150 +
     Math.max(0, scienceLost(t, catalog)) * (0.5 + p.science) +
     Math.max(0, t.rep.budget.used - rep.budget.used) * (0.5 + p.cost) +
     reliabilityDrop(t, design, catalog) * 600 * (0.5 + p.safety) +
@@ -280,22 +315,41 @@ function rankedFixes(issue: Issue, ctx: ReviewContext, who: Actor): Fix[] {
     const g = gap(issue, t.issues, t.rep) ?? now;
     return g < now - 1e-9 && (!issue.id.endsWith("-tight") || t.rep[issue.resource].status === "ok");
   };
-  const clears = tried
-    .filter((t) => !t.issues.some((i) => i.id === issue.id) && !newBlocker(t) && better(t))
-    .map((t) => ({ text: label(t), rank: rankOf(t), id: t.move.id }))
-    .sort((a, b) => a.rank - b.rank || a.id.localeCompare(b.id));
-  if (clears.length) return clears;
-  if (now === undefined) return [];
-  return tried
+  const clearing = (list: Tried[]) =>
+    list
+      .filter((t) => !t.issues.some((i) => i.id === issue.id) && !newBlocker(t) && better(t))
+      .map((t) => ({ text: label(t), rank: rankOf(t), id: t.move.id }))
+      .sort((a, b) => a.rank - b.rank || a.id.localeCompare(b.id));
+  const single = clearing(singles);
+  if (single.length) return single;
+  if (issue.resource || issue.id === "battery-small") {
+    const double = clearing((ctx.twoSteps ??= tryTwoSteps(singles, catalog)));
+    if (double.length) return double;
+  }
+  if (now === undefined || now <= 0) return [];
+  // A first step trims a part: it closes at least a quarter of the gap and makes nothing else worse.
+  // Swapping the radio to save 5 W at night is not a battery fix, and a new lander is not a first step.
+  const trims = (t: Tried) => t.move.kind !== "vehicle" && !(t.move.kind === "swap" && isCarrier(moduleOf(catalog, t.move.outId)));
+  return singles
     .map((t) => ({ t, g: gap(issue, t.issues, t.rep) ?? now }))
-    .filter(({ t, g }) => g < now - 1e-9 && !newBlocker(t))
+    .filter(({ t, g }) => trims(t) && g <= now * 0.75 && t.issues.every((i) => known.has(i.id)))
     .sort((a, b) => a.g - b.g || a.t.move.id.localeCompare(b.t.move.id))
     .map(({ t, g }) => ({ text: label(t, true), rank: g }));
 }
 
-/** When no single change helps, say so plainly in a few words. */
-function noFix(issue: Issue, rep: ResourceReport): string {
-  if (issue.id === "battery-small") return "No battery on offer covers it, so cut the night load";
+/** When no change helps, say why in a few words. */
+function noFix(issue: Issue, rep: ResourceReport, design: MissionDesign, catalog: Catalog): string {
+  if (issue.id === "battery-small") {
+    const flown = design.moduleIds.map((id) => moduleOf(catalog, id));
+    const carrier = flown.find(isCarrier);
+    const biggest = getMission(catalog, design.missionId).moduleIds
+      .map((id) => moduleOf(catalog, id))
+      .filter((m): m is Module => !!m && (m.storageWh ?? 0) > 0)
+      .sort((a, b) => (b.storageWh ?? 0) - (a.storageWh ?? 0))[0];
+    if (carrier && biggest && !design.moduleIds.includes(biggest.id))
+      return `No room for the ${biggest.name} (${fmt(biggest.massKg)} kg)`;
+    return "No battery on offer covers it, so cut the night load";
+  }
   switch (issue.resource) {
     case "lifetime":
       return `No part on offer lasts longer than ${fmt(rep.lifetime.capacity)} days`;
@@ -352,6 +406,8 @@ interface ReviewContext {
   rep: ResourceReport;
   storage: number;
   tried: Tried[];
+  /** two-step changes, built the first time an issue needs them */
+  twoSteps?: Tried[];
 }
 
 const SEVERITY_ORDER = (i: Issue, over: Set<ResourceKey>) =>
@@ -376,15 +432,10 @@ export function councilReview(design: MissionDesign, catalog: Catalog): Review[]
   let ctx: ReviewContext | undefined;
   const context = (): ReviewContext =>
     (ctx ??= { design, catalog, issues, rep, storage: storageOf(design, catalog), tried: tryMoves(design, catalog) });
-  // Two members raising the same issue offer different fixes of similar quality, and approvals
-  // talk about different numbers.
-  const said = new Set<string>();
+  // Two members raising the same issue offer different fixes of similar quality, or the second one
+  // agrees with the first; approvals talk about different numbers.
+  const said = new Map<string, string>();
   const spoken = new Set<ResourceKey>();
-  const freshFix = (fixes: Fix[]) => {
-    const best = fixes[0];
-    if (!best) return undefined;
-    return (fixes.find((f) => !said.has(f.text) && f.rank <= best.rank + 30) ?? best).text;
-  };
   const fresh = (options: string[]) => options.find((o) => !said.has(o)) ?? options[0];
   const blocked = issues.some((i) => i.severity === "blocker");
   const raised = new Set<string>();
@@ -419,10 +470,15 @@ export function councilReview(design: MissionDesign, catalog: Catalog): Review[]
       const repeat = raised.has(first.id);
       raised.add(first.id);
       const fixes = rankedFixes(first, context(), actor);
-      const fix = (repeat ? fixes.find((f) => !said.has(f.text))?.text : undefined) ?? freshFix(fixes) ?? noFix(first, rep);
-      said.add(fix);
+      const best = fixes[0];
+      const freshOne = best && fixes.find((f) => !said.has(f.text) && f.rank <= best.rank + 30);
+      const pick = freshOne?.text ?? best?.text ?? noFix(first, rep, design, catalog);
+      const fact = sentence(issueFact(first, rep, design, catalog));
+      // agreeing keeps a number on the card: the fact's, or else the fix's
+      const fix = repeat && said.has(pick) ? `Agree with ${said.get(pick)}${/\d/.test(fact) ? "" : `: ${lowerFirst(pick)}`}` : pick;
+      if (!said.has(pick)) said.set(pick, actor.shortName);
       if (first.resource) spoken.add(first.resource);
-      message = `${voice[verdict]} ${sentence(issueFact(first, rep, design, catalog))}. ${fix}.`;
+      message = `${voice[verdict]} ${fact}. ${fix}.`;
     } else {
       const key = tightest(domains, rep, spoken);
       spoken.add(key);
@@ -432,7 +488,7 @@ export function councilReview(design: MissionDesign, catalog: Catalog): Review[]
         : budgetOnly
           ? `${money(rep.budget.capacity - rep.budget.used)} stays in reserve`
           : fresh(roomFor(context().tried, issues, catalog).map((m) => `Room for ${m.name} (${signedMoney(m.costMUsd)})`));
-      if (idea) said.add(idea);
+      if (idea && !said.has(idea)) said.set(idea, actor.shortName);
       message = `${voice.approve} ${sentence(resourceFact(key, rep))}.${idea ? ` ${sentence(idea)}.` : ""}`;
     }
     return { actorId: actor.id, verdict, message, issueIds: cited.map((i) => i.id) };
