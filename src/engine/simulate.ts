@@ -99,6 +99,14 @@ export function simulateFlight(
   const lifeDays = rep.lifetime.capacity;
   // The carrier's reliability is its arrival roll; once it has arrived it does not roll again.
   const carrierIndex = carrier ? r.modules.indexOf(carrier) : -1;
+  // success chances with the council's perks, quoted the same way in events and lessons
+  const launchP = Math.min(1, vehicle.reliability * applyStat(1, "launchReliability", mods, { missionId: mid }));
+  const arrivalP = Math.min(
+    1,
+    (carrier?.reliability ?? 0.98) * destination.arrivalFactor * applyStat(1, "landingReliability", mods, { missionId: mid }),
+  );
+  // first operations day of lunar night: the cold, not a random day, is what ends a lander
+  const firstNight = Math.ceil(destination.sunlightFraction * LUNAR_CYCLE_DAYS);
 
   const units: Unit[] = [
     ...r.modules.map((m, i): Unit => ({
@@ -243,7 +251,8 @@ export function simulateFlight(
       for (const t of mission.events) {
         if (t.phase !== "operations" || t === liveTemplate) continue;
         if (rng() < t.chance * mitigation(t)) {
-          const d = Math.floor(rng() * days);
+          const roll = Math.floor(rng() * days);
+          const d = lunar && t.effect.kind === "mission-loss" && firstNight < days ? firstNight : roll;
           scheduled.set(d, [...(scheduled.get(d) ?? []), t]);
         }
       }
@@ -353,17 +362,15 @@ export function simulateFlight(
     }
 
     if (phase.id === "launch") {
-      const p = (vehicle.reliability * applyStat(1, "launchReliability", mods, { missionId: mid }));
-      if (!(rng() < p)) {
-        push(day, "launch", "failure", "Launch failure", `${vehicle.name} failed during launch (it succeeds ${fmt(Math.min(1, p) * 100)}% of the time).`);
+      if (!(rng() < launchP)) {
+        push(day, "launch", "failure", "Launch failure", `${vehicle.name} failed during launch (it succeeds ${fmt(launchP * 100)}% of the time).`);
         lostAt = "launch";
         break;
       }
       push(day, "launch", "success", "Liftoff", `${vehicle.name} launched on schedule.`);
     } else if (phase.id === "arrival") {
-      const p = (carrier?.reliability ?? 0.98) * destination.arrivalFactor * applyStat(1, "landingReliability", mods, { missionId: mid });
-      if (!(rng() < p)) {
-        push(day, "arrival", "failure", "Arrival failed", `The spacecraft was lost during arrival at ${destination.name} (success chance ${fmt(Math.min(1, p) * 100)}%).`);
+      if (!(rng() < arrivalP)) {
+        push(day, "arrival", "failure", "Arrival failed", `The spacecraft was lost during arrival at ${destination.name} (success chance ${fmt(arrivalP * 100)}%).`);
         lostAt = "arrival";
         break;
       }
@@ -419,10 +426,10 @@ export function simulateFlight(
 
   // lessons
   const lessons: string[] = [];
-  const kindOfLoss = lostAt === "launch" ? `${vehicle.name} has a ${fmt((1 - vehicle.reliability) * 100)}% chance of failing at launch and this was one of those flights.` : null;
-  if (kindOfLoss) lessons.push(kindOfLoss);
+  if (lostAt === "launch")
+    lessons.push(`${vehicle.name} has a ${fmt((1 - launchP) * 100)}% chance of failing at launch and this was one of those flights.`);
   if (lostAt === "arrival")
-    lessons.push(`Arrival is the riskiest step: the carrier and destination gave only a ${fmt((carrier?.reliability ?? 0.98) * destination.arrivalFactor * 100)}% chance, so a more reliable carrier or an easier site buys safety.`);
+    lessons.push(`Arrival is the riskiest step: the carrier and destination gave only a ${fmt(arrivalP * 100)}% chance, so a more reliable carrier or an easier site buys safety.`);
   if (lostAt && lostAt !== "launch" && lostAt !== "arrival") {
     const last = [...events].reverse().find((e) => e.kind === "failure");
     lessons.push(`The mission was lost in ${lostAt}${last ? ` (${last.title}: ${last.text})` : ""}. Modules that mitigate this risk lower its chance.`);
@@ -440,7 +447,11 @@ export function simulateFlight(
     lessons.push(`${failedUnits.map((u) => u.name).join(", ")} failed during operations. Each module has a small chance of failing, so reliable parts and redundancy matter on long missions.`);
   if (reachedOps && planned > 0 && quietDay < 0) {
     const left = queuedTotal();
-    if (left > planned * 0.1)
+    const deadLink = units.find((u) => u.failed && u.downlinkPerDay > 0);
+    const linkLeft = units.some((u) => !u.failed && u.downlinkPerDay > 0);
+    if (left > planned * 0.1 && deadLink && !linkLeft)
+      lessons.push(`${fmt(left)} Gb were still waiting on board at the end because the ${deadLink.name} failed and nothing else could send data home. A second comms module keeps the link if one fails.`);
+    else if (left > planned * 0.1)
       lessons.push(`${fmt(left)} Gb were still waiting on board at the end because the link was up only ${fmt(linkFrac * 100)}% of the time. A relay or a faster comms module would have returned more.`);
     else if (returned / planned >= 0.9) lessons.push(`${fmt((returned / planned) * 100)}% of the planned data reached Earth, so the comms link kept up with the instruments.`);
     else lessons.push(`Only ${fmt((returned / planned) * 100)}% of the planned data reached Earth, because instruments were throttled, modules failed or events destroyed queued data.`);
