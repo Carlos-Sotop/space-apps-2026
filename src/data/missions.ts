@@ -402,8 +402,8 @@ export const missions: Mission[] = [
       id: "mb-primary",
       title: "Land and run a powered outpost",
       summary: "Store energy, keep a link to Earth and send site data for 45 days.",
-      // any one science payload: the outpost must return data, so power, link and lifetime all count
-      requires: { categories: ["lander", "battery", "comms"], moduleIds: ["mb-dust-plasma", "mb-regolith-science", "mb-ice-drill", "mb-rover"] },
+      // an instrument: the outpost must return data, so power, link and lifetime all count
+      requires: { categories: ["lander", "battery", "comms", "instrument"] },
       scienceValue: 120, // game value
     },
     secondaryObjectives: [
@@ -516,7 +516,7 @@ export const missions: Mission[] = [
       "mb-pq-link",
       "mb-dtn-node",
     ],
-    requiredCategories: ["lander", "battery", "comms"], // every lander carries its own solar panels; the VSAT mast is an upgrade
+    requiredCategories: ["lander", "battery", "comms", "instrument"], // every lander carries its own solar panels; the VSAT mast is an upgrade
     durationDays: 45, // includes one lunar night
     requiredLinkFraction: 0.5,
     baseTreasuryMUsd: 220, // game value: best options need rideshare money

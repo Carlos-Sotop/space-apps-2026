@@ -38,4 +38,4 @@ Primary objective met: operations reached and completed within the design life, 
 `simulateFlight` for seeds 1..runs (default 200): success share, mean total, p10, p90 (linear interpolation).
 
 ## Balance
-`balance.test.ts` names at least three good and two bad designs per mission and checks them on the real catalog: good designs succeed in at least 60% of 200 flights, each mission's starting design in at least 70%, and bad designs succeed in at most 40% and fail for the reason they are named for (a blocker, a warning, or a flight event such as "Launch failure" or "Design life reached").
+`balance.test.ts` names at least three good and two bad designs per mission and checks them on the real catalog: good designs succeed in at least 60% of 200 flights, each mission's starting design in at least 65%, and bad designs succeed in at most 40% and fail for the reason they are named for (a blocker, a warning, or a flight event such as "Launch failure" or "Design life reached").

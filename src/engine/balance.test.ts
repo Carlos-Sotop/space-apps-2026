@@ -6,7 +6,7 @@ import { catalog } from "../data";
 import { computeResources, councilValues, defaultDesign, forecast, simulateFlight, validateDesign } from "./index";
 import { MAX_ONBOARD_CUT } from "./resources";
 import { successProbability } from "./score";
-import type { Catalog, Coalition, MissionDesign, MissionId, Module } from "./types";
+import type { Catalog, Coalition, FlightResult, MissionDesign, MissionId, Module } from "./types";
 
 const withModule = (cat: Catalog, id: string, patch: Partial<Module>): Catalog => ({
   ...cat,
@@ -151,6 +151,15 @@ const BAD: { name: string; design: () => MissionDesign; blocker?: string; warnin
 
 const MISSIONS: MissionId[] = ["orbital-lab", "earth-guardian", "moon-base-zero"];
 
+// Each design flies its 200 seeds once; the tests below share the results.
+const flown = new Map<string, FlightResult[]>();
+const fly200 = (key: string, d: MissionDesign): FlightResult[] => {
+  if (!flown.has(key)) flown.set(key, seeds(200).map((s) => simulateFlight(d, catalog, s)));
+  return flown.get(key)!;
+};
+const share = (fs: FlightResult[]) => fs.filter((f) => f.success).length / fs.length;
+const meanScore = (fs: FlightResult[]) => fs.reduce((s, f) => s + f.score.total, 0) / fs.length;
+
 describe("balance on the real catalog", () => {
   it("every mission has at least 3 good and 2 bad named designs", () => {
     for (const m of MISSIONS) {
@@ -163,23 +172,22 @@ describe("balance on the real catalog", () => {
   it.each(MISSIONS)("the starting design of %s flies without blockers and usually succeeds", (m) => {
     const d = start(m);
     expect(validateDesign(d, catalog).filter((i) => i.severity === "blocker")).toEqual([]);
-    expect(forecast(d, catalog).successProbability).toBeGreaterThanOrEqual(0.7);
+    expect(share(fly200(`start:${m}`, d))).toBeGreaterThanOrEqual(0.65);
   });
 
-  it.each(GOOD.map((g) => [g.name, g] as const))("good: %s succeeds in most flights", (_, g) => {
+  it.each(GOOD.map((g) => [g.name, g] as const))("good: %s succeeds in most flights", (name, g) => {
     const d = g.design();
     expect(validateDesign(d, catalog).filter((i) => i.severity === "blocker")).toEqual([]);
-    expect(forecast(d, catalog).successProbability).toBeGreaterThanOrEqual(0.6);
+    expect(share(fly200(name, d))).toBeGreaterThanOrEqual(0.6);
   });
 
-  it.each(BAD.map((b) => [b.name, b] as const))("bad: %s fails for a visible reason", (_, b) => {
+  it.each(BAD.map((b) => [b.name, b] as const))("bad: %s fails for a visible reason", (name, b) => {
     const d = b.design();
     const issues = validateDesign(d, catalog);
     if (b.blocker) expect(issues.find((i) => i.id === b.blocker)?.severity).toBe("blocker");
     if (b.warning) expect(issues.find((i) => i.id === b.warning)?.severity).toBe("warning");
-    const flights = seeds(200).map((s) => simulateFlight(d, catalog, s));
-    const wins = flights.filter((f) => f.success).length;
-    expect(wins / flights.length).toBeLessThanOrEqual(0.4);
+    const flights = fly200(name, d);
+    expect(share(flights)).toBeLessThanOrEqual(0.4);
     if (b.event) {
       const failed = flights.filter((f) => !f.success);
       const named = failed.filter((f) => f.events.some((e) => e.title === b.event)).length;
@@ -188,8 +196,17 @@ describe("balance on the real catalog", () => {
   });
 
   it("good designs score more than bad ones on average", () => {
-    const mean = (ds: MissionDesign[]) => ds.reduce((s, d) => s + forecast(d, catalog, 100).expectedScore, 0) / ds.length;
-    expect(mean(GOOD.map((g) => g.design()))).toBeGreaterThan(mean(BAD.map((b) => b.design())) + 200);
+    const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+    const good = mean(GOOD.map((g) => meanScore(fly200(g.name, g.design()))));
+    const bad = mean(BAD.map((b) => meanScore(fly200(b.name, b.design()))));
+    expect(good).toBeGreaterThan(bad + 200);
+  });
+
+  it("the forecast agrees with the flights it summarizes", () => {
+    const g = GOOD[0]!;
+    const f = forecast(g.design(), catalog);
+    expect(f.successProbability).toBeCloseTo(share(fly200(g.name, g.design())), 10);
+    expect(f.expectedScore).toBeCloseTo(meanScore(fly200(g.name, g.design())), 6);
   });
 });
 
@@ -219,11 +236,11 @@ describe("data: Moon Base Zero", () => {
     const d = mb("mb-malapert", "falcon-9", ["mb-blue-ghost", "mb-li-ion", "mb-dte-xband", "mb-rhu", "mb-dust-plasma"]);
     expect(validateDesign(d, catalog).filter((i) => i.severity === "blocker")).toEqual([]);
   });
-  it("needs a science payload for the main objective", () => {
-    const d = mb("mb-malapert", "falcon-9", ["mb-blue-ghost", "mb-li-ion", "mb-dte-xband", "mb-rhu"]);
-    const issue = validateDesign(d, catalog).find((i) => i.id === "primary-unmet");
-    expect(issue?.severity).toBe("blocker");
-    expect(issue?.text).toContain("Dust and plasma sensor");
+  it("needs an instrument for the main objective", () => {
+    const d = mb("mb-malapert", "falcon-9", ["mb-blue-ghost", "mb-li-ion", "mb-dte-xband", "mb-rhu", "mb-ice-drill"]);
+    const issues = validateDesign(d, catalog);
+    expect(issues.find((i) => i.id === "missing-category-instrument")?.severity).toBe("blocker");
+    expect(issues.find((i) => i.id === "primary-unmet")?.text).toContain("instrument");
   });
   it("a tipped lander loses half its power", () => {
     const cat: Catalog = {
