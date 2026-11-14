@@ -3,44 +3,64 @@ import type { LaunchVehicle } from "@/engine/types";
 // Wikipedia is used as a last resort: the vehicle pages cite manufacturer guides, but WebFetch could not open most of those.
 const wiki = (title: string, slug: string) => ({ title, url: `https://en.wikipedia.org/wiki/${slug}` });
 
+// NASA Launch Services Program performance query, read 2026-11-14 (site data updated 2024-02-29).
+// Lunar transfer (TLI) values use C3 = -1 km2/s2, the lowest C3 the Falcon curves cover; a TLI is about -2, so they are slightly conservative.
+const S_LSP = { title: "NASA Launch Services Program: Launch Vehicle Performance Website (performance query)", url: "https://elvperf.ksc.nasa.gov/Pages/Query.aspx" };
+
 export const launchVehicles: LaunchVehicle[] = [
   {
     id: "falcon-9",
     name: "Falcon 9",
     providerId: "spacex",
-    // reusable figures (drone ship landing), how it usually flies
+    // reusable figures (first stage lands on the drone ship, "ASDS" in NASA LSP), how it usually flies
     capacityKg: {
       LEO: 17400, // reusable, Wikipedia infobox (expended: 22,800)
-      ISS: 16000, // derived: 0.92 x LEO
-      SSO: 10000, // estimate: reusable figure between LEO and GTO capability
+      ISS: 14460, // NASA LSP: Falcon 9 Full Thrust ASDS, 400 km circular at 51.6 deg
+      SSO: 11560, // NASA LSP: Falcon 9 Full Thrust ASDS, 550 km circular sun-synchronous from Vandenberg
       GTO: 5500, // reusable, drone ship
-      TLI: 3500, // derived: 0.2 x LEO, conservative for a reusable first stage
+      TLI: 3425, // NASA LSP: Falcon 9 Full Thrust ASDS, C3 = -1 km2/s2
     },
     costMUsd: 74, // US$74M per launch, Block 5, 2026
     reliability: 0.9957, // 699 successes of 702 launches as of 2026-11-12
     reusable: true,
     status: "operational",
     blurb: "Reusable workhorse with the longest flight record today.",
-    sources: [wiki("Falcon 9 (Block 5 payload, price, launch record)", "Falcon_9")],
+    sources: [S_LSP, wiki("Falcon 9 (Block 5 payload, price, launch record)", "Falcon_9")],
     verified: false,
   },
+  // Falcon Heavy flies in two configurations with very different capacity, so the game lists both.
+  // Only the lunar figure is listed: no mission in the game flies Falcon Heavy to another orbit.
   {
     id: "falcon-heavy",
-    name: "Falcon Heavy",
+    name: "Falcon Heavy (boosters recovered)",
     providerId: "spacex",
     capacityKg: {
-      LEO: 57000, // side boosters recovered (fully expended: 63,800)
-      ISS: 52000, // derived: 0.92 x LEO
-      SSO: 30000, // estimate: roughly half of LEO capacity
-      GTO: 16000, // side boosters recovered (expended: 26,700)
-      TLI: 16000, // 2011 projection quoted by Wikipedia, no current official figure
+      TLI: 6880, // NASA LSP: Falcon Heavy (Recovery), C3 = -1 km2/s2
     },
-    costMUsd: 97, // reusable price published in 2022 (expendable: 150)
+    costMUsd: 97, // reusable price published in 2022
     reliability: 1, // 14 successes of 14 launches
     reusable: true,
     status: "operational",
-    blurb: "Three-core heavy lifter: Europa Clipper and Psyche rode it.",
-    sources: [wiki("Falcon Heavy (payload, price, flights)", "Falcon_Heavy")],
+    blurb: "Lands its three cores for reuse: cheaper, but lifts less.",
+    sources: [S_LSP, wiki("Falcon Heavy (payload, price, flights)", "Falcon_Heavy")],
+    verified: false,
+  },
+  {
+    id: "falcon-heavy-expendable",
+    name: "Falcon Heavy (expendable)",
+    providerId: "spacex",
+    capacityKg: {
+      TLI: 15310, // NASA LSP: Falcon Heavy (Expendable), C3 = -1 km2/s2
+    },
+    costMUsd: 178, // NASA JPL, 2021-07-23: Europa Clipper launch services on Falcon Heavy, "approximately $178 million" (a contract total, not a list price)
+    reliability: 1, // same vehicle record as above, 14 of 14
+    reusable: false,
+    status: "operational",
+    blurb: "All three cores spent for full power. Europa Clipper flew this way.",
+    sources: [
+      S_LSP,
+      { title: "NASA JPL: NASA awards launch services contract for the Europa Clipper mission (about $178 million)", url: "https://www.jpl.nasa.gov/news/nasa-awards-launch-services-contract-for-the-europa-clipper-mission/" },
+    ],
     verified: false,
   },
   {
@@ -66,16 +86,16 @@ export const launchVehicles: LaunchVehicle[] = [
     providerId: "blue-origin",
     capacityKg: {
       LEO: 45000, // 7x2 configuration
-      ISS: 41000, // derived: 0.92 x LEO
+      ISS: 34110, // NASA LSP: New Glenn with first stage recovery, 400 km circular at 51.6 deg
       GTO: 13600,
-      TLI: 7000, // 7x2 without third stage
+      TLI: 7130, // NASA LSP: New Glenn with first stage recovery, C3 = -1 km2/s2
     },
     costMUsd: 90, // US$68-110M reported range, midpoint
     reliability: 0.667, // 2 successes of 3 flights as of 2026-04 (NG-3 failed)
     reusable: true,
     status: "operational",
     blurb: "Heavy lifter with a reusable first stage; ESCAPADE rode it.",
-    sources: [wiki("New Glenn (payload, flights, price)", "New_Glenn")],
+    sources: [S_LSP, wiki("New Glenn (payload, flights, price)", "New_Glenn")],
     verified: false,
   },
   {

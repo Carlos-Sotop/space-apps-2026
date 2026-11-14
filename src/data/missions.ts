@@ -82,7 +82,7 @@ export const missions: Mission[] = [
         lightTimeS: 0.25, // derived: two hops to a geostationary TDRS, about 2 x 36,000 km / c
       },
     ],
-    launchVehicleIds: ["falcon-9", "falcon-heavy", "vulcan-centaur", "h3"],
+    launchVehicleIds: ["falcon-9", "vulcan-centaur", "h3"], // the carriers fly on Falcon 9 (Dragon, Cygnus), H3 (HTV-X) and Vulcan (Dream Chaser)
     moduleIds: [
       "ol-cargo-dragon",
       "ol-cygnus",
@@ -401,8 +401,9 @@ export const missions: Mission[] = [
     primaryObjective: {
       id: "mb-primary",
       title: "Land and run a powered outpost",
-      summary: "Power, store energy and keep a link to Earth for 45 days.",
-      requires: { categories: ["lander", "power", "battery", "comms"] },
+      summary: "Store energy, keep a link to Earth and send site data for 45 days.",
+      // an instrument: the outpost must return data, so power, link and lifetime all count
+      requires: { categories: ["lander", "battery", "comms", "instrument"] },
       scienceValue: 120, // game value
     },
     secondaryObjectives: [
@@ -489,6 +490,7 @@ export const missions: Mission[] = [
     launchVehicleIds: [
       "falcon-9",
       "falcon-heavy",
+      "falcon-heavy-expendable",
       "starship",
       "new-glenn",
       "vulcan-centaur",
@@ -514,7 +516,7 @@ export const missions: Mission[] = [
       "mb-pq-link",
       "mb-dtn-node",
     ],
-    requiredCategories: ["lander", "power", "battery", "comms"],
+    requiredCategories: ["lander", "battery", "comms", "instrument"], // every lander carries its own solar panels; the VSAT mast is an upgrade
     durationDays: 45, // includes one lunar night
     requiredLinkFraction: 0.5,
     baseTreasuryMUsd: 220, // game value: best options need rideshare money
@@ -540,13 +542,13 @@ export const missions: Mission[] = [
         id: "mb-lander-tips",
         phase: "arrival",
         title: "Lander tips over",
-        text: "The lander lands on a slope and falls on its side. Panels and antennas point the wrong way.",
+        text: "The lander lands on a slope and falls on its side. Panels point the wrong way and power drops by half.",
         chance: 0.25, // game value: IM-1 and IM-2 both tipped; Blue Ghost 1 did not
         mitigatedBy: [
           { moduleId: "mb-blue-ghost", factor: 0.4 },
           { moduleId: "mb-blue-moon", factor: 0.5 },
         ],
-        effect: { kind: "lose-science", share: 0.5 },
+        effect: { kind: "lose-power", share: 0.5 }, // game value: IM-2 lay on its side and its panels could not charge the batteries
       },
       {
         id: "mb-solar-storm",
@@ -585,9 +587,11 @@ export const missions: Mission[] = [
         title: "Lunar night freeze",
         text: "The sun sets for days. Without heat or stored power, the cold kills the electronics.",
         chance: 0.35, // game value
+        // A lander with no heat or night storage already stops at its design life (lifetime gauge);
+        // this is the risk left once heaters or a fuel cell fly.
         mitigatedBy: [
-          { moduleId: "mb-rhu", factor: 0.3 },
-          { moduleId: "mb-rfc", factor: 0.25 },
+          { moduleId: "mb-rhu", factor: 0.15 }, // game value
+          { moduleId: "mb-rfc", factor: 0.15 }, // game value
           { moduleId: "mb-li-ion", factor: 0.8 },
         ],
         effect: { kind: "mission-loss" },

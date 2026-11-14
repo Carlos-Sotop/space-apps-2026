@@ -187,7 +187,7 @@ export function validateDesign(design: MissionDesign, catalog: Catalog): Issue[]
       resource: "lifetime",
       domain: "spacecraft",
       severity: "warning",
-      text: `The design lasts ${fmt(rep.lifetime.capacity)} days but the mission needs ${fmt(rep.lifetime.used)}.`,
+      text: `The design lasts ${fmt(rep.lifetime.capacity)} days but the mission needs ${fmt(rep.lifetime.used)}, so it will go quiet after ${fmt(rep.lifetime.capacity)} days and miss the main objective.`,
       fix: "Add a thermal or battery module that keeps the spacecraft alive through the night (radioisotope heaters, fuel cells)"
         + (carrierName ? `, or pick a carrier that lasts longer than the ${carrierName}.` : ", or add a longer-lived carrier."),
     });
