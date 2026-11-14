@@ -4,6 +4,8 @@ import { TopBar } from "@/components/hud/TopBar";
 import { Badge, Button, Icon, MonogramBadge, toast } from "@/components/ui";
 import type { Blueprint, ModuleCategory } from "@/engine/types";
 import { getActor, getBlueprint, getMission, getModule } from "@/lib/catalog";
+import { Leaderboard } from "@/registry/Leaderboard";
+import { registry } from "@/registry/client";
 import { fmtGb } from "@/lib/format";
 import { useGame } from "@/store/game";
 
@@ -49,7 +51,8 @@ export default function Debrief() {
     };
     publish(bp);
     setDone(true);
-    toast("Published to the Open Tech Registry (local only for now)", "ok");
+    const shared = await registry.publishBlueprint(bp);
+    toast(shared ? "Published to the shared Open Tech Registry" : "Saved on this device (shared registry not available)", "ok");
   };
 
   return (
@@ -108,6 +111,8 @@ export default function Debrief() {
             </div>
           ) : <p className="text-sm text-muted">This flight was not signed by the council.</p>}
         </div>
+
+        <Leaderboard key={result.seed} result={result} design={design} manifestHash={ratification?.manifestHash} />
 
         <div className="flex flex-wrap items-center gap-3">
           <Button variant="primary" className="h-auto min-h-10 max-w-full !whitespace-normal py-2 text-left" onClick={onPublish} disabled={done}>{done ? <><Icon name="check" size={16} /> Published ({published.length})</> : <><Icon name="fork" size={16} /> Publish your design to the Open Tech Registry</>}</Button>
