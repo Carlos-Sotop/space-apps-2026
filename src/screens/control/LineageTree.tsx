@@ -24,8 +24,8 @@ export function LineageTree({ blueprints, adopted, onToggle }: Props) {
   const pos = new Map<string, { x: number; y: number }>();
   const maxD = Math.max(...cols.keys());
   const rows = Math.max(...[...cols.values()].map((c) => c.length));
-  cols.forEach((list, d) => list.forEach((b, i) => pos.set(b.id, { x: 50 + d * 110, y: 34 + i * 62 + ((rows - list.length) * 62) / 2 })));
-  const w = 100 + maxD * 110, h = 20 + rows * 62;
+  cols.forEach((list, d) => list.forEach((b, i) => pos.set(b.id, { x: 62 + d * 125, y: 34 + i * 62 + ((rows - list.length) * 62) / 2 })));
+  const w = 124 + maxD * 125, h = 20 + rows * 62;
 
   return (
     <svg viewBox={`0 0 ${w} ${h}`} className="w-full" style={{ maxHeight: 260 }} role="group" aria-label="Fork lineage of open designs">
@@ -45,7 +45,7 @@ export function LineageTree({ blueprints, adopted, onToggle }: Props) {
             onClick={() => onToggle(b.id)} onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), onToggle(b.id))}>
             <circle r="18" fill={on ? color : "#0b0d24"} fillOpacity={on ? 0.35 : 1} stroke={color} strokeWidth={on ? 2.5 : 1.5} />
             <text textAnchor="middle" dy="4" fontSize="10" fill={color} fontFamily="var(--font-display)">{(a?.shortName ?? b.authorId).slice(0, 2).toUpperCase()}</text>
-            <text textAnchor="middle" y="32" fontSize="9" fill="var(--fg-muted)">{b.name.length > 18 ? `${b.name.slice(0, 17)}…` : b.name}</text>
+            <text textAnchor="middle" y="32" fontSize="10" fill="var(--fg-muted)">{b.name.length > 22 ? `${b.name.slice(0, 21)}…` : b.name}</text>
           </g>
         );
       })}
