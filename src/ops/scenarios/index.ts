@@ -1,7 +1,8 @@
 import type { MissionId } from "../../engine/types";
 import type { OpsScenario } from "../scenario";
+import { moon } from "./moon";
 
-const registry: Partial<Record<MissionId, OpsScenario>> = {};
+const registry: Partial<Record<MissionId, OpsScenario>> = { "moon-base-zero": moon };
 
 export function getScenario(missionId: MissionId): OpsScenario {
   const sc = registry[missionId];
