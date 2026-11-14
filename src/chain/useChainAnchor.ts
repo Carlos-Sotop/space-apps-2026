@@ -50,10 +50,18 @@ export function useChainAnchor(design: MissionDesign | null, ratification: Ratif
     if (!design || !ratification || ratification.anchor) return;
     const key = signingKey(ratification);
     let alive = true;
-    anchorOnce(design, ratification).then((result) => {
-      keepReceipt(key, result);
-      if (alive) setDone({ key, result });
-    });
+    anchorOnce(design, ratification)
+      .then((result) => {
+        try {
+          keepReceipt(key, result);
+        } catch {
+          // the receipt is optional: a store hiccup never reaches the game
+        }
+        if (alive) setDone({ key, result });
+      })
+      .catch(() => {
+        // anchorRatification never rejects; this guard keeps it that way for any future change
+      });
     return () => {
       alive = false;
     };
