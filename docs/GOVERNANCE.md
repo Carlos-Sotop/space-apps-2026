@@ -1,6 +1,6 @@
 # Governance: how the SpaceDAO council decides
 
-SpaceDAO's governance has to be understandable in a five-minute game and still be a serious proposal for real space cooperation. We combine four mechanisms, each doing one job. Owner of the code: Charlie (`src/governance/`, `src/engine/council.ts`, `src/chain/`), with Manuel on signatures (`src/crypto/`).
+SpaceDAO's governance has to be understandable in a five-minute game and still be a serious proposal for real space cooperation. We combine four mechanisms, each doing one job. Owner of the code: Charlie (`src/engine/council.ts`, `src/screens/control/market.ts`, `src/chain/`), with Manuel on signatures (`src/crypto/`).
 
 ## 1. Council (who decides)
 
@@ -16,14 +16,16 @@ At the start, each member sets how much it cares about **science**, **safety** a
 
 Futarchy (Robin Hanson, *"Shall We Vote on Values, But Bet on Beliefs?"*) separates *what we want* (values, voted) from *what will work* (beliefs, predicted by markets). MetaDAO on Solana runs it in production for DAO proposals.
 
-In the game, when the council has a contested design choice:
-- the market compares the current design with an alternative (e.g. "drop the hyperspectral camera and add a battery");
-- each option's forecast comes from 200 simulated flights of the real engine (success probability, expected score, p10-p90);
-- bots stake **play credits** on their (noisy) forecasts, and the player can stake on what they believe;
-- the council adopts the option with the higher market forecast of the agreed score;
-- after the flight, stakes on the adopted option settle against the actual score; accurate forecasters gain reputation.
+In the game, after the council review:
+- the market compares the current design with two alternatives: the best cheaper design and the best upgrade one change away (add, drop or swap a part, or change rocket), each picked by screening candidates with simulated flights;
+- each option's price starts at its forecast from 120 simulated flights of the real engine (success probability, expected score);
+- each option has its own conditional market on the score it will reach, quoted by an LMSR (logarithmic market scoring rule) market maker with a liquidity of 1,000 **play credits**. Buying "higher" pays the score / 1,000 per share, "lower" pays the rest;
+- bots trade where they disagree most with the price: their belief is the forecast, bent by their priorities (cost-first members lean to the cheaper design, science-first to the upgrade, safety-first to the higher success odds) plus noise. The player picks an option, higher or lower, and a stake;
+- the council adopts the option with the highest market price;
+- after the flight, only the adopted option's market settles against the actual score; trades in the other options are refunded, because their condition never happened. A design changed after the market closed refunds everything;
+- every member keeps a forecasting record (play credits won or lost). A better record scales a bot's trading budget from half to double, so accurate forecasters get more say. The record is kept in the browser.
 
-Pricing can start as a stake-weighted average of predicted scores; the stretch goal is an LMSR (logarithmic market scoring rule) market maker per option. **Play credits only. No real money.**
+**Play credits only. No real money.**
 
 ## 4. Ratification: 4-of-4 quantum-safe multisig
 
@@ -44,7 +46,7 @@ Members publish technology as **blueprints**: open designs with a content hash, 
 | Piece | This weekend | Full product |
 |---|---|---|
 | Council, values vote, bot reviews | Simulated in the browser (engine + bots) | Real members, multiplayer |
-| Futarchy market | Real Monte Carlo forecasts, simulated stakes, play credits | Conditional markets (MetaDAO-style) with play credits or grants |
+| Futarchy market | Real Monte Carlo forecasts, LMSR market maker per option, bot and player trades settled after the flight, forecasting records, play credits | Conditional markets (MetaDAO-style) with play credits or grants |
 | Signatures | **Real** ed25519 + ML-DSA-65 in the browser | Same, plus on-chain multisig (e.g. Squads on Solana) |
 | On-chain anchor | **Optional**: Worker relayer writes the manifest hash with the Solana Memo program on **devnet**; debrief links the explorer | Mainnet anchoring of ratified missions and blueprints |
 | Open Tech Registry | Local seed + publish to Supabase | Content-addressed storage + on-chain attribution |

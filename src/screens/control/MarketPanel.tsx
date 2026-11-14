@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Badge, Button, Icon, MonogramBadge, Slider } from "@/components/ui";
+import { Badge, Button, Icon, InfoButton, MonogramBadge, Slider } from "@/components/ui";
 import { toast } from "@/components/ui/Toast";
 import type { Actor } from "@/engine/types";
 import { getActor } from "@/lib/catalog";
 import { fmtPct } from "@/lib/format";
 import { useGame } from "@/store/game";
 import {
-  designKey, lmsrTrade, runMarketSteps, trade, useLedger, winner,
+  designKey, lmsrTrade, runMarketSteps, trade, useLedger, winner, FORECAST_RUNS, LMSR_B,
   type MarketOption, type MarketRecord, type MarketState, type OptionKind, type Side, type Trade,
 } from "./market";
 import { useDesign } from "./useDesign";
@@ -126,6 +126,26 @@ function RecordRow({ ids }: { ids: string[] }) {
 /* ------------------------------------------------------------------ */
 /* The market                                                          */
 /* ------------------------------------------------------------------ */
+
+const MARKET_SOURCES = [
+  { title: "Robin Hanson, Shall We Vote on Values, But Bet on Beliefs? (2013)", url: "https://mason.gmu.edu/~rhanson/futarchy2013.pdf" },
+  { title: "Robin Hanson, Logarithmic Market Scoring Rules for Modular Combinatorial Information Aggregation (2002)", url: "https://mason.gmu.edu/~rhanson/mktscore.pdf" },
+  { title: "MetaDAO documentation: futarchy on Solana", url: "https://docs.metadao.fi/" },
+];
+
+/** What sits behind the info button: how the market prices, decides and settles. */
+function MarketInfo() {
+  return (
+    <div className="space-y-3 text-sm text-fg/90">
+      <p>Vote on values, bet on beliefs. The values step set what the council wants; this market asks which design will deliver it.</p>
+      <p>Each option starts at the score forecast from {FORECAST_RUNS} simulated flights of the game engine. A market maker using Hanson&apos;s logarithmic market scoring rule (LMSR, liquidity {LMSR_B.toLocaleString("en-US")} credits) quotes the price. Buying &ldquo;higher&rdquo; raises it and &ldquo;lower&rdquo; lowers it; near the middle of the scale, moving 50 points costs about 100 credits.</p>
+      <p>The council adopts the option with the highest price.</p>
+      <p>After the flight, only the adopted option&apos;s market settles: each &ldquo;higher&rdquo; share pays the score divided by 1,000 in credits, each &ldquo;lower&rdquo; share pays the rest. Trades in the other options come back, because their condition never happened.</p>
+      <p>Each member keeps a forecasting record of credits won or lost. A better record lets a member trade bigger next time, from half to double.</p>
+      <p>Decision markets like this run DAO proposals on Solana today (MetaDAO). Here they use play credits only; nothing is real money.</p>
+    </div>
+  );
+}
 
 function Simulating({ progress }: { progress: number }) {
   return (
@@ -250,7 +270,10 @@ export function MarketPanel({ onClosed }: { onClosed: () => void }) {
     <div className="glass space-y-5 p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="font-display text-base">Decision market</h3>
-        <span className="rounded-full border border-violet/40 bg-violet/10 px-3 py-0.5 text-xs text-violet-bright">Bet on beliefs</span>
+        <span className="flex items-center gap-2">
+          <span className="rounded-full border border-violet/40 bg-violet/10 px-3 py-0.5 text-xs text-violet-bright">Bet on beliefs</span>
+          <InfoButton title="Decision market" body={<MarketInfo />} sources={MARKET_SOURCES} />
+        </span>
       </div>
       {previous && !closed && (
         <div className="rounded-2xl border border-line p-4">
