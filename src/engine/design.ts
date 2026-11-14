@@ -74,7 +74,53 @@ export function strongCapabilities(actor: Actor): Capability[] {
   return entries.filter(([, s]) => s >= 2 || s === max).map(([c]) => c);
 }
 
+interface DefaultCacheEntry {
+  parts: unknown[];
+  designs: Map<string, MissionDesign>;
+}
+const defaultCache: DefaultCacheEntry[] = [];
+
+/** Results are cached per catalog content (the arrays defaultDesign reads) so a rebuilt catalog object still hits. */
+function defaultCacheFor(catalog: Catalog): Map<string, MissionDesign> {
+  const parts = [catalog.missions, catalog.actors, catalog.launchVehicles, catalog.modules];
+  let entry = defaultCache.find((e) => e.parts.every((p, i) => p === parts[i]));
+  if (!entry) {
+    entry = { parts, designs: new Map() };
+    defaultCache.unshift(entry);
+    defaultCache.length = Math.min(defaultCache.length, 4);
+  }
+  return entry.designs;
+}
+
+function copyDesign(d: MissionDesign, coalition: Coalition): MissionDesign {
+  return {
+    ...d,
+    coalition: { leadId: coalition.leadId, partnerIds: [...coalition.partnerIds] as Coalition["partnerIds"] },
+    values: { ...d.values },
+    secondaryObjectiveIds: [...d.secondaryObjectiveIds],
+    moduleIds: [...d.moduleIds],
+    blueprintIds: [...d.blueprintIds],
+    rideshareIds: [...d.rideshareIds],
+  };
+}
+
+/**
+ * The cheapest design that flies, for a mission and coalition. The search tries thousands of
+ * combinations (about 70 ms for Earth Guardian), so the result is cached: the same mission,
+ * coalition and catalog return a fresh copy at once.
+ */
 export function defaultDesign(missionId: MissionId, coalition: Coalition, catalog: Catalog): MissionDesign {
+  const cache = defaultCacheFor(catalog);
+  const key = `${missionId}|${coalition.leadId}|${coalition.partnerIds.join(",")}`;
+  let design = cache.get(key);
+  if (!design) {
+    design = searchDefaultDesign(missionId, coalition, catalog);
+    cache.set(key, design);
+  }
+  return copyDesign(design, coalition);
+}
+
+function searchDefaultDesign(missionId: MissionId, coalition: Coalition, catalog: Catalog): MissionDesign {
   const mission = getMission(catalog, missionId);
   const lead = getActor(catalog, coalition.leadId);
   const values = councilValues(coalition, lead.priorities, catalog).values;
@@ -118,7 +164,9 @@ export function defaultDesign(missionId: MissionId, coalition: Coalition, catalo
   const STARVED = new Set(["power-over", "data-over", "comms-under", "lifetime-under"]);
   let best: { design: MissionDesign; cost: number } | undefined;
   for (const dest of mission.destinations)
-    for (const vid of mission.launchVehicleIds)
+    for (const vid of mission.launchVehicleIds) {
+      // a rocket that cannot reach this orbit always blocks, so skip its whole subtree
+      if (!((getLaunchVehicle(catalog, vid).capacityKg[dest.orbitClass] ?? 0) > 0)) continue;
       for (const carrier of carriers.length ? carriers : [undefined])
         for (const combo of combos(cats.filter((c) => c !== carrier?.category)))
           for (const instrument of instrumentChoices)
@@ -134,6 +182,7 @@ export function defaultDesign(missionId: MissionId, coalition: Coalition, catalo
             const cost = computeResources(design, catalog).budget.used + (proven ? 0 : 10_000) + starved * 1_000;
             if (!best || cost < best.cost) best = { design, cost };
           }
+    }
   if (best) return best.design;
 
   const destination = mission.destinations[0];
@@ -170,4 +219,65 @@ export function categoryDomain(cat: ModuleCategory): "comms" | "science" | "spac
 export function fmt(x: number): string {
   const r = Math.abs(x) >= 100 ? Math.round(x) : Math.round(x * 10) / 10;
   return String(r).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+
+/* ------------------------------------------------------------------ */
+/* One-step changes: the council's fixes and the market's alternatives */
+/* ------------------------------------------------------------------ */
+
+export type MoveKind = "add" | "drop" | "swap" | "vehicle";
+
+export interface DesignMove {
+  /** stable id: "add:<module>", "drop:<module>", "swap:<out>><in>" or "vehicle:<id>" */
+  id: string;
+  kind: MoveKind;
+  /** short imperative label, e.g. "Add Ka-band downlink" */
+  label: string;
+  /** module added or swapped in, or the new launch vehicle */
+  inId?: string;
+  /** module dropped or swapped out, or the old launch vehicle */
+  outId?: string;
+  design: MissionDesign;
+}
+
+const isCarrierModule = (m: Module) => (m.category === "lander" || m.category === "bus") && m.payloadCapacityKg !== undefined;
+/** "ISS data link (Ku-band via TDRS)" -> "ISS data link": labels stay one line. */
+const shortName = (name: string) => name.replace(/\s*\([^)]*\)\s*$/, "");
+
+/**
+ * Every design one step away from this one: add one offered module, drop one, swap one for another
+ * of its category, or change the rocket. Moves are not validated; callers check what each one breaks.
+ */
+export function designMoves(design: MissionDesign, catalog: Catalog): DesignMove[] {
+  const mission = getMission(catalog, design.missionId);
+  const offered = mission.moduleIds.map((id) => catalog.modules.find((m) => m.id === id)).filter((m): m is Module => !!m);
+  const flownIds = [...new Set(design.moduleIds)];
+  const flown = flownIds.map((id) => getModule(catalog, id));
+  const has = new Set(flownIds);
+  const withModules = (moduleIds: string[]): MissionDesign => ({ ...design, moduleIds });
+  const moves: DesignMove[] = [];
+
+  for (const m of offered) {
+    if (has.has(m.id) || isCarrierModule(m)) continue;
+    moves.push({ id: `add:${m.id}`, kind: "add", label: `Add ${shortName(m.name)}`, inId: m.id, design: withModules([...design.moduleIds, m.id]) });
+  }
+  for (const m of flown) {
+    if (isCarrierModule(m)) continue;
+    moves.push({ id: `drop:${m.id}`, kind: "drop", label: `Drop ${shortName(m.name)}`, outId: m.id, design: withModules(design.moduleIds.filter((id) => id !== m.id)) });
+  }
+  for (const m of flown)
+    for (const n of offered) {
+      if (n.category !== m.category || has.has(n.id) || isCarrierModule(n) !== isCarrierModule(m)) continue;
+      moves.push({
+        id: `swap:${m.id}>${n.id}`, kind: "swap", label: `Swap to ${shortName(n.name)}`, outId: m.id, inId: n.id,
+        design: withModules(design.moduleIds.map((id) => (id === m.id ? n.id : id))),
+      });
+    }
+  for (const vid of mission.launchVehicleIds) {
+    if (vid === design.launchVehicleId) continue;
+    const v = catalog.launchVehicles.find((x) => x.id === vid);
+    if (!v) continue;
+    moves.push({ id: `vehicle:${vid}`, kind: "vehicle", label: `Launch on ${shortName(v.name)}`, inId: vid, outId: design.launchVehicleId || undefined, design: { ...design, launchVehicleId: vid } });
+  }
+  return moves;
 }

@@ -6,3 +6,4 @@ export { validateDesign } from "./validate";
 export { councilValues, councilReview } from "./council";
 export { simulateFlight } from "./simulate";
 export { forecast } from "./forecast";
+export { designMoves, type DesignMove, type MoveKind } from "./design";
