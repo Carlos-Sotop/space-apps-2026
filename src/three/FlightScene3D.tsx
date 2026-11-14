@@ -8,6 +8,7 @@ import { Line, Stars } from "@react-three/drei";
 import * as THREE from "three";
 import type { FlightSceneProps } from "@/screens/FlightSceneSvg";
 import { earthTexture } from "./earthTexture";
+import { moonTextures } from "./moonTexture";
 import { phaseAt } from "@/screens/flightTimeline";
 import type { FlightPhaseId } from "@/engine/types";
 
@@ -90,7 +91,7 @@ function Plume({ pos, dir, scale, t }: { pos: THREE.Vector3; dir: THREE.Vector3;
 
 function Planet({ center, radius, kind, t }: { center: THREE.Vector3; radius: number; kind: "earth" | "moon"; t: number }) {
   const map = useMemo(() => (kind === "earth" ? earthTexture() : null), [kind]);
-  const craters = useMemo(() => [[0.5, 0.7, 0.07], [-0.4, 0.3, 0.05], [0.1, -0.6, 0.09], [0.8, -0.2, 0.04], [-0.7, -0.5, 0.06], [0.3, 0.2, 0.05]], []);
+  const moon = useMemo(() => (kind === "moon" ? moonTextures() : null), [kind]);
   if (kind === "earth") {
     return (
       <group position={center}>
@@ -112,22 +113,66 @@ function Planet({ center, radius, kind, t }: { center: THREE.Vector3; radius: nu
     );
   }
   return (
-    <group position={center}>
+    <group position={center} rotation={[0, t * 0.01, 0]}>
       <mesh>
-        <sphereGeometry args={[radius, 48, 32]} />
-        <meshStandardMaterial color="#aab0c4" roughness={1} />
+        <sphereGeometry args={[radius, 96, 64]} />
+        {moon
+          ? <meshStandardMaterial map={moon.map} bumpMap={moon.bump} bumpScale={2.4} roughness={1} />
+          : <meshStandardMaterial color="#aab0c4" roughness={1} />}
       </mesh>
-      {craters.map(([x, y, s], i) => {
-        const n = new THREE.Vector3(x, y, Math.sqrt(Math.max(0.05, 1 - x * x - y * y))).normalize();
-        const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), n);
-        return (
-          <mesh key={i} position={n.clone().multiplyScalar(radius * 1.002)} quaternion={q}>
-            <circleGeometry args={[s * radius * 3, 20]} />
-            <meshBasicMaterial color="#6b7390" transparent opacity={0.6} />
-          </mesh>
-        );
-      })}
     </group>
+  );
+}
+
+/**
+ * Dust thrown up by the landing engine. On the Moon there is no air, so the grains fly in
+ * straight, low arcs along the surface and fall back instead of billowing: that is what this draws.
+ */
+function Dust({ at, up, age, radius }: { at: THREE.Vector3; up: THREE.Vector3; age: number; radius: number }) {
+  const N = 300;
+  const basis = useMemo(() => {
+    const u = up.clone().normalize();
+    const a1 = new THREE.Vector3(1, 0, 0).cross(u);
+    const e1 = (a1.lengthSq() < 1e-6 ? new THREE.Vector3(0, 0, 1).cross(u) : a1).normalize();
+    const e2 = u.clone().cross(e1).normalize();
+    return { u, e1, e2 };
+  }, [up]);
+  const seeds = useMemo(
+    () => Array.from({ length: N }, (_, i) => {
+      const a = (i * 2.399963) % (Math.PI * 2);
+      const s = 0.25 + ((i * 37) % 100) / 100 * 0.8;
+      const lift = 0.16 + ((i * 53) % 100) / 100 * 0.5;
+      const delay = ((i * 29) % 100) / 100 * 0.3;
+      return { ca: Math.cos(a), sa: Math.sin(a), s, lift, delay };
+    }),
+    [],
+  );
+  const positions = useMemo(() => {
+    const arr = new Float32Array(N * 3);
+    const p = new THREE.Vector3();
+    seeds.forEach((d, i) => {
+      const tau = Math.max(0, age - d.delay);
+      const reach = d.s * tau * radius * 0.95;
+      const h = Math.max(0, d.lift * tau - 0.34 * tau * tau) * radius * 1.5;
+      p.copy(at).addScaledVector(basis.e1, d.ca * reach).addScaledVector(basis.e2, d.sa * reach).addScaledVector(basis.u, h);
+      arr[i * 3] = p.x;
+      arr[i * 3 + 1] = p.y;
+      arr[i * 3 + 2] = p.z;
+    });
+    return arr;
+    // rebuilt as the burst grows, quantised so it costs at most one array a frame
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [Math.round(age * 80), at.x, at.y, at.z, radius, seeds, basis]);
+
+  const fade = Math.max(0, Math.min(1, 1.45 - age)) * Math.min(1, age * 5);
+  if (fade <= 0.01) return null;
+  return (
+    <points key="dust">
+      <bufferGeometry>
+        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
+      </bufferGeometry>
+      <pointsMaterial size={0.03} sizeAttenuation color="#e2e6f0" transparent opacity={0.6 * fade} depthWrite={false} />
+    </points>
   );
 }
 
@@ -217,6 +262,15 @@ function Scene({ timeline, p, lunar, lostAt, ended }: FlightSceneProps) {
   }
 
   const lost = ended && !!lostAt;
+  // the burst starts at touchdown and dies out over the first moments on the surface
+  // dust builds through the last of the descent and settles over the first part of the stay
+  const dustAge = !lunar
+    ? 0
+    : phaseId === "arrival"
+      ? Math.max(0, (frac - 0.7) / 0.3) * 0.5
+      : inOps
+        ? 0.5 + opsFrac * 2.2
+        : 0;
   const burning = !ended && !inOps && (phaseId === "launch" || phaseId === "ascent" || phaseId === "orbit-insertion" || (phaseId === "transfer" && frac < 0.12) || (lunar && phaseId === "arrival" && frac > 0.4));
   // narrow screens (phones): back the camera off so the whole scene fits across, and draw the rocket bigger
   const { width, height } = useThree((st) => st.size);
@@ -263,6 +317,9 @@ function Scene({ timeline, p, lunar, lostAt, ended }: FlightSceneProps) {
       {lunar && (
         <>
           <Planet center={MOON_C} radius={MOON_R} kind="moon" t={t} />
+          {dustAge > 0 && !lost && (
+            <Dust at={pathAt(1, true)} up={pathAt(1, true).clone().sub(MOON_C).normalize()} age={dustAge} radius={MOON_R} />
+          )}
           <Label text="Moon" position={moonLabel} />
         </>
       )}
@@ -279,7 +336,7 @@ function Scene({ timeline, p, lunar, lostAt, ended }: FlightSceneProps) {
           <Rocket pos={pos} dir={dir} scale={rocketScale} flame={burning} />
           {burning && <Plume pos={pos} dir={dir} scale={rocketScale} t={t} />}
           {inOps && (
-            <mesh position={pos} scale={1 + 0.35 * Math.abs(Math.sin(t * 2))}>
+            <mesh position={pos} scale={(lunar ? 0.45 : 1) * (1 + 0.35 * Math.abs(Math.sin(t * 2)))}>
               <sphereGeometry args={[0.09, 16, 16]} />
               <meshBasicMaterial color="#22d3ee" transparent opacity={0.25} depthWrite={false} blending={THREE.AdditiveBlending} />
             </mesh>
