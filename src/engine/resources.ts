@@ -28,6 +28,19 @@ export const moduleGeneratesW = (m: Module, mods: Modifier[], mid: MissionId) =>
 export const moduleDownlinkGb = (m: Module, mods: Modifier[], mid: MissionId) =>
   applyStat(m.downlinkGbPerDay ?? 0, "downlinkRate", mods, scope(m, mid));
 
+/**
+ * On-board screening (modules with negative dataGbPerDay) can drop at most this share of the raw data.
+ * A cloud screener only removes cloudy images, and about 67% of Earth is cloud-covered at any time
+ * (NASA Earth Observatory, "Cloudy Earth": https://science.nasa.gov/earth/earth-observatory/cloudy-earth-85843/).
+ */
+export const MAX_ONBOARD_CUT = 0.67;
+
+/** Share of the raw data that still has to reach Earth after on-board screening; 0 when nothing is produced. */
+export function onboardKeep(grossGb: number, cutGb: number): number {
+  if (grossGb <= 0) return 0;
+  return (grossGb - Math.min(Math.max(0, cutGb), MAX_ONBOARD_CUT * grossGb)) / grossGb;
+}
+
 export function effectiveLinkFraction(r: ResolvedDesign): number {
   const bonus = r.modules.reduce((s, m) => s + (m.category === "comms" ? (m.linkFractionBonus ?? 0) : 0), 0);
   return Math.min(1, (r.destination?.earthLinkFraction ?? 0) + bonus);
@@ -110,10 +123,17 @@ export function computeResources(design: MissionDesign, catalog: Catalog): Resou
 
   // data and comms
   const link = effectiveLinkFraction(r);
-  const dataUsedBy: ResourceLine[] = [
+  const dataLines: ResourceLine[] = [
     ...modules.map((m) => ({ label: m.name, amount: m.dataGbPerDay ?? 0 })),
     ...rideshares.map((o) => ({ label: `${o.payloadName} (rideshare)`, amount: o.dataGbPerDay })),
-  ].filter((l) => l.amount !== 0);
+  ];
+  const grossGb = dataLines.reduce((s, l) => s + Math.max(0, l.amount), 0);
+  const cutGb = dataLines.reduce((s, l) => s + Math.max(0, -l.amount), 0);
+  const appliedCut = grossGb * (1 - onboardKeep(grossGb, cutGb));
+  // screening lines show the cut that applies, shared in proportion when it is capped
+  const dataUsedBy = dataLines
+    .map((l) => (l.amount < 0 ? { ...l, amount: -appliedCut * (-l.amount / cutGb) } : l))
+    .filter((l) => l.amount !== 0);
   const dataProvided: ResourceLine[] = modules
     .filter((m) => (m.downlinkGbPerDay ?? 0) > 0)
     .map((m) => ({ label: m.name, amount: moduleDownlinkGb(m, mods, mid) * link }));

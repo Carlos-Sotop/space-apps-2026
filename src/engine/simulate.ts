@@ -14,7 +14,7 @@ import type {
 import { fmt, resolveDesign } from "./design";
 import { makeRng } from "./rng";
 import { applyStat, effectiveModifiers } from "./modifiers";
-import { computeResources, effectiveLinkFraction, moduleDownlinkGb, moduleGeneratesW, modulePowerW } from "./resources";
+import { computeResources, effectiveLinkFraction, moduleDownlinkGb, moduleGeneratesW, modulePowerW, onboardKeep } from "./resources";
 import { validateDesign } from "./validate";
 import { scoreFlight, ZERO_SCORE, type UnitOutcome } from "./score";
 
@@ -95,9 +95,21 @@ export function simulateFlight(
   const linkFrac = effectiveLinkFraction(r);
   const lunar = destination.orbitClass === "TLI";
   const opsDays = Math.max(1, mission.phases.filter((p) => p.id === "operations").reduce((s, p) => s + Math.round(p.days), 0));
+  // The design life (lifetime gauge capacity): operations stop on that day if it comes first.
+  const lifeDays = rep.lifetime.capacity;
+  // The carrier's reliability is its arrival roll; once it has arrived it does not roll again.
+  const carrierIndex = carrier ? r.modules.indexOf(carrier) : -1;
+  // success chances with the council's perks, quoted the same way in events and lessons
+  const launchP = Math.min(1, vehicle.reliability * applyStat(1, "launchReliability", mods, { missionId: mid }));
+  const arrivalP = Math.min(
+    1,
+    (carrier?.reliability ?? 0.98) * destination.arrivalFactor * applyStat(1, "landingReliability", mods, { missionId: mid }),
+  );
+  // first operations day of lunar night: the cold, not a random day, is what ends a lander
+  const firstNight = Math.ceil(destination.sunlightFraction * LUNAR_CYCLE_DAYS);
 
   const units: Unit[] = [
-    ...r.modules.map((m): Unit => ({
+    ...r.modules.map((m, i): Unit => ({
       id: m.id,
       moduleId: m.id,
       name: m.name,
@@ -109,7 +121,7 @@ export function simulateFlight(
       storageWh: m.storageWh ?? 0,
       dataPerDay: m.dataGbPerDay ?? 0,
       downlinkPerDay: moduleDownlinkGb(m, mods, mid),
-      reliability: m.reliability,
+      reliability: i === carrierIndex ? 1 : m.reliability,
       scienceValue: m.scienceValue ?? 0,
       isModule: true,
       failed: false,
@@ -138,6 +150,13 @@ export function simulateFlight(
     })),
   ];
   const alive = (u: Unit) => !u.failed;
+  // Data a unit is planned to send: its raw output after nominal on-board screening, so screening
+  // shrinks the downlink without shrinking the science.
+  const nominalKeep = onboardKeep(
+    units.reduce((s, u) => s + Math.max(0, u.dataPerDay), 0),
+    units.reduce((s, u) => s + Math.max(0, -u.dataPerDay), 0),
+  );
+  const plannedOf = (u: Unit) => Math.max(0, u.dataPerDay) * nominalKeep * opsDays;
 
   let day = 0;
   let lostAt: FlightPhaseId | undefined;
@@ -156,6 +175,8 @@ export function simulateFlight(
   let streakDays = 0;
   let worst = { wh: 0, days: 0 };
   let startBattery = 0;
+  /** day the spacecraft reached its design life and went quiet; -1 if it lasted the mission */
+  let quietDay = -1;
   const samples: TelemetrySample[] = [];
 
   const queuedTotal = () => units.reduce((s, u) => s + u.queued, 0);
@@ -215,7 +236,7 @@ export function simulateFlight(
     (req.categories ?? []).every((c) => units.some((u) => u.category === c && alive(u))) &&
     (!req.moduleIds?.length || req.moduleIds.some((id) => units.some((u) => u.moduleId === id && alive(u))));
   const dataShare = (us: Unit[]): number => {
-    const planned = Math.max(0, us.reduce((s, u) => s + u.dataPerDay, 0)) * opsDays;
+    const planned = us.reduce((s, u) => s + plannedOf(u), 0);
     return planned > 0 ? us.reduce((s, u) => s + u.returned, 0) / planned : 1;
   };
 
@@ -230,13 +251,25 @@ export function simulateFlight(
       for (const t of mission.events) {
         if (t.phase !== "operations" || t === liveTemplate) continue;
         if (rng() < t.chance * mitigation(t)) {
-          const d = Math.floor(rng() * days);
+          const roll = Math.floor(rng() * days);
+          const d = lunar && t.effect.kind === "mission-loss" && firstNight < days ? firstNight : roll;
           scheduled.set(d, [...(scheduled.get(d) ?? []), t]);
         }
       }
       let lost = false;
       for (let d = 0; d < days && !lost; d++) {
         const today = start + d;
+        if (d >= lifeDays) {
+          quietDay = today;
+          push(
+            today,
+            "operations",
+            "failure",
+            "Design life reached",
+            `The spacecraft was built to last ${fmt(lifeDays)} days of operations and went quiet on day ${today}, ${fmt(days - d)} days before the end of the mission.`,
+          );
+          break;
+        }
         for (const u of units) {
           if (u.failed) continue;
           if (rng() < (1 - u.reliability) / days) {
@@ -285,7 +318,7 @@ export function simulateFlight(
         const gains = units.map((u) => (alive(u) ? Math.max(0, u.dataPerDay) * throttle * producing : 0));
         const cuts = units.reduce((s, u) => (alive(u) && u.dataPerDay < 0 ? s - u.dataPerDay : s), 0) * throttle * producing;
         const gross = gains.reduce((s, g) => s + g, 0);
-        const keep = gross > 0 ? Math.max(0, gross - cuts) / gross : 0;
+        const keep = onboardKeep(gross, cuts);
         units.forEach((u, i) => {
           const g = (gains[i] ?? 0) * keep;
           u.produced += g;
@@ -329,17 +362,15 @@ export function simulateFlight(
     }
 
     if (phase.id === "launch") {
-      const p = (vehicle.reliability * applyStat(1, "launchReliability", mods, { missionId: mid }));
-      if (!(rng() < p)) {
-        push(day, "launch", "failure", "Launch failure", `${vehicle.name} failed during launch (it succeeds ${fmt(Math.min(1, p) * 100)}% of the time).`);
+      if (!(rng() < launchP)) {
+        push(day, "launch", "failure", "Launch failure", `${vehicle.name} failed during launch (it succeeds ${fmt(launchP * 100)}% of the time).`);
         lostAt = "launch";
         break;
       }
       push(day, "launch", "success", "Liftoff", `${vehicle.name} launched on schedule.`);
     } else if (phase.id === "arrival") {
-      const p = (carrier?.reliability ?? 0.98) * destination.arrivalFactor * applyStat(1, "landingReliability", mods, { missionId: mid });
-      if (!(rng() < p)) {
-        push(day, "arrival", "failure", "Arrival failed", `The spacecraft was lost during arrival at ${destination.name} (success chance ${fmt(Math.min(1, p) * 100)}%).`);
+      if (!(rng() < arrivalP)) {
+        push(day, "arrival", "failure", "Arrival failed", `The spacecraft was lost during arrival at ${destination.name} (success chance ${fmt(arrivalP * 100)}%).`);
         lostAt = "arrival";
         break;
       }
@@ -354,9 +385,9 @@ export function simulateFlight(
     day += phase.days;
   }
 
-  // objectives
+  // objectives: a spacecraft that went quiet before the end of operations meets none
   const objectivesMet: string[] = [];
-  if (reachedOps) {
+  if (reachedOps && quietDay < 0) {
     const all = dataShare(units);
     if (all >= 0.5 && requiresOk(mission.primaryObjective.requires)) objectivesMet.push(mission.primaryObjective.id);
     for (const id of design.secondaryObjectiveIds) {
@@ -374,12 +405,12 @@ export function simulateFlight(
   const primaryMet = objectivesMet.includes(mission.primaryObjective.id);
   const success = !lostAt && primaryMet;
   const returned = returnedTotal();
-  const planned = Math.max(0, units.reduce((s, u) => s + u.dataPerDay, 0)) * opsDays;
+  const planned = units.reduce((s, u) => s + plannedOf(u), 0);
 
   const outcomes: UnitOutcome[] = units.map((u) => ({
     category: u.category,
     scienceValue: u.scienceValue,
-    planned: Math.max(0, u.dataPerDay) * opsDays,
+    planned: plannedOf(u),
     returned: u.returned,
     failed: u.failed,
     isModule: u.isModule,
@@ -388,19 +419,25 @@ export function simulateFlight(
 
   if (success)
     push(day, "end", "success", "Mission complete", `${fmt(returned)} Gb of ${fmt(planned)} Gb planned reached Earth and the primary objective was met.`);
+  else if (!lostAt && quietDay >= 0)
+    push(day, "end", "warning", "Mission ended early", `The spacecraft stopped on day ${quietDay}, before the ${fmt(opsDays)} days of operations were done, so the primary objective was not met.`);
   else if (!lostAt)
     push(day, "end", "warning", "Mission fell short", `Only ${fmt(returned)} Gb of ${fmt(planned)} Gb planned reached Earth, so the primary objective was not met.`);
 
   // lessons
   const lessons: string[] = [];
-  const kindOfLoss = lostAt === "launch" ? `${vehicle.name} has a ${fmt((1 - vehicle.reliability) * 100)}% chance of failing at launch and this was one of those flights.` : null;
-  if (kindOfLoss) lessons.push(kindOfLoss);
+  if (lostAt === "launch")
+    lessons.push(`${vehicle.name} has a ${fmt((1 - launchP) * 100)}% chance of failing at launch and this was one of those flights.`);
   if (lostAt === "arrival")
-    lessons.push(`Arrival is the riskiest step: the carrier and destination gave only a ${fmt((carrier?.reliability ?? 0.98) * destination.arrivalFactor * 100)}% chance, so a more reliable carrier or an easier site buys safety.`);
+    lessons.push(`Arrival is the riskiest step: the carrier and destination gave only a ${fmt(arrivalP * 100)}% chance, so a more reliable carrier or an easier site buys safety.`);
   if (lostAt && lostAt !== "launch" && lostAt !== "arrival") {
     const last = [...events].reverse().find((e) => e.kind === "failure");
     lessons.push(`The mission was lost in ${lostAt}${last ? ` (${last.title}: ${last.text})` : ""}. Modules that mitigate this risk lower its chance.`);
   }
+  if (quietDay >= 0)
+    lessons.push(
+      `The design was built to last ${fmt(lifeDays)} days but the mission needs ${fmt(mission.durationDays)}, so the spacecraft went quiet on day ${quietDay}. ${lunar ? "Radioisotope heaters or a fuel cell keep a lander alive through the lunar night." : "A longer-lived carrier, or thermal and battery modules rated for the full mission, fixes it."}`,
+    );
   if (throttledDays > 0)
     lessons.push(
       `Your batteries held ${fmt(startBattery)} Wh but ${worst.days} day${worst.days === 1 ? "" : "s"} ${lunar ? "of lunar night" : "of low generation"} needed ${fmt(worst.wh)} Wh, so instruments ran at reduced output from day ${firstThrottleDay} on (${throttledDays} throttled days). More storage, sunlight-independent power such as an RTG, or a smaller load would have saved it.`,
@@ -408,9 +445,13 @@ export function simulateFlight(
   const failedUnits = units.filter((u) => u.failed);
   if (failedUnits.length > 0)
     lessons.push(`${failedUnits.map((u) => u.name).join(", ")} failed during operations. Each module has a small chance of failing, so reliable parts and redundancy matter on long missions.`);
-  if (reachedOps && planned > 0) {
+  if (reachedOps && planned > 0 && quietDay < 0) {
     const left = queuedTotal();
-    if (left > planned * 0.1)
+    const deadLink = units.find((u) => u.failed && u.downlinkPerDay > 0);
+    const linkLeft = units.some((u) => !u.failed && u.downlinkPerDay > 0);
+    if (left > planned * 0.1 && deadLink && !linkLeft)
+      lessons.push(`${fmt(left)} Gb were still waiting on board at the end because the ${deadLink.name} failed and nothing else could send data home. A second comms module keeps the link if one fails.`);
+    else if (left > planned * 0.1)
       lessons.push(`${fmt(left)} Gb were still waiting on board at the end because the link was up only ${fmt(linkFrac * 100)}% of the time. A relay or a faster comms module would have returned more.`);
     else if (returned / planned >= 0.9) lessons.push(`${fmt((returned / planned) * 100)}% of the planned data reached Earth, so the comms link kept up with the instruments.`);
     else lessons.push(`Only ${fmt((returned / planned) * 100)}% of the planned data reached Earth, because instruments were throttled, modules failed or events destroyed queued data.`);

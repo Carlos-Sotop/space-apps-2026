@@ -13,6 +13,7 @@ const S_DC: Source = { title: "eoPortal: Dream Chaser (5,500 kg upmass target)",
 const S_VEGGIE: Source = { title: "NASA Veggie fact sheet (about 70 W)", url: "https://www.nasa.gov/wp-content/uploads/2019/04/veggie_fact_sheet_508.pdf" };
 const S_VEGGIE2: Source = { title: "Vegetable Production System (Veggie), module under 8 kg", url: "https://en.wikipedia.org/wiki/Vegetable_Production_System" };
 const S_CAL: Source = { title: "NASA JPL Cold Atom Lab: what we do", url: "https://coldatomlab.jpl.nasa.gov/what-we-do" };
+const S_CAL2: Source = { title: "Oudrhiri, Kohel et al. (NASA JPL): NASA's Cold Atom Laboratory, five years of quantum science in space (draws up to 565 W)", url: "https://arxiv.org/abs/2305.13285" };
 const S_BIOMON: Source = { title: "CSA Bio-Monitor: keeping an eye on astronauts' vital signs", url: "https://asc-csa.gc.ca/eng/sciences/astroskin.asp" };
 const S_DOSIS: Source = { title: "DOSIS 3D radiation measurements in Columbus (DLR/Kiel)", url: "https://elib.dlr.de/125417/1/ME-SBA-2018-Berger%20WRMISS%202018_DOSIS%203D.pdf" };
 const S_ZBLAN: Source = { title: "ISS National Lab: exotic glass fibers from space (ZBLAN)", url: "https://issnationallab.org/?p=35108" };
@@ -251,7 +252,7 @@ export const modules: Module[] = [
     category: "experiment",
     tier: "advanced",
     massKg: 250, // estimate: about mini-fridge size, quad locker; no mass found
-    powerW: 300, // estimate
+    powerW: 565, // sourced: "draws up to 565 W of power from the station's 28 VDC power"; a rack allocation must cover the peak
     costMUsd: 40, // game value
     dataGbPerDay: 40, // estimate
     scienceValue: 160, // game value
@@ -260,7 +261,7 @@ export const modules: Module[] = [
     heritage: "NASA JPL Cold Atom Lab",
     satisfies: [],
     blurb: "Chills atoms near absolute zero to test quantum sensors.",
-    sources: [S_CAL],
+    sources: [S_CAL, S_CAL2],
     verified: false,
   },
 
@@ -766,7 +767,7 @@ export const modules: Module[] = [
     storageWh: 40000, // estimate: sized to ride out several days of darkness
     costMUsd: 55, // game value
     reliability: 0.88, // game value: little flight heritage
-    lifetimeDays: 45, // game value: cap on night survival
+    lifetimeDays: 60, // game value: rated for two lunar nights, recharged by day
     sunlightIndependent: true, // stored energy carries the night
     heritage: "NASA regenerative fuel cell studies for the lunar surface",
     satisfies: ["mb-night"],
@@ -799,7 +800,7 @@ export const modules: Module[] = [
     powerW: 0, // heat only, no electric power
     costMUsd: 3, // estimate: game value
     reliability: 0.97,
-    lifetimeDays: 45, // game value: keeps electronics warm through the night
+    lifetimeDays: 90, // game value: warm through three lunar nights; plutonium-238 heat itself lasts decades
     sunlightIndependent: true,
     providerId: "nasa",
     heritage: "NASA light-weight radioisotope heater units, about 1 W thermal each",

@@ -150,16 +150,22 @@ export function validateDesign(design: MissionDesign, catalog: Catalog): Issue[]
       });
   }
 
-  // warnings
+  // warnings, except power over at the station: it gives each payload a fixed allocation and
+  // switches the payload off above it, so that one blocks the flight
+  const station = destination?.orbitClass === "ISS";
   if (rep.power.status === "over")
     add({
       id: "power-over",
       resource: "power",
       domain: "spacecraft",
-      severity: "warning",
-      text: `The spacecraft draws ${fmt(rep.power.used)} W but generates ${fmt(rep.power.capacity)} W on average, so instruments will be throttled.`,
+      severity: station ? "blocker" : "warning",
+      text: station
+        ? `The experiments draw ${fmt(rep.power.used)} W but the station allocates ${fmt(rep.power.capacity)} W, and it will not run a payload over its allocation.`
+        : `The spacecraft draws ${fmt(rep.power.used)} W but generates ${fmt(rep.power.capacity)} W on average, so instruments will be throttled.`,
       fix: hungriest
-        ? `Add a solar array or drop the ${hungriest.name} (-${fmt(modulePowerW(hungriest, mods, mid))} W).`
+        ? station
+          ? `Drop the ${hungriest.name} (-${fmt(modulePowerW(hungriest, mods, mid))} W) or swap it for a smaller experiment.`
+          : `Add a solar array or drop the ${hungriest.name} (-${fmt(modulePowerW(hungriest, mods, mid))} W).`
         : "Add a solar array.",
     });
   if (destination && rep.data.status === "over")
@@ -187,7 +193,7 @@ export function validateDesign(design: MissionDesign, catalog: Catalog): Issue[]
       resource: "lifetime",
       domain: "spacecraft",
       severity: "warning",
-      text: `The design lasts ${fmt(rep.lifetime.capacity)} days but the mission needs ${fmt(rep.lifetime.used)}.`,
+      text: `The design lasts ${fmt(rep.lifetime.capacity)} days but the mission needs ${fmt(rep.lifetime.used)}, so it will go quiet after ${fmt(rep.lifetime.capacity)} days and miss the main objective.`,
       fix: "Add a thermal or battery module that keeps the spacecraft alive through the night (radioisotope heaters, fuel cells)"
         + (carrierName ? `, or pick a carrier that lasts longer than the ${carrierName}.` : ", or add a longer-lived carrier."),
     });
@@ -207,7 +213,8 @@ export function validateDesign(design: MissionDesign, catalog: Catalog): Issue[]
     });
   }
 
-  if (destination && destination.sunlightFraction < 1 && rep.power.used > 0) {
+  // the station powers its payloads through eclipse, so only free flyers and landers need batteries
+  if (destination && !station && destination.sunlightFraction < 1 && rep.power.used > 0) {
     const dark =
       destination.orbitClass === "TLI"
         ? (1 - destination.sunlightFraction) * LUNAR_DAY_HOURS
