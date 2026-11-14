@@ -9,7 +9,7 @@
  * Pure and deterministic like src/engine: same design, flight, seed, live input and
  * action list give the same state. The Worker replays the action list to verify scores.
  */
-import type { FlightResult, MissionId, Source } from "@/engine/types";
+import type { FlightResult, MissionId, Source } from "../engine/types";
 
 /** 3 Earth days per turn: a 45-day mission is 15 turns. */
 export const DAYS_PER_TURN = 3;
