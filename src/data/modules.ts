@@ -766,7 +766,7 @@ export const modules: Module[] = [
     storageWh: 40000, // estimate: sized to ride out several days of darkness
     costMUsd: 55, // game value
     reliability: 0.88, // game value: little flight heritage
-    lifetimeDays: 45, // game value: cap on night survival
+    lifetimeDays: 60, // game value: rated for two lunar nights, recharged by day
     sunlightIndependent: true, // stored energy carries the night
     heritage: "NASA regenerative fuel cell studies for the lunar surface",
     satisfies: ["mb-night"],
@@ -799,7 +799,7 @@ export const modules: Module[] = [
     powerW: 0, // heat only, no electric power
     costMUsd: 3, // estimate: game value
     reliability: 0.97,
-    lifetimeDays: 45, // game value: keeps electronics warm through the night
+    lifetimeDays: 90, // game value: warm through three lunar nights; plutonium-238 heat itself lasts decades
     sunlightIndependent: true,
     providerId: "nasa",
     heritage: "NASA light-weight radioisotope heater units, about 1 W thermal each",

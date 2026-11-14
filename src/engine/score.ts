@@ -48,7 +48,10 @@ export function successProbability(design: MissionDesign, catalog: Catalog): num
     0,
     1,
   );
-  const avg = r.modules.length ? r.modules.reduce((s, m) => s + m.reliability, 0) / r.modules.length : 1;
+  // The carrier's reliability is already its arrival chance, so the average covers the other modules.
+  const carrierIndex = r.carrier ? r.modules.indexOf(r.carrier) : -1;
+  const others = r.modules.filter((_, i) => i !== carrierIndex);
+  const avg = others.length ? others.reduce((s, m) => s + m.reliability, 0) / others.length : 1;
   return launch * arrival * avg;
 }
 
