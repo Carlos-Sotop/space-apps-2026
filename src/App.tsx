@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect } from "react";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import { InfoDrawerHost, Starfield, ToastHost } from "@/components/ui";
+import { PrimerHost } from "@/components/learn/Primer";
 import { useLive } from "@/live/useLive";
 import { useGame } from "@/store/game";
 import type { Screen } from "@/store/steps";
@@ -52,6 +53,7 @@ export default function App() {
         </AnimatePresence>
       </main>
       <InfoDrawerHost />
+      <PrimerHost />
       <ToastHost />
     </MotionConfig>
   );
