@@ -237,6 +237,52 @@ describe("balance on the real catalog", () => {
   });
 });
 
+describe("lessons quote what happened", () => {
+  const percent = (text: string) => text.match(/([\d.]+)%/)?.[1];
+  it("an arrival loss quotes the same chance in the event and the lesson, perks included", () => {
+    // JAXA's pinpoint-landing perk lifts the Blue Ghost landing chance above the lander's own figure
+    const d = start("moon-base-zero");
+    const lost = fly200("start:moon-base-zero", d).find((f) => f.lostAt === "arrival")!;
+    const chance = percent(lost.events.find((e) => e.title === "Arrival failed")!.text)!;
+    expect(Number(chance)).toBeGreaterThan(92 * 0.9);
+    expect(lost.lessons.some((l) => l.includes(`only a ${chance}% chance`))).toBe(true);
+  });
+  it("a launch loss quotes the failure chance that matches the event", () => {
+    const b = BAD.find((x) => x.name.includes("Firefly"))!;
+    const lost = fly200(b.name, b.design()).find((f) => f.lostAt === "launch")!;
+    const succeeds = Number(percent(lost.events.find((e) => e.title === "Launch failure")!.text));
+    const fails = Math.round((100 - succeeds) * 10) / 10;
+    expect(lost.lessons.some((l) => l.includes(`a ${fails}% chance of failing`))).toBe(true);
+  });
+  it("blames a failed radio, not link coverage, when nothing else can send data", () => {
+    const cat = withModule(testCatalog, "radio", { reliability: 0 });
+    const flights = seeds(60).map((s) => simulateFlight(orbitalDesign(), cat, s));
+    const cut = flights.filter((f) => f.events.some((e) => e.title === "radio failed") && f.lessons.some((l) => l.includes("still waiting on board")));
+    expect(cut.length).toBeGreaterThan(0);
+    for (const f of cut) expect(f.lessons.some((l) => l.includes("because the radio failed and nothing else could send data home"))).toBe(true);
+  });
+});
+
+describe("rule: on the Moon the night freeze strikes on the first night", () => {
+  it("lands on the first dark day of operations", () => {
+    const cat: Catalog = {
+      ...catalog,
+      missions: catalog.missions.map((m) =>
+        m.id === "moon-base-zero" ? { ...m, events: m.events.map((e) => (e.id === "mb-night-freeze" ? { ...e, chance: 1, mitigatedBy: [] } : e)) } : m,
+      ),
+    };
+    // the connecting ridge is lit 88% of a 29.5-day cycle: night begins on operations day 26
+    const d = mb("mb-connecting-ridge", "falcon-9", ["mb-blue-ghost", "mb-li-ion", "mb-dte-xband", "mb-rhu", "mb-dust-plasma"]);
+    const reached = seeds(30).map((s) => simulateFlight(d, cat, s)).filter((f) => f.events.some((e) => e.title === "Lunar night freeze"));
+    expect(reached.length).toBeGreaterThan(0);
+    for (const f of reached) {
+      const opsStart = f.telemetry.find((t) => t.phase === "operations")!.day;
+      expect(f.events.find((e) => e.title === "Lunar night freeze")!.day - opsStart).toBe(26);
+      expect(f.lostAt).toBe("operations");
+    }
+  });
+});
+
 describe("data: Falcon Heavy configurations", () => {
   const recovered = catalog.launchVehicles.find((v) => v.id === "falcon-heavy")!;
   const expendable = catalog.launchVehicles.find((v) => v.id === "falcon-heavy-expendable")!;
