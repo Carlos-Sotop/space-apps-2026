@@ -5,6 +5,7 @@ import { Badge, Button, Icon, MonogramBadge, toast } from "@/components/ui";
 import type { Blueprint, ModuleCategory } from "@/engine/types";
 import { getActor, getBlueprint, getMission, getModule } from "@/lib/catalog";
 import { fmtGb } from "@/lib/format";
+import { ChainReceipt } from "@/chain";
 import { useGame } from "@/store/game";
 
 const GRADE_COLOR: Record<string, string> = { S: "#fbbf24", A: "var(--ok)", B: "var(--blue-bright)", C: "var(--violet-bright)", F: "var(--over)" };
@@ -97,6 +98,7 @@ export default function Debrief() {
           {ratification ? (
             <div className="space-y-3">
               <p className="num text-xs text-muted">Manifest SHA-256 <span className="text-fg">{short(ratification.manifestHash)}</span></p>
+              <ChainReceipt design={design} ratification={ratification} />
               <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 {ratification.signatures.map((s) => (
                   <li key={s.actorId} className="flex items-center gap-2.5 rounded-xl border border-line p-2.5">
