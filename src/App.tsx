@@ -13,6 +13,8 @@ import Debrief from "@/screens/Debrief";
 
 const MissionControl = lazy(() => import("@/screens/control/MissionControl"));
 const Flight = lazy(() => import("@/screens/Flight"));
+const Leaderboard = lazy(() => import("@/screens/Leaderboard"));
+const OpsScreen = lazy(() => import("@/screens/ops/OpsScreen"));
 
 function ScreenView({ screen }: { screen: Screen }) {
   switch (screen) {
@@ -23,6 +25,8 @@ function ScreenView({ screen }: { screen: Screen }) {
     case "control": return <MissionControl />;
     case "flight": return <Flight />;
     case "debrief": return <Debrief />;
+    case "leaderboard": return <Leaderboard />;
+    case "ops": return <OpsScreen />;
   }
 }
 

@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import { Button } from "@/components/ui";
+import { Button, Icon } from "@/components/ui";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { LogoMark, Wordmark } from "@/components/brand/Logo";
 import { useGame } from "@/store/game";
@@ -27,6 +27,7 @@ export default function Intro() {
         <div className="flex flex-wrap items-center justify-center gap-3">
           <Button variant="primary" size="lg" onClick={() => go("missions")}>Begin mission</Button>
           <Button size="lg" onClick={() => go("story")}>What is SpaceDAO?</Button>
+          <Button size="lg" onClick={() => go("leaderboard")}><Icon name="trophy" size={16} /> Ranking</Button>
         </div>
       </div>
     </section>

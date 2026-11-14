@@ -7,7 +7,7 @@ import type { Structure, TerrainSpec, Tile } from "@/ops/types";
 import { prefersCalm } from "../bodies";
 import { StructureModel } from "./models";
 
-export type BoardTheme = "moon" | "station";
+export type BoardTheme = "moon" | "station" | "earth";
 
 export interface HexBoardProps {
   theme: BoardTheme;
@@ -36,7 +36,8 @@ const STATION_COLORS: Record<string, string> = { rack: "#8fa0b8", external: "#b8
 
 function tileHeight(t: Tile, theme: BoardTheme): number {
   if (theme === "station") return t.terrain === "external" ? 0.25 : 0.4;
-  return Math.max(0.12, 0.45 + t.elevationM / 140);
+  if (theme === "earth") return t.terrain === "ocean" ? 0.18 : t.terrain === "coast" ? 0.26 : 0.34 + Math.max(0, t.elevationM) / 400;
+  return Math.max(0.06, 0.2 + t.elevationM / 420);
 }
 
 function HexTile({ tile, theme, color, valid, selected, onClick }: { tile: Tile; theme: BoardTheme; color: string; valid: boolean; selected: boolean; onClick?: (t: Tile) => void }) {
@@ -60,10 +61,10 @@ function HexTile({ tile, theme, color, valid, selected, onClick }: { tile: Tile;
         onPointerOver={(e) => { e.stopPropagation(); setHover(true); document.body.style.cursor = onClick ? "pointer" : "default"; }}
         onPointerOut={() => { setHover(false); document.body.style.cursor = "default"; }}
       >
-        <cylinderGeometry args={[HEX * 0.97, HEX * 1.0, h, 6, 1]} />
+        <cylinderGeometry args={[HEX * 0.9, HEX * 0.95, h, 6, 1]} />
         <meshStandardMaterial
           color={color}
-          roughness={theme === "station" ? 0.45 : 0.97}
+          roughness={theme === "station" ? 0.45 : theme === "earth" ? 0.7 : 0.97}
           metalness={theme === "station" ? 0.55 : 0}
           emissive={selected ? "#7c3aed" : hover ? "#3b82f6" : isPsr ? "#1e3a8a" : "#000000"}
           emissiveIntensity={selected ? 0.5 : hover ? 0.25 : isPsr ? 0.25 : 0}
@@ -88,6 +89,35 @@ function HexTile({ tile, theme, color, valid, selected, onClick }: { tile: Tile;
   );
 }
 
+/** Seeded boulders and crater rims around the site, for scale and texture. */
+function Rocks() {
+  const rocks = useMemo(() => {
+    let x = 1234567;
+    const rnd = () => ((x = (x * 16807) % 2147483647) / 2147483647);
+    return Array.from({ length: 90 }, () => {
+      const a = rnd() * Math.PI * 2, d = 5.8 + rnd() * 16;
+      return { p: [Math.cos(a) * d, 0, Math.sin(a) * d] as [number, number, number], s: 0.08 + rnd() * rnd() * 0.7, r: rnd() * 3 };
+    });
+  }, []);
+  const craters = useMemo(() => [[-9, -6, 2.4], [10, 4, 1.6], [3, -12, 3.2], [-12, 8, 2], [14, -9, 2.8]] as [number, number, number][], []);
+  return (
+    <group>
+      {rocks.map((k, i) => (
+        <mesh key={i} position={[k.p[0], k.s * 0.35, k.p[2]]} rotation={[k.r, k.r * 2, 0]} scale={[k.s, k.s * 0.7, k.s]} castShadow receiveShadow>
+          <dodecahedronGeometry args={[1, 0]} />
+          <meshStandardMaterial color="#6f6b64" roughness={1} flatShading />
+        </mesh>
+      ))}
+      {craters.map(([cx, cz, cr], i) => (
+        <mesh key={`c${i}`} position={[cx, 0.02, cz]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+          <torusGeometry args={[cr, cr * 0.12, 6, 28]} />
+          <meshStandardMaterial color="#55524d" roughness={1} flatShading />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
 function EarthOnHorizon({ up }: { up: boolean }) {
   const ref = useRef<THREE.Mesh>(null);
   useFrame((_, dt) => {
@@ -107,7 +137,7 @@ function Lights({ theme, sunFactor }: { theme: BoardTheme; sunFactor: number }) 
   // South pole: the Sun skims the horizon, so light comes in almost flat and shadows run long.
   const elev = theme === "moon" ? 0.08 + 0.22 * sunFactor : 0.9;
   const pos = new THREE.Vector3(Math.cos(0.6) * 18, Math.max(0.6, elev * 18), Math.sin(0.6) * 18);
-  const intensity = theme === "moon" ? 0.4 + 3.2 * sunFactor : 2.2;
+  const intensity = theme === "moon" ? 0.3 + 2.6 * sunFactor : 2.2;
   return (
     <>
       <ambientLight intensity={theme === "moon" ? 0.06 + 0.1 * sunFactor : 0.5} color={theme === "moon" ? "#8aa0ff" : "#ffffff"} />
@@ -130,7 +160,7 @@ function Lights({ theme, sunFactor }: { theme: BoardTheme; sunFactor: number }) 
 
 function Board(props: HexBoardProps) {
   const { theme, tiles, terrains, structures, sunFactor, earthUp, validTileIds = [], selectedTileId, onTileClick } = props;
-  const palette = theme === "moon" ? MOON_COLORS : STATION_COLORS;
+  const palette: Record<string, string> = theme === "moon" ? MOON_COLORS : theme === "station" ? STATION_COLORS : {};
   const colorOf = (t: Tile) => palette[t.terrain] ?? terrains.find((x) => x.id === t.terrain)?.color ?? "#888";
   const byTile = useMemo(() => {
     const m = new Map<string, Structure[]>();
@@ -143,9 +173,11 @@ function Board(props: HexBoardProps) {
       <Lights theme={theme} sunFactor={sunFactor} />
       <Stars radius={80} depth={40} count={2500} factor={3} saturation={0} fade speed={0.2} />
       {theme === "moon" && <EarthOnHorizon up={earthUp} />}
+      <fog attach="fog" args={[theme === "moon" ? "#05060c" : "#030a18", 16, 42]} />
+      {theme === "moon" && <Rocks />}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]} receiveShadow>
-        <circleGeometry args={[30, 64]} />
-        <meshStandardMaterial color={theme === "moon" ? "#3a3936" : "#0d1222"} roughness={1} />
+        <circleGeometry args={[60, 64]} />
+        <meshStandardMaterial color={theme === "moon" ? "#3a3936" : theme === "earth" ? "#0b1f3a" : "#0d1222"} roughness={1} />
       </mesh>
       {tiles.map((t) => {
         const [x, z] = hexToWorld(t.q, t.r);
@@ -183,8 +215,8 @@ function Board(props: HexBoardProps) {
 /** 3D hex map for Operations: the Moon's south pole or the station's racks. */
 export default function HexBoard(props: HexBoardProps) {
   return (
-    <Canvas shadows dpr={[1, 1.75]} camera={{ position: [7, 9.5, 10], fov: 40 }} gl={{ antialias: true }}>
-      <color attach="background" args={[props.theme === "moon" ? "#020308" : "#05070f"]} />
+    <Canvas shadows dpr={[1, 1.75]} camera={{ position: [6, 8, 9], fov: 42 }} gl={{ antialias: true }}>
+      <color attach="background" args={[props.theme === "moon" ? "#020308" : props.theme === "earth" ? "#030a18" : "#05070f"]} />
       <Suspense fallback={null}>
         <Board {...props} />
       </Suspense>

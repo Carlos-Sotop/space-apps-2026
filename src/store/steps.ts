@@ -1,8 +1,8 @@
-export type Screen = "intro" | "story" | "missions" | "coalition" | "control" | "flight" | "debrief";
+export type Screen = "intro" | "story" | "missions" | "coalition" | "control" | "flight" | "ops" | "debrief" | "leaderboard";
 
 export type StepId = "values" | "objectives" | "launch" | "build" | "opentech" | "rideshare" | "council";
 
-export const SCREENS: Screen[] = ["intro", "story", "missions", "coalition", "control", "flight", "debrief"];
+export const SCREENS: Screen[] = ["intro", "story", "missions", "coalition", "control", "flight", "ops", "debrief", "leaderboard"];
 
 export const STEPS: { id: StepId; label: string; hint: string }[] = [
   { id: "values", label: "Values", hint: "Vote on what matters" },

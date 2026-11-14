@@ -6,6 +6,9 @@ import { councilValues, defaultDesign, simulateFlight } from "@/engine";
 import { MAX_SECONDARY } from "@/engine/types";
 import type { Blueprint, Catalog, Coalition, FlightResult, LiveContext, MissionDesign, MissionId, Ratification, Values } from "@/engine/types";
 import { getMission } from "@/lib/catalog";
+import { toOpsLive } from "@/lib/opsLive";
+import { fetchLiveRoute } from "@/live/client";
+import { applyAction, canRunOps, createOps, type OpsAction, type OpsLive, type OpsState } from "@/ops";
 import { recommendedCoalitions } from "@/lib/coalition";
 import { SCREENS, type Screen, type StepId } from "./steps";
 
@@ -27,6 +30,10 @@ interface GameState {
   seed: number;
   ratification: Ratification | null;
   published: Blueprint[];
+  /** Operations phase after arrival (null when the flight never arrived or ops were skipped) */
+  ops: OpsState | null;
+  opsSeed: number;
+  opsLive: OpsLive | null;
 
   go: (screen: Screen) => void;
   setStep: (step: StepId) => void;
@@ -45,6 +52,10 @@ interface GameState {
   setLiveStatus: (s: LiveStatus) => void;
   fly: () => void;
   flyAgain: () => void;
+  /** after the flight: start Operations if the spacecraft arrived, else go to the debrief */
+  afterFlight: () => Promise<void>;
+  opsAct: (a: OpsAction) => void;
+  finishOps: () => void;
   publish: (bp: Blueprint) => void;
   newMission: () => void;
   devJump: (params: URLSearchParams) => void;
@@ -89,6 +100,9 @@ export const useGame = create<GameState>()(
       seed: 1,
       ratification: null,
       published: [],
+      ops: null,
+      opsSeed: 1,
+      opsLive: null,
 
       go: (screen) => set({ screen }),
       setStep: (step) => set({ step }),
@@ -140,8 +154,22 @@ export const useGame = create<GameState>()(
         const s = get();
         if (!s.design) return;
         const seed = newSeed();
-        set({ seed, result: simulateFlight(s.design, catalogWith(s.published), seed, s.live ?? undefined), screen: "flight" });
+        set({ seed, ops: null, opsLive: null, result: simulateFlight(s.design, catalogWith(s.published), seed, s.live ?? undefined), screen: "flight" });
       },
+
+      afterFlight: async () => {
+        const s = get();
+        if (!s.design || !s.result || !canRunOps(s.result)) { set({ ops: null, screen: "debrief" }); return; }
+        const dsn = await fetchLiveRoute("dsn").catch(() => null);
+        const opsLive = toOpsLive(s.live, dsn);
+        const opsSeed = newSeed();
+        const ops = createOps(s.design, catalogWith(s.published), { flight: s.result, seed: opsSeed, live: opsLive });
+        set({ ops, opsSeed, opsLive, screen: "ops" });
+      },
+
+      opsAct: (a) => set((s) => (s.ops && s.design ? { ops: applyAction(s.ops, a, { design: s.design, catalog: catalogWith(s.published) }) } : s)),
+
+      finishOps: () => set({ screen: "debrief" }),
       flyAgain: () => get().fly(),
 
       publish: (bp) => set((s) => ({ published: [...s.published, bp] })),
@@ -160,7 +188,8 @@ export const useGame = create<GameState>()(
           if (screen !== "coalition") get().startControl();
           const step = params.get("step") as StepId | null;
           if (step) set({ step });
-          if (screen === "flight" || screen === "debrief") get().fly();
+          if (screen === "flight" || screen === "debrief" || screen === "ops") get().fly();
+          if (screen === "ops") { void get().afterFlight(); return; }
         }
         set({ screen });
       },
