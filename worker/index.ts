@@ -1,6 +1,7 @@
 // Cloudflare Worker: /api/live/* routes (NASA data, cached, snapshot fallback); everything else is static assets.
 import type { LiveContext, LiveEarthEvent, LiveSpaceWeather } from "../src/engine/types.ts";
 import type { LiveApod, LiveDsn, LiveIss, LiveMoon } from "../src/live/types.ts";
+import { handleScores, type ScoresEnv } from "./scores.ts";
 import { isoDay, normalizeApod, normalizeCme, normalizeEonet, normalizeFlr, normalizeGst, parseDsn, parseHorizons, parseSsc, sscStamp } from "./normalize.ts";
 import spaceWeatherSnap from "../src/data/snapshots/space-weather.json";
 import earthEventsSnap from "../src/data/snapshots/earth-events.json";
@@ -9,9 +10,10 @@ import issSnap from "../src/data/snapshots/iss.json";
 import dsnSnap from "../src/data/snapshots/dsn.json";
 import apodSnap from "../src/data/snapshots/apod.json";
 
-interface Env {
+interface Env extends ScoresEnv {
   ASSETS?: Fetcher;
   NASA_API_KEY?: string;
+  FIRMS_MAP_KEY?: string;
 }
 
 type Result<T> = { data: T; snapshot: boolean };
@@ -175,6 +177,7 @@ export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     try {
       const url = new URL(request.url);
+      if (url.pathname.replace(/\/$/, "") === "/api/scores") return await handleScores(request, env);
       if (request.method === "GET" && url.pathname.startsWith("/api/")) {
         const route = ROUTES[url.pathname.replace(/\/$/, "")];
         if (route) return await handleLive(request, env, ctx, route);

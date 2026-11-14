@@ -6,6 +6,8 @@ import type { Blueprint, ModuleCategory } from "@/engine/types";
 import { getActor, getBlueprint, getMission, getModule } from "@/lib/catalog";
 import { fmtGb } from "@/lib/format";
 import { useGame } from "@/store/game";
+import { finalScore, opsScore } from "@/ops";
+import { RankingSubmit } from "./RankingSubmit";
 
 const GRADE_COLOR: Record<string, string> = { S: "#fbbf24", A: "var(--ok)", B: "var(--blue-bright)", C: "var(--violet-bright)", F: "var(--over)" };
 const short = (h: string) => `${h.slice(0, 8)}…${h.slice(-4)}`;
@@ -22,14 +24,16 @@ function ScoreBar({ label, value }: { label: string; value: number }) {
 }
 
 export default function Debrief() {
-  const { result, design, ratification, published, go, fly, newMission, publish } = useGame();
+  const { result, design, ratification, published, go, fly, newMission, publish, ops } = useGame();
   const mission = design ? getMission(design.missionId) : undefined;
   const [done, setDone] = useState(false);
 
   if (!result || !design || !mission) return <div className="grid min-h-[60vh] place-items-center"><Button variant="primary" onClick={() => go("missions")}>Choose a mission</Button></div>;
 
   const objectives = [mission.primaryObjective, ...mission.secondaryObjectives.filter((o) => design.secondaryObjectiveIds.includes(o.id))];
-  const grade = result.score.grade;
+  const fin = finalScore(result, ops);
+  const grade = fin.grade;
+  const os = ops ? opsScore(ops) : null;
 
   const onPublish = async () => {
     const { manifestHash } = await import("@/crypto");
@@ -59,7 +63,7 @@ export default function Debrief() {
         <div className="glass grid items-center gap-6 p-5 sm:grid-cols-[auto_1fr] sm:p-6">
           <div className="text-center">
             <motion.div initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="font-display text-[72px] leading-none sm:text-[120px]" style={{ color: GRADE_COLOR[grade] ?? "var(--fg)", textShadow: `0 0 40px ${GRADE_COLOR[grade] ?? "#fff"}` }}>{grade}</motion.div>
-            <div className="num text-sm text-muted">{result.score.total} points</div>
+            <div className="num text-sm text-muted">{fin.total} points</div>
             <Badge tone={result.lostAt ? "over" : result.success ? "ok" : "tight"} className="mt-2">{result.lostAt ? "Lost" : result.success ? "Success" : "Partial"}</Badge>
           </div>
           <div className="space-y-3">
@@ -67,9 +71,31 @@ export default function Debrief() {
             <ScoreBar label="Safety" value={result.score.safety} />
             <ScoreBar label="Efficiency" value={result.score.efficiency} />
             <ScoreBar label="Collaboration" value={result.score.collaboration} />
+            {os && <ScoreBar label="Operations on site" value={os.total} />}
             <p className="num pt-1 text-xs text-muted">{fmtGb(result.dataReturnedGb)} of data returned to Earth</p>
           </div>
         </div>
+
+        {ops && (
+          <div className="glass p-5">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <h2 className="font-display text-sm">Operations</h2>
+              <Badge tone={ops.status === "lost" ? "over" : "ok"}>{ops.status === "lost" ? `Lost: ${ops.lostReason ?? ""}` : `${ops.turn >= ops.maxTurns ? ops.maxTurns : ops.turn} turns run`}</Badge>
+            </div>
+            <ul className="grid gap-2 sm:grid-cols-2">
+              {ops.goals.filter((g) => !g.hidden || g.done).map((g) => (
+                <li key={g.id} className="flex items-center gap-2.5 text-sm">
+                  <span className={g.done ? "text-ok" : "text-faint"}><Icon name={g.done ? "check" : "x"} size={16} /></span>
+                  <span className={g.done ? "" : "text-muted"}>{g.title}</span>
+                  <span className="ml-auto text-[10px] uppercase tracking-wider text-faint">{g.kind}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="num mt-3 text-xs text-muted">{fmtGb(ops.dataReturnedGb)} sent from the site · {ops.research.filter((r) => r.unlocked).length} research unlocked · score {os?.total}/100</p>
+          </div>
+        )}
+
+        <RankingSubmit />
 
         <div className="grid gap-5 md:grid-cols-2">
           <div className="glass p-5">
