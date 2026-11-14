@@ -4,7 +4,7 @@ import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { LogoMark, Wordmark } from "@/components/brand/Logo";
 import { useGame } from "@/store/game";
 
-const NetworkGlobe = lazy(() => import("@/three/NetworkGlobe"));
+const HeroScene = lazy(() => import("@/scene/HeroScene"));
 
 export default function Intro() {
   const go = useGame((s) => s.go);
@@ -15,7 +15,7 @@ export default function Intro() {
       <div className="min-h-0 w-full flex-1">
         <ErrorBoundary fallback={<div className="grid h-full place-items-center">{fallback}</div>}>
           <Suspense fallback={<div className="grid h-full place-items-center">{fallback}</div>}>
-            <NetworkGlobe />
+            <HeroScene />
           </Suspense>
         </ErrorBoundary>
       </div>
