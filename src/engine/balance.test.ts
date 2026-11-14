@@ -297,10 +297,24 @@ describe("data: Falcon Heavy configurations", () => {
   it("cites NASA for the lunar capacity of both", () => {
     for (const v of [recovered, expendable]) expect(v.sources.some((s) => s.url.includes("elvperf.ksc.nasa.gov"))).toBe(true);
   });
-  it("only an expendable Falcon Heavy lifts a loaded Blue Moon lander", () => {
-    const ids = ["mb-blue-moon", "mb-vsat", "mb-rfc", "mb-li-ion", "mb-rhu", "mb-dte-xband", "mb-ice-drill"];
-    expect(validateDesign(mb("mb-connecting-ridge", "falcon-heavy", ids), catalog).some((i) => i.id === "mass-over")).toBe(true);
-    expect(validateDesign(mb("mb-connecting-ridge", "falcon-heavy-expendable", ids), catalog).some((i) => i.id === "mass-over")).toBe(false);
+  it("New Glenn, Blue Moon's own launcher, lifts it with the full 3 t; a recovered Falcon Heavy cannot", () => {
+    const tli = (id: string) => catalog.launchVehicles.find((v) => v.id === id)!.capacityKg.TLI ?? 0;
+    const blueMoon = catalog.modules.find((m) => m.id === "mb-blue-moon")!;
+    const loaded = blueMoon.massKg + blueMoon.payloadCapacityKg!;
+    expect(tli("new-glenn")).toBeGreaterThanOrEqual(loaded);
+    expect(tli("falcon-heavy-expendable")).toBeGreaterThanOrEqual(loaded);
+    expect(tli("falcon-heavy")).toBeLessThan(loaded);
+    expect(tli("falcon-9")).toBeLessThan(blueMoon.massKg);
+  });
+});
+
+describe("data: Starship", () => {
+  it("cannot reach the Moon in one launch: NASA plans propellant loading in Earth orbit first", () => {
+    const starship = catalog.launchVehicles.find((v) => v.id === "starship")!;
+    expect(starship.capacityKg.TLI).toBeUndefined();
+    expect(starship.sources.some((s) => s.url.includes("nasa.gov"))).toBe(true);
+    const d = mb("mb-malapert", "starship", ["mb-blue-ghost", "mb-li-ion", "mb-dte-xband", "mb-rhu", "mb-dust-plasma"]);
+    expect(validateDesign(d, catalog).find((i) => i.id === "launch-cannot-reach")?.severity).toBe("blocker");
   });
 });
 

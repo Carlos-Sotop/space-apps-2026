@@ -70,14 +70,17 @@ export const launchVehicles: LaunchVehicle[] = [
     capacityKg: {
       LEO: 35000, // Block 2 figure; Block 3 is listed at 100,000 but unproven
       ISS: 32000, // derived: 0.92 x LEO
-      TLI: 12000, // derived: 0.35 x LEO
+      // no TLI: a Starship reaches the Moon only after propellant is loaded in Earth orbit by tanker flights (NASA, HLS)
     },
     costMUsd: 100, // Wikipedia infobox, expendable cost
     reliability: 0.85, // game value
     reusable: true,
     status: "in-development",
-    blurb: "Fully reusable super-heavy lifter still in flight testing.",
-    sources: [wiki("SpaceX Starship (payload by block, status)", "SpaceX_Starship")],
+    blurb: "Super-heavy and reusable. Needs refilling in orbit to reach the Moon.",
+    sources: [
+      wiki("SpaceX Starship (payload by block, status)", "SpaceX_Starship"),
+      { title: "NASA: NASA, SpaceX illustrate key moments of Artemis lunar lander mission (propellant loading in Earth orbit)", url: "https://www.nasa.gov/directorates/esdmd/artemis-campaign-development-division/human-landing-system-program/nasa-spacex-illustrate-key-moments-of-artemis-lunar-lander-mission/" },
+    ],
     verified: false,
   },
   {
