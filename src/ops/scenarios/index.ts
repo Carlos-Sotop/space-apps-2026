@@ -1,9 +1,10 @@
 import type { MissionId } from "../../engine/types";
 import type { OpsScenario } from "../scenario";
+import { earth } from "./earth";
 import { moon } from "./moon";
 import { station } from "./station";
 
-const registry: Partial<Record<MissionId, OpsScenario>> = { "moon-base-zero": moon, "orbital-lab": station };
+const registry: Partial<Record<MissionId, OpsScenario>> = { "moon-base-zero": moon, "orbital-lab": station, "earth-guardian": earth };
 
 export function getScenario(missionId: MissionId): OpsScenario {
   const sc = registry[missionId];

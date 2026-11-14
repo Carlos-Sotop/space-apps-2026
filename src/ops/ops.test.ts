@@ -80,6 +80,8 @@ interface Plan {
   build: { kind: string; moduleHint?: string }[];
   /** scout with this many tiles at most per turn */
   scout?: boolean;
+  /** retask campaigns onto regions not covered yet */
+  roam?: boolean;
 }
 
 const dist = (s: OpsState, id: string) => {
@@ -109,6 +111,13 @@ function turnOf(s: OpsState, ctx: OpsCtx, plan: Plan): OpsState {
   for (const b of plan.build) {
     const tiles = validTiles(cur, { build: b.kind }, ctx);
     if (tiles.length && !cur.structures.some((st) => st.kind === b.kind)) act({ type: "build", kind: b.kind, tileId: tiles[0] });
+  }
+  if (plan.roam) {
+    for (const st of cur.structures.filter((x) => x.kind === "campaign")) {
+      const open = validTiles(cur, { move: st.id }, ctx).filter((id) => !Object.keys(cur.flags).some((k) => k.startsWith("cov:") && k.endsWith(`:${id}`)));
+      const best = open.sort((a, b) => (cur.tiles.find((t) => t.id === b)?.value ?? 0) - (cur.tiles.find((t) => t.id === a)?.value ?? 0))[0];
+      if (best && cur.flags[`cov:seen:${st.id}`] !== cur.turn) act({ type: "move", structureId: st.id, tileId: best });
+    }
   }
   for (const r of [...cur.research].sort((a, b) => a.cost - b.cost)) act({ type: "research", id: r.id });
   if (plan.scout) {
@@ -398,6 +407,104 @@ describe("Orbital Lab scenario", () => {
     const bad = idle(createOps(d, catalog, init()), ctx);
     expect(good.status).toBe("ended");
     expect(opsScore(good).total).toBeGreaterThanOrEqual(60);
+    expect(opsScore(bad).total).toBeLessThan(opsScore(good).total);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* Earth Guardian                                                      */
+/* ------------------------------------------------------------------ */
+
+const EARTH_MODULES = [
+  "eg-bus-medium", "eg-array-large", "eg-batt-large", "eg-kaband", "eg-ground-network",
+  "eg-lsar", "eg-ssar", "eg-thermal-ir", "eg-msi", "eg-ais",
+];
+const earthDesign = () => design("earth-guardian", "eg-sso-dawn-dusk", EARTH_MODULES, ["eg-wildfire", "eg-crops", "eg-ships"]);
+
+const earthPlan: Plan = {
+  deploy: ["eg-lsar", "eg-thermal-ir", "eg-msi", "eg-ais", "eg-ssar"],
+  pick(s, moduleId, tiles) {
+    const good: Record<string, string[]> = { "eg-lsar": ["forest"], "eg-thermal-ir": ["dryland", "forest"], "eg-msi": ["farmland"], "eg-ais": ["ocean"], "eg-ssar": ["coast"] };
+    const score = (id: string) => {
+      const t = s.tiles.find((x) => x.id === id) as OpsState["tiles"][number];
+      return (good[moduleId]?.includes(t.terrain) ? 100 : 0) + t.value;
+    };
+    return [...tiles].sort((a, b) => score(b) - score(a))[0];
+  },
+  build: [],
+  scout: true,
+  roam: true,
+};
+
+describe("Earth Guardian scenario", () => {
+  const d = earthDesign();
+  const ctx = ctxOf(d);
+  const src = { title: "NASA EONET", url: "https://eonet.gsfc.nasa.gov/" };
+
+  it("sets up 18 regions plus the ground network, 15 months", () => {
+    const s = createOps(d, catalog, init());
+    expect(s.tiles).toHaveLength(19);
+    expect(s.tiles[0].label).toBe("Ground station network");
+    expect(s.maxTurns).toBe(15);
+    expect(getScenario("earth-guardian").turnLabel).toBe("Month");
+    expect(s.waterKg).toBeGreaterThan(0);
+  });
+
+  it("attaches live Earth events to the nearest region by great-circle distance", () => {
+    const live: OpsLive = {
+      storms: [],
+      earthEvents: [
+        { id: "a", title: "Fire near Manaus", category: "wildfires", lat: -3.5, lon: -60.5, source: src },
+        { id: "b", title: "Flood on the Nile", category: "floods", lat: 31.5, lon: 30, source: src },
+        { id: "c", title: "Cyclone east of Fiji", category: "severeStorms", lat: -10, lon: -175, source: src },
+      ],
+    };
+    const s = createOps(d, catalog, init(1, live));
+    const by = (label: string) => s.tiles.find((t) => t.label === label) as OpsState["tiles"][number];
+    expect(by("Amazon basin").liveEvent?.title).toBe("Fire near Manaus");
+    expect(by("Amazon basin").value).toBe(30);
+    expect(by("Nile delta").liveEvent?.category).toBe("floods");
+    expect(by("Nile delta").value).toBe(20);
+    expect(by("Pacific islands").liveEvent?.title).toBe("Cyclone east of Fiji");
+  });
+
+  it("adds simulated fires when the live feed has none", () => {
+    const s = createOps(d, catalog, init());
+    const fires = s.tiles.filter((t) => t.liveEvent?.category === "wildfires");
+    expect(fires.length).toBeGreaterThanOrEqual(3);
+    expect(fires[0].liveEvent?.title).toMatch(/simulated/);
+  });
+
+  it("retasks a campaign for 1 action point and 2 kg of propellant", () => {
+    let s = createOps(d, catalog, init());
+    s = applyAction(s, { type: "deploy", moduleId: "eg-lsar", tileId: validTiles(s, { moduleId: "eg-lsar" }, ctx)[0] }, ctx);
+    const to = validTiles(s, { move: "eg-lsar" }, ctx)[0];
+    const fuel = s.waterKg;
+    const ap = s.ap;
+    const t = applyAction(s, { type: "move", structureId: "eg-lsar", tileId: to }, ctx);
+    expect(t.structures.find((x) => x.id === "eg-lsar")?.tileId).toBe(to);
+    expect(t.waterKg).toBe(fuel - 2);
+    expect(t.ap).toBe(ap - 1);
+    expect(whyNot(s, { type: "move", structureId: "eg-bus-medium", tileId: to }, ctx)).toMatch(/cannot move/);
+  });
+
+  it("cuts the downlink when you keep imaging through a geomagnetic storm", () => {
+    let s = createOps(d, catalog, init());
+    for (let i = 0; i < 20 && !s.pendingEvent?.id.startsWith("storm-"); i++) s = idleTurn(s, ctx);
+    const card = s.pendingEvent;
+    if (!card) throw new Error("no storm");
+    s = { ...s, dataStoredGb: 20000, ap: 0 };
+    const run = (optionId: string) =>
+      applyAction(applyAction(s, { type: "choose", eventId: card.id, optionId }, ctx), { type: "advance" }, ctx).dataReturnedGb;
+    expect(run("shelter")).toBeGreaterThan(run("work"));
+  });
+
+  it("is deterministic and plays a good game", () => {
+    const good = play(d, earthPlan, init(9));
+    expect(replay(d, catalog, init(9), good.actions)).toEqual(good);
+    expect(good.status).toBe("ended");
+    expect(opsScore(good).total).toBeGreaterThanOrEqual(60);
+    const bad = idle(createOps(d, catalog, init(9)), ctx);
     expect(opsScore(bad).total).toBeLessThan(opsScore(good).total);
   });
 });
