@@ -46,7 +46,9 @@ export function ChainReceipt({ design, ratification, className = "" }: Props) {
       {state.status === "not-recorded" && (
         <span title={state.message} className={`${CHIP} border-line bg-white/5 text-muted`}>
           <Icon name="minus" size={12} />
-          <span className="truncate">Not recorded on Solana devnet · {WHY[state.reason]}</span>
+          <span className="truncate">
+            Not recorded on Solana devnet<span className="hidden sm:inline"> · {WHY[state.reason]}</span>
+          </span>
         </span>
       )}
     </span>
