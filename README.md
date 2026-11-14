@@ -4,7 +4,7 @@
 
 SpaceDAO is a mission design game for the NASA Space Apps Challenge 2026 challenge [Space Mission Design Game](https://www.spaceappschallenge.org/2026/challenges/space-mission-design-game/). You represent a space agency or company, form a council with three partners, and design a real mission: objectives, launch vehicle, orbit, spacecraft, budget, power, mass, data, communications and lifetime. The council governs it like a DAO (a values vote, a futarchy decision market, open-tech sharing and a 4-of-4 quantum-safe signature), then the flight is simulated with live NASA data and the debrief explains why it succeeded or failed.
 
-Three missions: **Orbital Lab** (ISS, easy), **Earth Guardian** (Earth observation for wildfires and floods, medium) and **Moon Base Zero** (lunar south pole, commissioned by MoonDAO, hard).
+Three missions: **Orbital Lab** (ISS, easy), **Earth Guardian** (Earth observation for wildfires and floods, medium) and **Moon Base Zero** (lunar south pole, hard).
 
 Team Founder House, Florianópolis, Brazil: Dayon (`xdayon`), Charlie (`Carlos-Sotop`), Manuel (`Galmanus`), Eric (`Eric-lsg`).
 

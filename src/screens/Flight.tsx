@@ -28,6 +28,7 @@ export default function Flight() {
   const design = useGame((s) => s.design);
   const live = useGame((s) => s.live);
   const go = useGame((s) => s.go);
+  const afterFlight = useGame((s) => s.afterFlight);
   const mission = design ? getMission(design.missionId) : undefined;
   const [p, setP] = useState(0);
   const [speed, setSpeed] = useState(1);
@@ -129,7 +130,7 @@ export default function Flight() {
               <div className="font-display text-4xl" style={{ color: OUTCOME[outcome].color, textShadow: `0 0 28px ${OUTCOME[outcome].color}` }}>{OUTCOME[outcome].label}</div>
               <p className="mt-3 text-sm text-muted">{OUTCOME[outcome].line}</p>
               <div className="mt-3 flex justify-center gap-2"><Badge>Score <span className="num">{result.score.total}</span></Badge><Badge>Grade {result.score.grade}</Badge></div>
-              <Button variant="primary" size="lg" className="mt-6" onClick={() => go("debrief")}>See the debrief <Icon name="arrow" size={16} /></Button>
+              <Button variant="primary" size="lg" className="mt-6" onClick={() => void afterFlight()}>{result.lostAt && !["operations", "downlink"].includes(result.lostAt) ? "See the debrief" : "Take command on site"} <Icon name="arrow" size={16} /></Button>
             </motion.div>
           </motion.div>
         )}

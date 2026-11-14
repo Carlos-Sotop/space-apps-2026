@@ -21,6 +21,13 @@ Every real-world number and every API we use is listed here and in the README. T
 - FIRMS MAP_KEY at https://firms.modaps.eosdis.nasa.gov/api/map_key/.
 Put them in `.dev.vars` locally and `wrangler secret put NASA_API_KEY` / `FIRMS_MAP_KEY` in production. Never paste keys in chat, issues or commits.
 
+## Used by Operations and the 3D scenes
+
+- NASA DONKI storms, DSN Now load and EONET events feed the Operations schedule (`src/lib/opsLive.ts`).
+- Textures: NASA Blue Marble, Black Marble, SVS CGI Moon Kit (LRO LROC color, LOLA elevation). Credits in `public/textures/CREDITS.md`.
+- Operations numbers cite Mazarico et al. 2011 (polar illumination), LCROSS (ice in Cabeus), NASA Veggie, CubeSat 101 (`src/ops/sources.ts`).
+- Challenge resources reviewed 2026-11-14 (downloads and a summary in the parent folder `reference/nasa-resources/`): NASA "Design and Develop a Science Mission" deck (lifecycle: need, concept, requirements, design, build and verify, implement), NASA CubeSat 101 (16 phases, margins, operations), JPL Concept Maturity Levels paper, Goddard Mission Design Lab, GMAT, NASA mission-viz, Webb "Build It Yourself", CSA games.
+
 ## Reference datasets and documents (static numbers in `src/data/`)
 
 Each entry in `src/data/*.ts` carries its own `sources`. Main families:

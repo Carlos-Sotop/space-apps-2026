@@ -1,6 +1,8 @@
 import { useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Button, Icon } from "@/components/ui";
+import { ConceptVisual, useLearn } from "@/components/learn/Primer";
+import { CONCEPTS, CONCEPT_ORDER } from "@/components/learn/concepts";
 import { useGame } from "@/store/game";
 
 const rocket = (x: number, fill: number) => (
@@ -46,10 +48,31 @@ function VisualSigned() {
   );
 }
 
+function TechInside() {
+  const open = useLearn((s) => s.open);
+  return (
+    <div className="grid w-full max-w-xl grid-cols-2 gap-2 sm:grid-cols-4">
+      {CONCEPT_ORDER.map((id) => (
+        <button
+          key={id}
+          type="button"
+          onClick={(e) => { e.stopPropagation(); open(id); }}
+          onPointerDown={(e) => e.stopPropagation()}
+          className="flex flex-col items-center gap-1 rounded-[var(--radius-card)] border border-line bg-white/[0.03] p-2 text-xs text-muted transition hover:border-violet-bright/60 hover:text-fg"
+        >
+          <ConceptVisual id={id} size={64} />
+          {CONCEPTS[id].short}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 const PANELS: { text: string; visual: ReactNode }[] = [
   { text: "Every nation builds alone. Rockets fly half empty.", visual: <VisualAlone /> },
   { text: "SpaceDAO links agencies and companies to plan, fund and share missions together.", visual: <VisualLinked /> },
   { text: "Decisions are signed by the council and the science is open to everyone.", visual: <VisualSigned /> },
+  { text: "Real tech runs under the hood. Tap any idea to see it work.", visual: <TechInside /> },
 ];
 
 export default function Story() {

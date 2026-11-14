@@ -5,6 +5,8 @@ import { IssueChips, ResourceHud, useIssues } from "@/components/hud/ResourceHud
 import { StepRail } from "@/components/hud/StepRail";
 import { TopBar } from "@/components/hud/TopBar";
 import { Button, Icon } from "@/components/ui";
+import { LearnChip } from "@/components/learn/Primer";
+import { STEP_CONCEPTS } from "@/components/learn/concepts";
 import { useGame } from "@/store/game";
 import { STEPS, type StepId } from "@/store/steps";
 import { BuildStep } from "./BuildStep";
@@ -48,6 +50,11 @@ function Inner() {
         <section className="min-w-0">
           <AnimatePresence mode="wait">
             <motion.div key={step} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.22 }}>
+              {STEP_CONCEPTS[step] && (
+                <div className="mb-4 flex flex-wrap gap-2">
+                  {STEP_CONCEPTS[step]!.map((c) => <LearnChip key={c} id={c} />)}
+                </div>
+              )}
               <View />
             </motion.div>
           </AnimatePresence>

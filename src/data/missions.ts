@@ -395,9 +395,8 @@ export const missions: Mission[] = [
     name: "Moon Base Zero",
     tagline: "First outpost at the lunar south pole",
     difficulty: 3,
-    client: "MoonDAO",
     briefing:
-      "MoonDAO wants a first outpost near the lunar south pole, where sunlit ridges sit beside craters that may hold ice. It must survive the dark, find water and stay in touch with Earth. A secure link and a local network show how a base can run when Earth drops out of view.",
+      "An international coalition wants a first outpost near the lunar south pole, where sunlit ridges sit beside craters that may hold ice. It must survive the dark, find water and stay in touch with Earth. A secure link and a local network show how a base can run when Earth drops out of view.",
     primaryObjective: {
       id: "mb-primary",
       title: "Land and run a powered outpost",
