@@ -7,6 +7,7 @@ import { getActor, getBlueprint, getMission, getModule } from "@/lib/catalog";
 import { fmtGb } from "@/lib/format";
 import { ChainReceipt } from "@/chain";
 import { useGame } from "@/store/game";
+import { MarketSettlement } from "@/screens/control/MarketPanel";
 
 const GRADE_COLOR: Record<string, string> = { S: "#fbbf24", A: "var(--ok)", B: "var(--blue-bright)", C: "var(--violet-bright)", F: "var(--over)" };
 const short = (h: string) => `${h.slice(0, 8)}…${h.slice(-4)}`;
@@ -110,6 +111,8 @@ export default function Debrief() {
             </div>
           ) : <p className="text-sm text-muted">This flight was not signed by the council.</p>}
         </div>
+
+        <MarketSettlement />
 
         <div className="flex flex-wrap items-center gap-3">
           <Button variant="primary" className="h-auto min-h-10 max-w-full !whitespace-normal py-2 text-left" onClick={onPublish} disabled={done}>{done ? <><Icon name="check" size={16} /> Published ({published.length})</> : <><Icon name="fork" size={16} /> Publish your design to the Open Tech Registry</>}</Button>
