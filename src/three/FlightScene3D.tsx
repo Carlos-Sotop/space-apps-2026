@@ -1,8 +1,13 @@
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
+import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import { Line, Stars } from "@react-three/drei";
 import * as THREE from "three";
 import type { FlightSceneProps } from "@/screens/FlightSceneSvg";
+import { earthTexture } from "./earthTexture";
 import { phaseAt } from "@/screens/flightTimeline";
 import type { FlightPhaseId } from "@/engine/types";
 
@@ -84,17 +89,20 @@ function Plume({ pos, dir, scale, t }: { pos: THREE.Vector3; dir: THREE.Vector3;
 }
 
 function Planet({ center, radius, kind, t }: { center: THREE.Vector3; radius: number; kind: "earth" | "moon"; t: number }) {
+  const map = useMemo(() => (kind === "earth" ? earthTexture() : null), [kind]);
   const craters = useMemo(() => [[0.5, 0.7, 0.07], [-0.4, 0.3, 0.05], [0.1, -0.6, 0.09], [0.8, -0.2, 0.04], [-0.7, -0.5, 0.06], [0.3, 0.2, 0.05]], []);
   if (kind === "earth") {
     return (
       <group position={center}>
-        <mesh rotation={[0, t * 0.05, 0]}>
-          <sphereGeometry args={[radius, 64, 48]} />
-          <meshStandardMaterial color="#1e4fa0" emissive="#0b1d4a" roughness={0.85} />
+        <mesh rotation={[0, t * 0.03, 0]}>
+          <sphereGeometry args={[radius, 96, 64]} />
+          {map
+            ? <meshStandardMaterial map={map} emissive="#0a1836" emissiveIntensity={0.55} roughness={0.9} />
+            : <meshStandardMaterial color="#1e4fa0" emissive="#0b1d4a" roughness={0.85} />}
         </mesh>
-        <mesh rotation={[0, t * 0.05, 0]}>
-          <sphereGeometry args={[radius * 1.003, 36, 18]} />
-          <meshBasicMaterial color="#60a5fa" wireframe transparent opacity={0.1} />
+        <mesh rotation={[0, t * 0.03, 0]}>
+          <sphereGeometry args={[radius * 1.002, 36, 18]} />
+          <meshBasicMaterial color="#7dd3fc" wireframe transparent opacity={0.06} />
         </mesh>
         <mesh>
           <sphereGeometry args={[radius * 1.1, 48, 32]} />
@@ -140,6 +148,25 @@ function Label({ text, position }: { text: string; position: THREE.Vector3 }) {
     return t;
   }, [text]);
   return <sprite position={position} scale={[0.9, 0.225, 1]}><spriteMaterial map={tex} transparent depthWrite={false} /></sprite>;
+}
+
+/** Bloom, so the plume, the rocket glow and the city-free night side carry real light. */
+function Bloom({ strength }: { strength: number }) {
+  const gl = useThree((st) => st.gl);
+  const scene = useThree((st) => st.scene);
+  const camera = useThree((st) => st.camera);
+  const size = useThree((st) => st.size);
+  const composer = useMemo(() => {
+    const c = new EffectComposer(gl);
+    c.addPass(new RenderPass(scene, camera));
+    c.addPass(new UnrealBloomPass(new THREE.Vector2(size.width, size.height), strength, 0.7, 0.72));
+    c.addPass(new OutputPass());
+    return c;
+  }, [gl, scene, camera, strength, size.width, size.height]);
+  useEffect(() => () => composer.dispose(), [composer]);
+  useEffect(() => composer.setSize(size.width, size.height), [composer, size]);
+  useFrame(() => composer.render(), 1);
+  return null;
 }
 
 function Rig({ pos, look }: { pos: THREE.Vector3; look: THREE.Vector3 }) {
@@ -224,6 +251,7 @@ function Scene({ timeline, p, lunar, lostAt, ended }: FlightSceneProps) {
   return (
     <>
       <Rig pos={camPos} look={camLook} />
+      <Bloom strength={burning ? 0.85 : 0.5} />
       <color attach="background" args={["#04060f"]} />
       <ambientLight intensity={0.45} />
       <directionalLight position={[6, 3, 6]} intensity={2.2} />
@@ -269,7 +297,7 @@ export default function FlightScene3D(props: FlightSceneProps) {
       <Canvas dpr={[1, 2]} camera={{ position: [0, 1.3, 4.8], fov: 45 }} gl={{ antialias: true }} aria-label={props.lunar ? "Flight from Earth to the Moon" : "Flight into Earth orbit"} role="img">
         <Scene {...props} />
       </Canvas>
-      <div className="pointer-events-none absolute bottom-2 right-3 text-[10px] uppercase tracking-wider text-white/40">{props.lunar ? "Not to scale" : "Earth orbit, not to scale"}</div>
+      <div className="pointer-events-none absolute bottom-2.5 right-14 text-[10px] uppercase tracking-wider text-white/40">{props.lunar ? "Not to scale" : "Earth orbit, not to scale"}</div>
     </div>
   );
 }
