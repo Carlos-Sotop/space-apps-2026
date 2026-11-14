@@ -9,7 +9,7 @@
  * Pure and deterministic like src/engine: same design, flight, seed, live input and
  * action list give the same state. The Worker replays the action list to verify scores.
  */
-import type { FlightResult, MissionId, Source } from "../engine/types";
+import type { Catalog, FlightResult, MissionDesign, MissionId, Source } from "../engine/types";
 
 /** 3 Earth days per turn: a 45-day mission is 15 turns. */
 export const DAYS_PER_TURN = 3;
@@ -127,6 +127,7 @@ export type OpsAction =
   | { type: "build"; kind: StructureKind; tileId: string }
   | { type: "research"; id: string }
   | { type: "toggle"; structureId: string }
+  | { type: "move"; structureId: string; tileId: string }
   | { type: "scout"; tileId: string }
   | { type: "repair"; structureId: string }
   | { type: "choose"; eventId: string; optionId: string }
@@ -209,6 +210,8 @@ export interface OpsState {
   env: OpsEnv;
   /** the next 3 turns, so the player can plan for the dark and for storms */
   forecast: OpsEnv[];
+  /** the whole environment, precomputed at creation (index = turn - 1) */
+  schedule: OpsEnv[];
   pendingEvent: OpsEventCard | null;
   goals: OpsGoal[];
   research: Research[];
@@ -220,6 +223,12 @@ export interface OpsState {
   lostReason?: string;
   /** consecutive turns with zero energy */
   frozenTurns: number;
+  /** event ids already drawn, so none repeats */
+  seenEvents: string[];
+  /** hidden discovery goal id -> tile id where scouting reveals it */
+  secrets: Record<string, string>;
+  /** scenario counters and per-turn switches (storm choice, AP spent, streaks...) */
+  flags: Record<string, number>;
   /** every accepted action, in order; the Worker replays this */
   actions: OpsAction[];
 }
@@ -250,4 +259,9 @@ export interface OpsInit {
   flight: FlightResult;
   seed: number;
   live?: OpsLive;
+}
+
+export interface OpsCtx {
+  design: MissionDesign;
+  catalog: Catalog;
 }
