@@ -710,7 +710,7 @@ export const modules: Module[] = [
     name: "Blue Moon Mark 1",
     category: "lander",
     tier: "advanced",
-    massKg: 7500, // estimate: game simplification. Wet mass is about 21,350 kg; it burns its own fuel after launch to LEO
+    massKg: 4130, // derived: Blue Moon flies itself to the Moon from Earth orbit (about 21,350 kg wet), so the game uses the mass that lets its launcher New Glenn (NASA LSP: 7,130 kg at C3 = -1) carry it with the full 3,000 kg
     powerW: 400, // game value
     generatesW: 2000, // estimate
     costMUsd: 250, // estimate: game value
