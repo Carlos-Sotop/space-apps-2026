@@ -1,7 +1,7 @@
 // The one-click coalitions on the Coalition screen, and the design each one gets in Quick play.
 import { describe, expect, it } from "vitest";
 import { catalog } from "@/data";
-import { autoDesign, councilReview, forecast, validateDesign } from "@/engine";
+import { autoDesign, councilReview, forecast, readinessAllGo, readinessReview, validateDesign } from "@/engine";
 import type { Coalition } from "@/engine/types";
 import { recommendedCoalitions } from "./coalition";
 
@@ -42,10 +42,12 @@ describe("every recommended coalition gets a design that flies", () => {
       recommendedCoalitions(m, lead).map((r) => [`${m.name}, ${lead} with ${r.label}`, m.id, { leadId: lead, partnerIds: r.partnerIds } as Coalition] as const),
     ),
   );
-  it.each(cases)("%s: clean, approved by every partner, at least 70% success", (_name, missionId, coalition) => {
+  it.each(cases)("%s: clean, approved by every partner, unanimous GO, at least 70% success", (_name, missionId, coalition) => {
     const d = autoDesign(missionId, coalition, catalog);
     expect(validateDesign(d, catalog)).toEqual([]);
     expect(councilReview(d, catalog).every((r) => r.verdict === "approve")).toBe(true);
-    expect(forecast(d, catalog, 200).successProbability).toBeGreaterThanOrEqual(0.7);
+    const risk = forecast(d, catalog, 200);
+    expect(risk.successProbability).toBeGreaterThanOrEqual(0.7);
+    expect(readinessAllGo(readinessReview(d, catalog, risk))).toBe(true);
   });
 });
