@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 import { Icon } from "@/components/ui/Icon";
 import { LogoMark } from "@/components/brand/Logo";
 import { useTutorial } from "@/components/tutorial";
+import { JourneyBar } from "./JourneyBar";
+import { NasaLiveChip } from "./NasaLiveChip";
 
 interface Props {
   title?: string;
@@ -13,6 +15,7 @@ interface Props {
 export function TopBar({ title, onBack, backLabel = "Back", right }: Props) {
   const tutorial = useTutorial();
   return (
+    <>
     <header className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-4 py-4 sm:px-6">
       <div className="flex min-w-0 items-center gap-3">
         {onBack && (
@@ -30,8 +33,11 @@ export function TopBar({ title, onBack, backLabel = "Back", right }: Props) {
         >
           <Icon name="sparkle" size={15} /> <span className="hidden sm:inline">Tutorial</span>
         </button>
+        <NasaLiveChip />
         {right}
       </div>
     </header>
+    <JourneyBar />
+    </>
   );
 }

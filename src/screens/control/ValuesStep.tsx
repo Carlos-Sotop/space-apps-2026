@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { councilValues } from "@/engine";
+import { councilValues, recommendStep } from "@/engine";
 import type { Values } from "@/engine/types";
-import { MonogramBadge, Slider } from "@/components/ui";
+import { MonogramBadge, RecommendedButton, Slider } from "@/components/ui";
 import { getActor } from "@/lib/catalog";
 import { fmtPct } from "@/lib/format";
 import { useGame } from "@/store/game";
-import { StepTitle, useDesign } from "./useDesign";
+import { useDesign } from "./useDesign";
 
 const KEYS: { key: keyof Values; label: string; color: string }[] = [
   { key: "science", label: "Science", color: "var(--violet-bright)" },
@@ -31,7 +31,17 @@ export function ValuesStep() {
   const { design, catalog } = useDesign();
   const playerValues = useGame((s) => s.playerValues);
   const setPlayerValues = useGame((s) => s.setPlayerValues);
+  const patchDesign = useGame((s) => s.patchDesign);
   const [raw, setRaw] = useState<Values>({ science: playerValues.science * 100, safety: playerValues.safety * 100, cost: playerValues.cost * 100 });
+
+  const applyRecommended = () => {
+    const { values: v, ...rest } = recommendStep("charter", design, catalog);
+    if (v) {
+      setRaw({ science: v.science * 100, safety: v.safety * 100, cost: v.cost * 100 });
+      setPlayerValues(v);
+    }
+    if (Object.keys(rest).length) patchDesign(rest);
+  };
 
   const update = (key: keyof Values, v: number) => {
     const next = { ...raw, [key]: v };
@@ -45,9 +55,9 @@ export function ValuesStep() {
 
   return (
     <div>
-      <StepTitle title="Council vote: what matters most?" chip="Vote on values" />
+      <div className="mb-5 flex justify-end"><RecommendedButton data-coach="charter.recommended" onClick={applyRecommended} /></div>
       <div className="grid gap-5 lg:grid-cols-2">
-        <div className="glass space-y-5 p-5">
+        <div className="glass space-y-5 p-5" data-coach="charter.vote">
           <div className="text-xs uppercase tracking-widest text-faint">Your vote</div>
           {KEYS.map((k) => <Slider key={k.key} id={`v-${k.key}`} label={k.label} value={raw[k.key]} min={0} max={100} step={1} display={fmtPct(playerValues[k.key])} onChange={(v) => update(k.key, v)} />)}
         </div>

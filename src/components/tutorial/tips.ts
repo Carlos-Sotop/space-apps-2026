@@ -20,7 +20,7 @@ export const TIPS: Record<string, Tip[]> = {
   control: [
     { anchor: "control.gauges", pose: "point", text: "These six gauges are your mission's health. Every choice you make moves them." },
     { anchor: "control.steps", pose: "point", text: "Work through the steps one by one. The list shows where you are." },
-    { anchor: "control.nav", pose: "wave", text: "Happy with this step? Press Next to continue." },
+    { anchor: "control.next", pose: "wave", text: "Happy with this step? Press Next to continue." },
   ],
   "control.values": [
     { anchor: "control.body", pose: "think", text: "Your council votes on what matters most: science, safety or cost. It shapes how they judge your design." },

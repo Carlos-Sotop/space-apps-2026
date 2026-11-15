@@ -9,6 +9,7 @@ export { InfoButton, InfoDrawerHost } from "./InfoDrawer";
 export { LiveBadge } from "./LiveBadge";
 export { Modal } from "./Modal";
 export { MonogramBadge } from "./MonogramBadge";
+export { RealEventBadge } from "./RealEventBadge";
 export { RecommendedButton } from "./RecommendedButton";
 export { Slider } from "./Slider";
 export { Starfield } from "./Starfield";
