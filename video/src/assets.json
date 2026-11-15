@@ -1,0 +1,57 @@
+{
+  "audio": {
+    "sfx_beep": {
+      "src": "audio/sfx/beep.mp3",
+      "seconds": 1.6
+    },
+    "sfx_click": {
+      "src": "audio/sfx/click.mp3",
+      "seconds": 0.09712
+    },
+    "sfx_glass": {
+      "src": "audio/sfx/glass.mp3",
+      "seconds": 0.275533
+    },
+    "sfx_glitch": {
+      "src": "audio/sfx/glitch.mp3",
+      "seconds": 0.3
+    },
+    "sfx_impact": {
+      "src": "audio/sfx/impact.mp3",
+      "seconds": 2.000045
+    },
+    "sfx_ping": {
+      "src": "audio/sfx/ping.mp3",
+      "seconds": 0.244444
+    },
+    "sfx_pop": {
+      "src": "audio/sfx/pop.mp3",
+      "seconds": 0.211859
+    },
+    "sfx_quindar": {
+      "src": "audio/sfx/quindar.mp3",
+      "seconds": 3.2
+    },
+    "sfx_riser": {
+      "src": "audio/sfx/riser.mp3",
+      "seconds": 2.6
+    },
+    "sfx_roar": {
+      "src": "audio/sfx/roar.mp3",
+      "seconds": 7
+    },
+    "sfx_seal": {
+      "src": "audio/sfx/seal.mp3",
+      "seconds": 0.539002
+    },
+    "sfx_swell": {
+      "src": "audio/sfx/swell.mp3",
+      "seconds": 0.955079
+    },
+    "sfx_whoosh": {
+      "src": "audio/sfx/whoosh.mp3",
+      "seconds": 1.1
+    }
+  },
+  "clips": {}
+}
