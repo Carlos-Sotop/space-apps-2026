@@ -1,6 +1,6 @@
 import { MAX_SECONDARY, type Catalog, type Domain, type Issue, type MissionDesign, type ResourceKey } from "./types";
-import { categoryDomain, fmt, getLaunchVehicle, getObjective, resolveDesign } from "./design";
-import { applyStat, effectiveModifiers } from "./modifiers";
+import { categoryDomain, fmt, getBlueprint, getLaunchVehicle, getModule, getObjective, resolveDesign } from "./design";
+import { applyStat, blueprintFit, effectiveModifiers } from "./modifiers";
 import { computeResources, moduleCostMUsd, moduleMassKg, modulePowerW } from "./resources";
 
 export const RESOURCE_DOMAIN: Record<ResourceKey, Domain> = {
@@ -210,6 +210,23 @@ export function validateDesign(design: MissionDesign, catalog: Catalog): Issue[]
       severity: "warning",
       text: `The ${key} margin is under 10% (${fmt((g.used / g.capacity) * 100)}% used). Real missions keep 10-20% margin because estimates always grow.`,
       fix: `Free up some ${key}: drop or swap the biggest item in the ${key} breakdown.`,
+    });
+  }
+
+  // an adopted open design that attaches to nothing on board adds nothing (and costs nothing)
+  for (const id of design.blueprintIds) {
+    const bp = getBlueprint(catalog, id);
+    const fit = blueprintFit(bp, design, catalog);
+    if (fit.ok) continue;
+    const names = fit.optionIds.map((x) => getModule(catalog, x).name);
+    add({
+      id: `opentech-unfit-${id}`,
+      domain: categoryDomain(bp.category),
+      severity: "warning",
+      text: names.length
+        ? `${bp.name} does nothing yet: it attaches to ${names.join(" or ")}, and the spacecraft flies none.`
+        : `${bp.name} does nothing: no module on this mission can carry it.`,
+      fix: names.length ? `Add ${names[0]} in Build, or drop ${bp.name} in Open tech.` : `Drop ${bp.name} in Open tech.`,
     });
   }
 
