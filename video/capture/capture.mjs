@@ -27,6 +27,15 @@ const MOON = "mission=moon-base-zero";
 
 mkdirSync(OUT, { recursive: true });
 
+// A local dev server has no shared registry, so Publish would toast "Saved on this device". Start the dev server
+// with VITE_SUPABASE_URL=https://registry.capture.invalid (any VITE_SUPABASE_PUBLISHABLE_KEY) and the capture
+// answers that host the way Supabase does: stored on POST, an empty list on reads. Production is never called.
+const REGISTRY = "https://registry.capture.invalid";
+const answerRegistry = (route) =>
+  route.request().method() === "POST"
+    ? route.fulfill({ status: 201, body: "" })
+    : route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+
 // visible cursor dot so viewers see what is hovered or clicked
 const CURSOR_JS = `
 (() => {
@@ -342,6 +351,7 @@ async function record(browser, name, shot) {
     recordVideo: { dir, size: VIEW, fps: FPS },
   });
   await ctx.addInitScript(CURSOR_JS);
+  await ctx.route(`${REGISTRY}/**`, answerRegistry);
   const errors = [];
   const rec0 = Date.now();
   const page = await ctx.newPage();
