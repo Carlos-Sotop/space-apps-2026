@@ -8,7 +8,6 @@ import { registry } from "@/registry/client";
 import { fmtGb } from "@/lib/format";
 import { ChainReceipt } from "@/chain";
 import { useGame } from "@/store/game";
-import { MarketSettlement } from "@/screens/control/MarketPanel";
 import { finalScore, opsScore } from "@/ops";
 import { RankingSubmit } from "./RankingSubmit";
 
@@ -139,9 +138,6 @@ export default function Debrief() {
             </div>
           ) : <p className="text-sm text-muted">This flight was not signed by the council.</p>}
         </div>
-
-        <MarketSettlement />
-
 
         <div className="flex flex-wrap items-center gap-3">
           <Button variant="primary" className="h-auto min-h-10 max-w-full !whitespace-normal py-2 text-left" onClick={onPublish} disabled={done}>{done ? <><Icon name="check" size={16} /> Published ({published.length})</> : <><Icon name="fork" size={16} /> Publish your design to the Open Tech Registry</>}</Button>

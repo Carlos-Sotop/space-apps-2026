@@ -5,7 +5,7 @@ import type { StepId } from "@/store/steps";
  * Plain-language primers for the web3 and crypto ideas in the game.
  * Each one: an everyday picture, what it does in the game, why it matters off-world.
  */
-export type ConceptId = "dao" | "weighted-vote" | "futarchy" | "multisig" | "post-quantum" | "fingerprint" | "desci" | "rideshare";
+export type ConceptId = "dao" | "weighted-vote" | "go-no-go" | "multisig" | "post-quantum" | "fingerprint" | "desci" | "rideshare";
 
 export interface Concept {
   id: ConceptId;
@@ -41,14 +41,14 @@ export const CONCEPTS: Record<ConceptId, Concept> = {
     inSpace: "Partners in joint missions negotiate shares the same way: who builds the module, who gets crew time and data.",
     sources: [{ title: "ethereum.org: How DAOs vote", url: "https://ethereum.org/en/dao/" }],
   },
-  futarchy: {
-    id: "futarchy",
-    title: "Decision market: vote on goals, bet on outcomes",
-    short: "Why bots bet",
-    like: "A weather forecast you can trust because forecasters lose points when they are wrong. Many guesses together beat one expert.",
-    inGame: "Council members stake play credits on which design will score higher. The council adopts the better forecast; after the flight, good forecasters gain reputation.",
-    inSpace: "Mission teams already price risk. A market turns hidden doubts into a number before money is spent, not after.",
-    sources: [{ title: "Robin Hanson: Futarchy, vote values but bet beliefs", url: "https://mason.gmu.edu/~rhanson/futarchy.html" }],
+  "go-no-go": {
+    id: "go-no-go",
+    title: "Go / No-Go review: one NO-GO holds the launch",
+    short: "Why GO or NO-GO",
+    like: "Before a road trip, everyone checks one thing: tires, fuel, map, snacks. If anyone says stop, nobody leaves yet.",
+    inGame: "Each of the 4 council members checks one number, like mass or power, and calls GO or NO-GO. All 4 must say GO before anyone signs.",
+    inSpace: "NASA holds readiness reviews before every launch, and minutes before liftoff the launch manager polls every team for a final GO.",
+    sources: [{ title: "NASA NPD 8610.24C: Launch Services Program Pre-Launch Readiness Reviews", url: "https://nodis3.gsfc.nasa.gov/displayDir.cfm?t=NPD&c=8610&s=24C" }],
   },
   multisig: {
     id: "multisig",
@@ -111,7 +111,7 @@ export const STEP_CONCEPTS: Partial<Record<StepId, ConceptId[]>> = {
   values: ["dao", "weighted-vote"],
   opentech: ["desci"],
   rideshare: ["rideshare"],
-  council: ["futarchy", "multisig", "post-quantum", "fingerprint"],
+  council: ["go-no-go", "multisig", "post-quantum", "fingerprint"],
 };
 
-export const CONCEPT_ORDER: ConceptId[] = ["dao", "weighted-vote", "futarchy", "fingerprint", "multisig", "post-quantum", "desci", "rideshare"];
+export const CONCEPT_ORDER: ConceptId[] = ["dao", "weighted-vote", "go-no-go", "fingerprint", "multisig", "post-quantum", "desci", "rideshare"];

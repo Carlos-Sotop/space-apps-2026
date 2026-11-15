@@ -422,38 +422,17 @@ export interface Review {
 }
 
 /* ------------------------------------------------------------------ */
-/* Futarchy: vote on values, bet on beliefs                            */
+/* Risk assessment: Monte Carlo over the flight engine                 */
 /* ------------------------------------------------------------------ */
 
-/** A design decision the council settles with a decision market. */
-export interface DecisionMarket {
-  id: string;
-  question: string;
-  options: {
-    id: string;
-    label: string;
-    /** the design the option would produce */
-    design: MissionDesign;
-  }[];
-}
-
+/** What `forecast()` returns; the player reads it as the risk assessment (probabilistic risk assessment). */
 export interface Forecast {
-  /** Monte Carlo over many seeds */
+  /** share of simulated flights that succeed, over many seeds */
   successProbability: number;
   expectedScore: number;
   p10: number;
   p90: number;
   runs: number;
-}
-
-/** Play credits a member stakes on an option's predicted score. Play only: never real money. */
-export interface Stake {
-  marketId: string;
-  optionId: string;
-  actorId: string;
-  credits: number;
-  /** the score the member predicts for this option */
-  predictedScore: number;
 }
 
 /* ------------------------------------------------------------------ */
