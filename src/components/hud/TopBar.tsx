@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Icon } from "@/components/ui/Icon";
 import { LogoMark } from "@/components/brand/Logo";
 import { useTutorial } from "@/components/tutorial";
+import { SoundToggle } from "@/components/audio/SoundToggle";
 import { JourneyBar } from "./JourneyBar";
 import { NasaLiveChip } from "./NasaLiveChip";
 
@@ -34,6 +35,7 @@ export function TopBar({ title, onBack, backLabel = "Back", right }: Props) {
           <Icon name="sparkle" size={15} /> <span className="hidden sm:inline">Tutorial</span>
         </button>
         <NasaLiveChip />
+        <SoundToggle />
         {right}
       </div>
     </header>
