@@ -47,9 +47,9 @@ export function Hero() {
         <div className="aspect-square w-[min(150vw,1100px)]"><Globe animate={!reduce} /></div>
       </motion.div>
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(4,5,13,0.75)_0%,rgba(4,5,13,0.15)_70%)]" />
-      <div className="relative mx-auto max-w-4xl text-center">
+      <div className="relative mx-auto w-full min-w-0 max-w-4xl text-center">
         <motion.p {...fade(0.1)} className="num mx-auto mb-6 max-w-xl text-[11px] uppercase leading-relaxed tracking-[0.2em] text-cyan-bright sm:text-xs">{hero.eyebrow}</motion.p>
-        <motion.h1 {...fade(0.25)} className="font-display text-5xl text-fg [text-shadow:0_0_40px_rgba(139,92,246,0.6)] sm:text-7xl md:text-8xl">
+        <motion.h1 {...fade(0.25)} className="font-display text-[9.5vw] leading-none text-fg [text-shadow:0_0_40px_rgba(139,92,246,0.6)] sm:text-7xl md:text-8xl">
           Space<span className="text-gradient">DAO</span>
         </motion.h1>
         <motion.p {...fade(0.45)} className="mx-auto mt-8 max-w-2xl text-2xl font-medium leading-snug text-fg sm:text-3xl">{hero.tagline}</motion.p>
