@@ -1,8 +1,8 @@
 import React from "react";
-import { AbsoluteFill, Easing, useCurrentFrame } from "remotion";
+import { AbsoluteFill, Easing, Sequence, useCurrentFrame } from "remotion";
 import { C, DISPLAY, MONO, SANS, T180 } from "./theme";
 import { captions180 } from "./captions180";
-import { ClipView, Flash, GlassFrame, Label, Mono, Shockwave, Wordmark, ramp, useSpring } from "./components";
+import { ClipView, Flash, GlassFrame, Label, Mono, Shockwave, Wordmark, ramp, useSpring, type Zoom } from "./components";
 
 // local frame (inside a scene starting at `start`) of the caption that begins with `prefix`
 export const cue = (prefix: string, start: number) => {
@@ -13,7 +13,8 @@ export const cue = (prefix: string, start: number) => {
 const grad = `linear-gradient(90deg, ${C.violetBright}, ${C.cyan})`;
 
 // ---------------- clip stage with cross-dissolves and gentle drift ----------------
-type Item = { name: string; from: number; to: number; label?: string };
+// each clip starts from its own first frame when its item appears (from), not from the scene start
+type Item = { name: string; from: number; to: number; label?: string; zoom?: Zoom };
 export const ClipShow: React.FC<{ items: Item[]; w?: number; top?: number; left?: number; glow?: string; fadeLast?: boolean; labelTop?: number }> = ({ items, w = 1500, top = 110, left, glow = C.violetBright, fadeLast, labelTop }) => {
   const f = useCurrentFrame();
   const h = (w * 9) / 16;
@@ -35,7 +36,9 @@ export const ClipShow: React.FC<{ items: Item[]; w?: number; top?: number; left?
               }}
             >
               <GlassFrame w={w} h={h} glow={i % 2 ? C.cyan : glow} strength={0.8}>
-                <ClipView name={it.name} />
+                <Sequence from={it.from} layout="none">
+                  <ClipView name={it.name} zoom={it.zoom} />
+                </Sequence>
               </GlassFrame>
             </div>
             {it.label && (

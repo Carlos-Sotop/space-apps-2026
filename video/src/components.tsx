@@ -144,11 +144,17 @@ const Placeholder: React.FC<{ name: string }> = ({ name }) => {
   );
 };
 
-export const ClipView: React.FC<{ name: string; trimBefore?: number }> = ({ name, trimBefore = 0 }) => {
+// zoom crops into one part of the capture (transformOrigin), for small UI such as Rocky's bubble
+export type Zoom = { scale: number; origin: string };
+export const ClipView: React.FC<{ name: string; trimBefore?: number; zoom?: Zoom }> = ({ name, trimBefore = 0, zoom }) => {
   const src = clipSrc(name);
   if (!src) return <Placeholder name={name} />;
-  return <OffthreadVideo src={src} muted startFrom={trimBefore} style={{ width: "100%", height: "100%", objectFit: "cover" }} />;
+  const video = <OffthreadVideo src={src} muted startFrom={trimBefore} style={{ width: "100%", height: "100%", objectFit: "cover" }} />;
+  return zoom ? <AbsoluteFill style={{ transform: `scale(${zoom.scale})`, transformOrigin: zoom.origin }}>{video}</AbsoluteFill> : video;
 };
+
+export const ROCKY_ZOOM: Zoom = { scale: 1.4, origin: "100% 100%" };
+export const LIVE_ZOOM: Zoom = { scale: 1.35, origin: "50% 85%" };
 
 // ---------------- wordmark ----------------
 export const Wordmark: React.FC<{ size: number; start: number; spacing?: number }> = ({ size, start, spacing = 0.2 }) => {

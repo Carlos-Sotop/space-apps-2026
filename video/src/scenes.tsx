@@ -1,7 +1,7 @@
 import React from "react";
 import { AbsoluteFill, Easing, interpolate, useCurrentFrame } from "remotion";
 import { C, MONO, SANS, T } from "./theme";
-import { ClipView, Flash, GlassFrame, Label, Mono, SceneFade, Shockwave, Wordmark, clamp, keys, ramp, useSpring } from "./components";
+import { ClipView, Flash, GlassFrame, LIVE_ZOOM, Label, Mono, ROCKY_ZOOM, SceneFade, Shockwave, Wordmark, clamp, keys, ramp, useSpring, type Zoom } from "./components";
 
 // ---------------- 1-3: globe hud ----------------
 export const Hud: React.FC<{ tl?: (f: number) => number }> = ({ tl }) => {
@@ -56,9 +56,9 @@ export const Reveal: React.FC = () => {
 };
 
 // ---------------- 5: three clips ----------------
-const SHARE: { name: string; label: string; x: number; ry: number; at: number; scale: number; y: number }[] = [
+const SHARE: { name: string; label: string; x: number; ry: number; at: number; scale: number; y: number; zoom?: Zoom }[] = [
   { name: "opentech", label: "OPEN TECH", x: 330, ry: 20, at: 6, scale: 1, y: 40 },
-  { name: "data", label: "DATA", x: 960, ry: 0, at: 40, scale: 1.16, y: 0 },
+  { name: "data", label: "DATA", x: 960, ry: 0, at: 40, scale: 1.16, y: 0, zoom: LIVE_ZOOM },
   { name: "rideshare", label: "RIDESHARE", x: 1590, ry: -20, at: 74, scale: 1, y: 40 },
 ];
 
@@ -87,7 +87,7 @@ export const Share: React.FC = () => {
               }}
             >
               <GlassFrame w={w} h={h} glow={i === 1 ? C.cyan : C.violetBright} strength={0.3 + 0.7 * focus}>
-                <ClipView name={c.name} />
+                <ClipView name={c.name} zoom={c.zoom} />
               </GlassFrame>
               <div style={{ marginTop: 34, textAlign: "center", transform: "translateZ(30px)" }}>
                 <Label size={34} color={active ? C.cyanBright : C.text} style={{ textShadow: active ? "0 0 26px rgba(34,211,238,0.7)" : undefined }}>
@@ -193,13 +193,14 @@ export const Flight: React.FC = () => {
 };
 
 // ---------------- 8: montage ----------------
-const CUTS: { name: string; label: string; trim: number }[] = [
+// trim is added to the montage frame: cut i shows clip frames [i * CUT_LEN + trim, (i + 1) * CUT_LEN + trim)
+const CUTS: { name: string; label: string; trim: number; zoom?: Zoom }[] = [
   { name: "missions", label: "MISSION SELECT", trim: 0 },
-  { name: "rocky", label: "ROCKY", trim: 0 },
+  { name: "rocky", label: "ROCKY", trim: 0, zoom: ROCKY_ZOOM },
   { name: "ops", label: "MOON OPERATIONS", trim: 0 },
   { name: "debrief", label: "DEBRIEF NETWORK", trim: 0 },
-  { name: "missions", label: "LIVE NASA DATA", trim: 60 },
-  { name: "rocky", label: "PLAY", trim: 60 },
+  { name: "missions", label: "LIVE NASA DATA", trim: 60, zoom: { scale: 1.35, origin: "20% 85%" } },
+  { name: "rocky", label: "PLAY", trim: 60, zoom: ROCKY_ZOOM },
 ];
 const CUT_LEN = 20;
 
@@ -218,7 +219,7 @@ export const Montage: React.FC = () => {
       <AbsoluteFill style={{ alignItems: "center", justifyContent: "center" }}>
         <div style={{ transform: `scale(${1.1 - 0.1 * punch + local * 0.0012}) rotateY(${dir * (4 - 4 * punch)}deg) rotateZ(${dir * (1.2 - 1.2 * punch)}deg)`, marginTop: -30 }}>
           <GlassFrame w={w} h={h} glow={i % 2 ? C.cyan : C.violetBright} strength={0.9}>
-            <ClipView name={cut.name} trimBefore={cut.trim} />
+            <ClipView name={cut.name} trimBefore={cut.trim} zoom={cut.zoom} />
           </GlassFrame>
         </div>
       </AbsoluteFill>
