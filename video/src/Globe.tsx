@@ -95,7 +95,7 @@ const earthMaterial = (day: THREE.Texture, night: THREE.Texture) =>
         vec3 deep = vec3(0.012, 0.018, 0.05);
         vec3 col = mix(deep + nl, day + deep, k);
         float rim = pow(1.0 - max(dot(normalize(vVN), vec3(0.0,0.0,1.0)), 0.0), 2.6);
-        col += vec3(0.30, 0.45, 1.0) * rim * 0.65;
+        col += vec3(0.30, 0.45, 1.0) * rim * 0.4;
         gl_FragColor = vec4(col * uDim, 1.0);
       }`,
   });
@@ -107,8 +107,8 @@ const atmoMaterial = (scale: number) =>
     vertexShader: `varying vec3 vN; void main(){ vN = normalize(normalMatrix * normal); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
     fragmentShader: `
       varying vec3 vN; uniform float uK;
-      void main(){ float i = pow(max(0.62 - dot(vN, vec3(0.0,0.0,1.0)), 0.0), 3.2) * 0.9 * uK;
-        vec3 c = mix(vec3(0.38,0.48,1.0), vec3(0.34,0.85,1.0), clamp(i * 0.6, 0.0, 1.0));
+      void main(){ float i = pow(max(0.62 - dot(vN, vec3(0.0,0.0,1.0)), 0.0), 3.2) * 0.7 * uK;
+        vec3 c = mix(vec3(0.5,0.42,1.0), vec3(0.42,0.62,1.0), clamp(i * 1.5, 0.0, 1.0));
         gl_FragColor = vec4(c * i, i); }`,
   });
 
@@ -178,8 +178,9 @@ const Stars: React.FC = () => {
 };
 
 // ---------------- scene ----------------
-const Scene: React.FC = () => {
-  const f = useCurrentFrame();
+const Scene: React.FC<{ tl?: (f: number) => number }> = ({ tl }) => {
+  const raw = useCurrentFrame();
+  const f = tl ? tl(raw) : raw;
   const [dayTex, nightTex] = useLoader(THREE.TextureLoader, [staticFile("textures/earth_day_2k.jpg"), staticFile("textures/earth_night_2k.jpg")]);
   const earth = useMemo(() => {
     for (const t of [dayTex, nightTex]) {
@@ -228,15 +229,15 @@ const Scene: React.FC = () => {
   }, []);
 
   // --- timeline ---
-  const rot = -1.2 + f * 0.0036;
+  const rot = -1.2 + raw * 0.0036;
   const scale = keys(f, [[0, 0.8], [300, 0.96], [450, 0.9], [494, 2.15], [830, 2.15], [866, 2.15]]);
-  const posY = keys(f, [[0, 0], [450, 0], [494, -2.62], [830, -2.62], [866, -3.05]]);
+  const posY = keys(f, [[0, 0], [450, 0], [494, -2.62], [830, -2.62], [866, -3.35]]);
   const dim = keys(f, [[0, 1], [200, 1], [226, 0.5], [296, 0.5], [310, 1.1], [340, 1]]);
   earth.uniforms.uDim.value = dim;
   const burst = 1 + ramp(f, 300, 304, 0, 1.6) * ramp(f, 304, 360, 1, 0) + ramp(f, 840, 844, 0, 0.7) * ramp(f, 844, 900, 1, 0);
   const atmoK = keys(f, [[0, 0.5], [60, 1], [210, 1], [226, 0.5], [296, 0.5], [310, 1]]) * burst;
   atmo.uniforms.uK.value = atmoK;
-  atmoWide.uniforms.uK.value = atmoK * 0.35;
+  atmoWide.uniforms.uK.value = atmoK * 0.25;
 
   const netAlpha = keys(f, [[450, 1], [494, 0.4], [830, 0.35], [866, 0.45]]);
   const markerVis = f < 450 ? 1 : 1;
@@ -271,10 +272,10 @@ const Scene: React.FC = () => {
         </group>
       </group>
       <group position={[0, posY, 0]} scale={scale} rotation={[0.36, 0, 0.16]}>
-        <mesh material={atmo} scale={1.13}>
+        <mesh material={atmo} scale={1.07}>
           <sphereGeometry args={[1, 64, 48]} />
         </mesh>
-        <mesh material={atmoWide} scale={1.34}>
+        <mesh material={atmoWide} scale={1.16}>
           <sphereGeometry args={[1, 48, 32]} />
         </mesh>
       </group>
@@ -291,8 +292,9 @@ const Scene: React.FC = () => {
   );
 };
 
-export const Globe: React.FC = () => (
+// tl maps the composition frame to the timeline frame (used by longer cuts to hold a state)
+export const Globe: React.FC<{ tl?: (f: number) => number }> = ({ tl }) => (
   <ThreeCanvas width={1920} height={1080} camera={{ fov: 35, position: [0, 0, 4.2], near: 0.1, far: 100 }} gl={{ antialias: true, alpha: true }} style={{ position: "absolute", inset: 0 }}>
-    <Scene />
+    <Scene tl={tl} />
   </ThreeCanvas>
 );

@@ -53,3 +53,14 @@ export const clipSrc = (name: string): string | undefined => {
   const c = assets.clips[name];
   return c ? staticFile(c.src) : undefined;
 };
+
+// 3-minute cut (placeholder spans until the script arrives), frames at 30 fps
+export const TOTAL180 = 5400;
+export const T180 = {
+  intro: [0, 600],
+  problem: [600, 1350],
+  idea: [1350, 2250],
+  how: [2250, 4200],
+  nasa: [4200, 4800],
+  closing: [4800, 5400],
+} as const;

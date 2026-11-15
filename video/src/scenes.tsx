@@ -41,6 +41,7 @@ export const Reveal: React.FC = () => {
       <Flash at={0} color="#c4b5fd" max={0.8} dur={22} />
       <Shockwave at={0} color={C.violetBright} size={2400} dur={40} />
       <Shockwave at={4} color={C.cyan} size={1800} dur={34} />
+      <AbsoluteFill style={{ opacity: out * ramp(f, 16, 40), background: "radial-gradient(ellipse 52% 30% at 50% 50%, rgba(4,5,13,0.92) 0%, rgba(4,5,13,0.78) 45%, rgba(4,5,13,0) 100%)" }} />
       <AbsoluteFill style={{ alignItems: "center", justifyContent: "center", opacity: out, filter: `blur(${(1 - out) * 14}px)` }}>
         <div style={{ transform: `scale(${1.1 - settle * 0.1})`, marginTop: -40 }}>
           <Wordmark size={132} start={22} spacing={0.16} />
@@ -233,19 +234,20 @@ export const EndCard: React.FC = () => {
   const fade = ramp(f, 52, 60, 1, 0);
   return (
     <AbsoluteFill style={{ opacity: fade }}>
+      <AbsoluteFill style={{ background: "radial-gradient(ellipse 55% 34% at 50% 40%, rgba(4,5,13,0.92) 0%, rgba(4,5,13,0.75) 50%, rgba(4,5,13,0) 100%)" }} />
       <Flash at={4} color="#ffffff" max={0.75} dur={20} />
       <Shockwave at={4} y={400} color={C.violetBright} size={2600} dur={44} />
       <Shockwave at={8} y={400} color={C.cyan} size={1900} dur={36} />
-      <AbsoluteFill style={{ alignItems: "center", paddingTop: 250 }}>
+      <AbsoluteFill style={{ alignItems: "center", paddingTop: 200 }}>
         <div style={{ transform: `scale(${1.2 - 0.2 * s})`, opacity: Math.min(s * 1.4, 1) }}>
           <Wordmark size={132} start={6} spacing={0.16} />
         </div>
-        <div style={{ marginTop: 44, fontFamily: SANS, fontWeight: 600, fontSize: 60, letterSpacing: "-0.02em", color: C.text, opacity: line, transform: `translateY(${(1 - line) * 20}px)`, filter: `blur(${(1 - line) * 8}px)` }}>
+        <div style={{ marginTop: 44, fontFamily: SANS, fontWeight: 700, fontSize: 76, letterSpacing: "-0.02em", color: "#ffffff", textShadow: "0 0 30px rgba(167,139,250,0.55), 0 2px 18px rgba(0,0,0,0.8)", opacity: line, transform: `translateY(${(1 - line) * 20}px)`, filter: `blur(${(1 - line) * 8}px)` }}>
           Space belongs to humanity.
         </div>
         <div
           style={{
-            marginTop: 40, padding: "16px 40px", borderRadius: 999, fontFamily: MONO, fontWeight: 500, fontSize: 34, color: C.cyanBright, letterSpacing: "0.04em",
+            marginTop: 34, padding: "12px 32px", borderRadius: 999, fontFamily: MONO, fontWeight: 500, fontSize: 28, color: C.cyanBright, letterSpacing: "0.04em",
             background: "rgba(8,10,26,0.7)", border: "1px solid rgba(34,211,238,0.4)", boxShadow: "0 0 36px rgba(34,211,238,0.22), inset 0 1px 0 rgba(255,255,255,0.1)",
             backdropFilter: "blur(16px)", opacity: url, transform: `translateY(${(1 - url) * 16}px)`,
           }}

@@ -19,6 +19,8 @@ const addAudio = (key, rel) => {
   if (existsSync(abs)) audio[key] = { src: rel, seconds: probe(abs) };
 };
 addAudio("music", "audio/music.mp3");
+addAudio("music180", "audio/music180.mp3");
+for (let i = 1; i <= 60; i++) addAudio(`vo180_${String(i).padStart(2, "0")}`, `audio/vo/vo180_${String(i).padStart(2, "0")}.mp3`);
 for (const v of VO) addAudio(v, `audio/vo/${v}.mp3`);
 for (const f of readdirSync(path.join(PUB, "audio/sfx"))) if (f.endsWith(".mp3")) addAudio(`sfx_${f.slice(0, -4)}`, `audio/sfx/${f}`);
 

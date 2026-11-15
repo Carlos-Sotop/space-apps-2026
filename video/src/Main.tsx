@@ -26,7 +26,7 @@ const VO: [string, number][] = [
 // effects: [file, frame, volume]
 const e = T.belong[0], t = T.treaty[0], r = T.reveal[0], s = T.share[0], g = T.sign[0], fl = T.flight[0], m = T.montage[0], en = T.end[0];
 const SFX: [string, number, number][] = [
-  ["quindar", 2, 0.5],
+  ["quindar", 0, 0.5],
   ["swell", e - 6, 0.4],
   ...[0, 1, 2, 3, 4, 5, 6, 7, 8].map((i): [string, number, number] => ["ping", e + 6 + i * 8, 0.3]),
   ["whoosh", t, 0.4],
@@ -53,14 +53,15 @@ const SFX: [string, number, number][] = [
 ];
 const SFX_GAIN = 0.55;
 
-const voIntervals = VO.flatMap(([name, at]) => {
-  const a = audio(name);
-  return a ? [[at, at + Math.round(a.seconds * FPS)] as const] : [];
-});
-const voActive = (f: number) => voIntervals.some(([a, z]) => f >= a - 4 && f <= z + 4);
+type SoundtrackProps = { music: string; vo: [string, number][]; sfx: [string, number, number][]; total: number; musicStartSec?: number };
 
-const Soundtrack: React.FC = () => {
-  const music = audioSrc("music");
+export const Soundtrack: React.FC<SoundtrackProps> = ({ music: musicName, vo: VO, sfx: SFX, total: TOTAL, musicStartSec = MUSIC_START_SEC }) => {
+  const music = audioSrc(musicName);
+  const voIntervals = VO.flatMap(([name, at]) => {
+    const a = audio(name);
+    return a ? [[at, at + Math.round(a.seconds * FPS)] as const] : [];
+  });
+  const voActive = (f: number) => voIntervals.some(([a, z]) => f >= a - 4 && f <= z + 4);
   const volume = (f: number) => {
     let duck = 0;
     for (let d = -9; d <= 9; d += 3) duck += voActive(f + d) ? 1 : 0;
@@ -68,8 +69,8 @@ const Soundtrack: React.FC = () => {
     const base = interpolate(duck, [0, 1], [0.5, 0.14]);
     return base * interpolate(f, [0, 20], [0, 1], clamp) * interpolate(f, [TOTAL - 24, TOTAL], [1, 0], clamp);
   };
-  const skip = Math.max(0, Math.round(MUSIC_START_SEC * FPS));
-  const delay = Math.max(0, Math.round(-MUSIC_START_SEC * FPS));
+  const skip = Math.max(0, Math.round(musicStartSec * FPS));
+  const delay = Math.max(0, Math.round(-musicStartSec * FPS));
   return (
     <>
       {music && (
@@ -97,7 +98,7 @@ const Soundtrack: React.FC = () => {
   );
 };
 
-const Scene: React.FC<{ span: readonly [number, number]; children: React.ReactNode }> = ({ span, children }) => (
+export const Scene: React.FC<{ span: readonly [number, number]; children: React.ReactNode }> = ({ span, children }) => (
   <Sequence from={span[0]} durationInFrames={span[1] - span[0]}>
     {children}
   </Sequence>
@@ -113,9 +114,9 @@ const GlobeLayer: React.FC = () => {
   );
 };
 
-const EndFade: React.FC = () => {
+export const EndFade: React.FC<{ total?: number }> = ({ total = TOTAL }) => {
   const f = useCurrentFrame();
-  return <AbsoluteFill style={{ background: "#000", opacity: ramp(f, TOTAL - 10, TOTAL - 1, 0, 1), pointerEvents: "none" }} />;
+  return <AbsoluteFill style={{ background: "#000", opacity: ramp(f, total - 10, total - 1, 0, 1), pointerEvents: "none" }} />;
 };
 
 export const SpaceDAO30: React.FC = () => (
@@ -133,6 +134,6 @@ export const SpaceDAO30: React.FC = () => (
     <Vignette />
     <Grain />
     <EndFade />
-    <Soundtrack />
+    <Soundtrack music="music" vo={VO} sfx={SFX} total={TOTAL} />
   </AbsoluteFill>
 );

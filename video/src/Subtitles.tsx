@@ -1,10 +1,10 @@
 import React from "react";
 import { useCurrentFrame } from "remotion";
-import { captions } from "./captions";
+import { captions as defaultCaptions, type Caption } from "./captions";
 import { ramp } from "./components";
 import { C, SANS } from "./theme";
 
-export const Subtitles: React.FC = () => {
+export const Subtitles: React.FC<{ captions?: Caption[] }> = ({ captions = defaultCaptions }) => {
   const frame = useCurrentFrame();
   const cap = captions.find((c) => c.burn !== false && frame >= c.from - 2 && frame <= c.to + 6);
   if (!cap) return null;

@@ -9,7 +9,9 @@
     "assets": "node scripts/assets.mjs",
     "render": "node scripts/assets.mjs && node scripts/make-vtt.mjs && remotion render src/index.ts SpaceDAO30 out/spacedao-30s.mp4 --codec=h264 --crf=16 --audio-bitrate=320k --concurrency=4 --timeout=120000",
     "capture": "node capture/capture.mjs",
-    "vtt": "node scripts/make-vtt.mjs"
+    "vtt": "node scripts/make-vtt.mjs",
+    "vtt180": "node scripts/make-vtt.mjs 180",
+    "render180": "node scripts/assets.mjs && node scripts/make-vtt.mjs 180 && remotion render src/index.ts SpaceDAO180 out/spacedao-3min.mp4 --codec=h264 --crf=16 --audio-bitrate=320k --concurrency=4 --timeout=120000"
   },
   "dependencies": {
     "@react-three/fiber": "8.18.0",
