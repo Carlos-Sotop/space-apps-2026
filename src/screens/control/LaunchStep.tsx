@@ -4,7 +4,8 @@ import { Badge, GlassCard, Icon, InfoButton, MonogramBadge } from "@/components/
 import { getActor, missionVehicles } from "@/lib/catalog";
 import { fmtKg, fmtMUsd, fmtPct, fmtSeconds } from "@/lib/format";
 import { useGame } from "@/store/game";
-import { StepTitle, useDesign } from "./useDesign";
+import { DestinationVisual } from "./DestinationVisual";
+import { useDesign } from "./useDesign";
 
 function Meter({ label, value, max = 1, text }: { label: string; value: number; max?: number; text?: string }) {
   return (
@@ -36,24 +37,32 @@ function VehicleCard({ v, reason }: { v: LaunchVehicle; reason: string | null })
   const patch = useGame((s) => s.patchDesign);
   const dest = mission.destinations.find((d) => d.id === design.destinationId) ?? mission.destinations[0];
   const selected = design.launchVehicleId === v.id;
-  const cap = (v.capacityKg[dest.orbitClass] ?? 0) * dest.capacityFactor;
+  const actor = getActor(v.providerId);
+  const kg = (n?: number) => (n && n > 0 ? fmtKg(n) : "n/a");
+  const specs: { key: string; label: string; value: string; on?: boolean }[] = [
+    { key: "LEO", label: "To LEO", value: kg(v.capacityKg.LEO ?? v.capacityKg.ISS), on: dest.orbitClass !== "TLI" },
+    { key: "TLI", label: "To Moon (TLI)", value: kg(v.capacityKg.TLI), on: dest.orbitClass === "TLI" },
+    { key: "cost", label: "Cost", value: fmtMUsd(v.costMUsd) },
+    { key: "rel", label: "Reliability", value: fmtPct(v.reliability, 1) },
+  ];
   return (
-    <GlassCard selected={selected} disabled={!!reason && !selected} onSelect={() => patch({ launchVehicleId: v.id })} label={`Select ${v.name}`} className="p-4">
+    <GlassCard selected={selected} disabled={!!reason && !selected} onSelect={() => patch({ launchVehicleId: v.id })} label={`Select ${v.name}`} className="p-4" data-coach="launch.rocket">
       <div className="flex items-start gap-3">
-        <MonogramBadge actor={getActor(v.providerId)} fallbackName={v.providerId} size={38} />
+        <MonogramBadge actor={actor} fallbackName={v.providerId} size={38} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-2">
-            <h3 className="truncate text-[15px]">{v.name}</h3>
+            <div className="min-w-0"><h3 className="truncate text-[15px]">{v.name}</h3><div className="truncate text-xs text-muted">{actor?.shortName ?? v.providerId}</div></div>
             <InfoButton title={v.name} body={<p>{v.blurb}{v.reusable ? " Its booster can fly again." : ""}</p>} sources={v.sources} verified={v.verified} />
           </div>
           <p className="truncate text-[13px] text-muted">{v.blurb}</p>
         </div>
       </div>
-      <dl className="num mt-3 grid grid-cols-3 gap-2 text-xs">
-        <div><dt className="text-faint">To {dest.orbitClass}</dt><dd className="text-fg">{cap > 0 ? fmtKg(cap) : "none"}</dd></div>
-        <div><dt className="text-faint">Price</dt><dd className="text-fg">{fmtMUsd(v.costMUsd)}</dd></div>
-        <div><dt className="text-faint">Reliability</dt><dd className="text-fg">{fmtPct(v.reliability, 1)}</dd></div>
+      <dl className="num mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-xs sm:grid-cols-4">
+        {specs.map((sp) => (
+          <div key={sp.key} className={sp.on ? "rounded-md bg-cyan/10 px-1.5 py-0.5 -mx-1.5" : ""}><dt className={sp.on ? "text-cyan" : "text-faint"}>{sp.label}</dt><dd className="text-fg">{sp.value}</dd></div>
+        ))}
       </dl>
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10" role="img" aria-label={`Reliability ${fmtPct(v.reliability, 1)}`}><div className="h-full rounded-full bg-brand" style={{ width: `${v.reliability * 100}%` }} /></div>
       {reason && <p className="mt-2 flex items-center gap-1.5 text-xs text-over"><Icon name="lock" size={12} /> {reason}</p>}
     </GlassCard>
   );
@@ -73,8 +82,9 @@ export function LaunchStep() {
   return (
     <div className="space-y-8">
       <div>
-        <StepTitle title="Where are we going?" />
-        <div className="grid gap-4 md:grid-cols-3">
+        <h2 className="font-display mb-4 text-lg sm:text-xl">Where will your mission go?</h2>
+        <div className="mb-4"><DestinationVisual dest={mission.destinations.find((d) => d.id === design.destinationId) ?? mission.destinations[0]} /></div>
+        <div className="grid gap-4 md:grid-cols-3" data-coach="launch.destinations">
           {mission.destinations.map((d) => (
             <GlassCard key={d.id} selected={design.destinationId === d.id} onSelect={() => patch({ destinationId: d.id })} label={`Select ${d.name}`} className="p-4">
               <div className="flex items-start justify-between gap-2">
@@ -93,8 +103,8 @@ export function LaunchStep() {
         </div>
       </div>
       <div>
-        <StepTitle title="Pick a rocket" />
-        <div className="grid gap-4 sm:grid-cols-2">
+        <h2 className="font-display mb-4 text-lg sm:text-xl">Pick a rocket</h2>
+        <div className="grid gap-4 sm:grid-cols-2" data-coach="launch.rockets">
           {missionVehicles(mission).map((v) => <VehicleCard key={v.id} v={v} reason={reasonFor(v)} />)}
         </div>
       </div>
