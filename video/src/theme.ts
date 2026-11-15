@@ -43,7 +43,11 @@ export const T = {
 } as const;
 
 type AudioEntry = { src: string; seconds: number };
-const assets = data as { audio: Record<string, AudioEntry>; clips: Record<string, AudioEntry> };
+// written by capture/capture.mjs: capture size, an optional focus rect [x, y, w, h], cursor moves [t, x, y]
+export type Track = { w: number; h: number; rect: [number, number, number, number] | null; moves: [number, number, number][] };
+type ClipEntry = AudioEntry & { track?: Track };
+const assets = data as unknown as { audio: Record<string, AudioEntry>; clips: Record<string, ClipEntry> };
+export const clipTrack = (name: string): Track | undefined => assets.clips[name]?.track;
 
 export const audio = (name: string): AudioEntry | undefined => assets.audio[name];
 export const audioSrc = (name: string): string | undefined => {

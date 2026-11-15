@@ -1,7 +1,7 @@
 import React from "react";
 import { AbsoluteFill, Sequence, useCurrentFrame } from "remotion";
 import { C, T180, TOTAL180 } from "./theme";
-import { Background, Grain, LIVE_ZOOM, ROCKY_ZOOM, SceneFade, Vignette, keys, ramp } from "./components";
+import { Background, Grain, SceneFade, Vignette, keys, ramp } from "./components";
 import { Globe } from "./Globe";
 import { Hud, Reveal, SealRow } from "./scenes";
 import { Closing180, ClipShow, DataChips, Facts, Network, Pillars, Treaty, cue } from "./scenes180";
@@ -101,7 +101,7 @@ export const SpaceDAO180: React.FC = () => (
     </Scene>
     <Scene span={T180.s04}>
       <SceneFade dur={450} inF={14} outF={12}>
-        <ClipShow items={[{ name: "intro", from: 0, to: 236, label: "THE GAME" }, { name: "rocky", from: 220, to: 450, label: "MEET ROCKY", zoom: ROCKY_ZOOM }]} />
+        <ClipShow items={[{ name: "intro", from: 0, to: 236, label: "THE GAME" }, { name: "rocky", from: 220, to: 450, label: "MEET ROCKY" }]} />
       </SceneFade>
     </Scene>
     <Scene span={T180.s05}>
@@ -137,7 +137,7 @@ export const SpaceDAO180: React.FC = () => (
     </Scene>
     <Scene span={T180.s09}>
       <SceneFade dur={360} inF={14} outF={12}>
-        <ClipShow items={[{ name: "nasalive", from: 0, to: 360, label: "EVERYTHING RUNS ON REAL DATA", zoom: LIVE_ZOOM }]} w={1000} left={80} top={250} labelTop={84} />
+        <ClipShow items={[{ name: "nasalive", from: 0, to: 360, label: "EVERYTHING RUNS ON REAL DATA" }]} w={1000} left={80} top={250} labelTop={84} />
         <DataChips />
       </SceneFade>
     </Scene>

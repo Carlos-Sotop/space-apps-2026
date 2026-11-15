@@ -1,7 +1,7 @@
 import React from "react";
 import { AbsoluteFill, Easing, interpolate, Sequence, useCurrentFrame } from "remotion";
 import { C, MONO, SANS, T } from "./theme";
-import { ClipView, Flash, GlassFrame, LIVE_ZOOM, Label, Mono, ROCKY_ZOOM, SceneFade, Shockwave, Wordmark, clamp, keys, ramp, useSpring, type Zoom } from "./components";
+import { ClipView, Flash, GlassFrame, Label, Mono, SceneFade, Shockwave, Wordmark, clamp, keys, ramp, useSpring, type Camera } from "./components";
 
 // ---------------- 1-3: globe hud ----------------
 export const Hud: React.FC<{ tl?: (f: number) => number }> = ({ tl }) => {
@@ -55,45 +55,45 @@ export const Reveal: React.FC = () => {
   );
 };
 
-// ---------------- 5: three clips ----------------
-const SHARE: { name: string; label: string; x: number; ry: number; at: number; scale: number; y: number; zoom?: Zoom }[] = [
-  { name: "opentech", label: "OPEN TECH", x: 330, ry: 20, at: 6, scale: 1, y: 40 },
-  { name: "data", label: "DATA", x: 960, ry: 0, at: 40, scale: 1.16, y: 0, zoom: LIVE_ZOOM },
-  { name: "rideshare", label: "RIDESHARE", x: 1590, ry: -20, at: 74, scale: 1, y: 40 },
+// ---------------- 5: share: a carousel, the card the narration names sits large in the centre ----------------
+const SHARE: { name: string; label: string }[] = [
+  { name: "opentech", label: "OPEN TECH" },
+  { name: "data", label: "DATA" },
+  { name: "rideshare", label: "RIDESHARE" },
 ];
+// [scene frame, card in focus]: moves on "technology", "data", "spare rocket capacity"
+export const SHARE_FOCUS: [number, number][] = [[0, 0], [34, 0], [46, 1], [68, 1], [80, 2]];
 
 export const Share: React.FC = () => {
   const f = useCurrentFrame();
+  const focus = keys(f, SHARE_FOCUS);
   return (
     <SceneFade dur={T.share[1] - T.share[0]} outF={8}>
-      <AbsoluteFill style={{ perspective: 2200 }}>
+      <AbsoluteFill style={{ perspective: 2400 }}>
         {SHARE.map((c, i) => {
-          const s = useSpring(c.at, { damping: 17, stiffness: 120 });
-          const active = f >= c.at && f < c.at + 36;
-          const focus = ramp(f, c.at, c.at + 10) * ramp(f, c.at + 30, c.at + 44, 1, 0.55);
-          const bob = Math.sin(f * 0.045 + i * 2) * 10;
-          const px = Math.sin(f * 0.02 + i) * 12;
-          const w = 600 * c.scale;
+          const enter = useSpring(i * 5, { damping: 17, stiffness: 120 });
+          const s = i - focus;
+          const d = Math.min(Math.abs(s), 1.3);
+          const lit = 1 - Math.min(d, 1);
+          const w = 1120 * (1 - 0.42 * Math.min(d, 1));
           const h = (w * 9) / 16;
+          const cx = 960 + Math.sign(s) * d * 650 + Math.sin(f * 0.02 + i) * 6;
+          const cy = 450 + Math.sin(f * 0.045 + i * 2) * 6 + (1 - enter) * 220;
           return (
             <div
               key={c.name}
               style={{
-                position: "absolute", left: c.x - w / 2 + px, top: 470 - h / 2 + c.y + bob + (1 - s) * 240,
-                opacity: Math.min(s * 1.6, 1),
-                transform: `rotateY(${c.ry * (0.6 + 0.4 * s) + Math.sin(f * 0.03 + i) * 2}deg) rotateX(${3 - s * 3}deg) scale(${0.96 + 0.06 * focus})`,
-                transformStyle: "preserve-3d",
-                filter: `brightness(${0.62 + 0.38 * Math.max(focus, i === 1 && f > 100 ? 1 : 0)})`,
+                position: "absolute", left: cx - w / 2, top: cy - h / 2, zIndex: Math.round(100 - d * 40),
+                opacity: Math.min(enter * 1.6, 1), transform: `rotateY(${-s * 16}deg)`, filter: `brightness(${0.5 + 0.5 * lit})`,
               }}
             >
-              <GlassFrame w={w} h={h} glow={i === 1 ? C.cyan : C.violetBright} strength={0.3 + 0.7 * focus}>
-                <ClipView name={c.name} zoom={c.zoom} />
+              <GlassFrame w={w} h={h} glow={lit > 0.5 ? C.cyan : C.violetBright} strength={0.3 + 0.7 * lit}>
+                <ClipView name={c.name} />
               </GlassFrame>
-              <div style={{ marginTop: 34, textAlign: "center", transform: "translateZ(30px)" }}>
-                <Label size={34} color={active ? C.cyanBright : C.text} style={{ textShadow: active ? "0 0 26px rgba(34,211,238,0.7)" : undefined }}>
+              <div style={{ marginTop: 22, textAlign: "center", opacity: 0.45 + 0.55 * lit }}>
+                <Label size={26 + 12 * lit} color={lit > 0.5 ? C.cyanBright : C.text} style={{ textShadow: lit > 0.5 ? "0 0 26px rgba(34,211,238,0.7)" : undefined }}>
                   {c.label}
                 </Label>
-                <div style={{ margin: "14px auto 0", height: 3, width: 90 * Math.max(focus, 0.3), background: `linear-gradient(90deg, ${C.violetBright}, ${C.cyan})`, boxShadow: "0 0 14px rgba(34,211,238,0.6)", borderRadius: 3 }} />
               </div>
             </div>
           );
@@ -146,24 +146,30 @@ export const SealRow: React.FC<{ seals?: { label: string; at: number }[]; top?: 
   );
 };
 
+// one large screen: the Go / No-Go poll on "Decide together", the signing on "Sign together"
+export const SIGN_SWAP = 38;
 export const Sign: React.FC = () => {
   const f = useCurrentFrame();
-  const a = useSpring(2, { damping: 18, stiffness: 110 });
-  const b = useSpring(18, { damping: 18, stiffness: 110 });
+  const a = useSpring(-5, { damping: 18, stiffness: 110 });
+  const swap = ramp(f, SIGN_SWAP, SIGN_SWAP + 12);
+  const w = 1180;
+  const h = (w * 9) / 16;
   return (
     <SceneFade dur={T.sign[1] - T.sign[0]} outF={6}>
       <AbsoluteFill style={{ perspective: 2400 }}>
-        <div style={{ position: "absolute", left: 90, top: 80 + (1 - a) * 160, opacity: Math.min(a * 1.6, 1), transform: `rotateY(${10 - 3 * a + Math.sin(f * 0.03) * 1.5}deg)` }}>
-          <GlassFrame w={1000} h={562} glow={C.violetBright} strength={0.7}>
-            <ClipView name="review" />
+        <div style={{ position: "absolute", left: (1920 - w) / 2, top: 50 + (1 - a) * 140, opacity: Math.min(a * 1.6, 1), transform: `rotateX(${(1 - a) * 8}deg) rotateY(${Math.sin(f * 0.03) * 1.2}deg)` }}>
+          <GlassFrame w={w} h={h} glow={swap > 0.5 ? C.cyan : C.violetBright} strength={0.8}>
+            <AbsoluteFill style={{ opacity: 1 - swap }}>
+              <ClipView name="review" />
+            </AbsoluteFill>
+            <AbsoluteFill style={{ opacity: swap }}>
+              <Sequence from={SIGN_SWAP - 2} layout="none">
+                <ClipView name="sign" />
+              </Sequence>
+            </AbsoluteFill>
           </GlassFrame>
         </div>
-        <div style={{ position: "absolute", left: 1150, top: 150 + (1 - b) * 180, opacity: Math.min(b * 1.6, 1), transform: `rotateY(${-14 + 4 * b + Math.sin(f * 0.03 + 1) * 1.5}deg)` }}>
-          <GlassFrame w={680} h={382} glow={C.cyan} strength={0.7}>
-            <ClipView name="sign" />
-          </GlassFrame>
-        </div>
-        <SealRow />
+        <SealRow top={748} />
       </AbsoluteFill>
     </SceneFade>
   );
@@ -185,7 +191,7 @@ export const Flight: React.FC = () => {
           </GlassFrame>
         </div>
       </AbsoluteFill>
-      <div style={{ position: "absolute", left: 120, top: 84, opacity: ramp(f, 10, 24) }}>
+      <div style={{ position: "absolute", left: 100, top: 48, opacity: ramp(f, 10, 24), padding: "10px 20px", borderRadius: 999, background: "rgba(4,5,13,0.82)", border: "1px solid rgba(255,255,255,0.14)", boxShadow: "0 8px 30px rgba(0,0,0,0.5)" }}>
         <Mono size={20} color={C.cyanBright}>LAUNCH / LIVE FLIGHT</Mono>
       </div>
     </SceneFade>
@@ -194,12 +200,12 @@ export const Flight: React.FC = () => {
 
 // ---------------- 8: montage ----------------
 // trim: the clip frame each cut starts on (cuts last CUT_LEN frames)
-const CUTS: { name: string; label: string; trim: number; zoom?: Zoom }[] = [
+const CUTS: { name: string; label: string; trim: number; zoom?: Camera }[] = [
   { name: "missions", label: "MISSION SELECT", trim: 0 },
-  { name: "rocky", label: "ROCKY", trim: 20, zoom: ROCKY_ZOOM },
+  { name: "rocky", label: "ROCKY", trim: 20 },
   { name: "ops", label: "MOON OPERATIONS", trim: 160 },
   { name: "debrief", label: "DEBRIEF NETWORK", trim: 60 },
-  { name: "missions", label: "LIVE NASA DATA", trim: 140, zoom: { scale: 1.35, origin: "20% 85%" } },
+  { name: "missions", label: "LIVE NASA DATA", trim: 140, zoom: { zoom: 1.45 } },
   { name: "intro", label: "PLAY", trim: 20 },
 ];
 const CUT_LEN = 20;
@@ -225,11 +231,11 @@ export const Montage: React.FC = () => {
           </GlassFrame>
         </div>
       </AbsoluteFill>
-      <div style={{ position: "absolute", left: 130, top: 78, display: "flex", alignItems: "center", gap: 22 }}>
+      <div style={{ position: "absolute", left: 110, top: 44, display: "flex", alignItems: "center", gap: 18, padding: "10px 20px", borderRadius: 999, background: "rgba(4,5,13,0.82)", border: "1px solid rgba(255,255,255,0.14)", boxShadow: "0 8px 30px rgba(0,0,0,0.5)" }}>
         <div style={{ width: 12, height: 12, borderRadius: 12, background: C.cyan, boxShadow: `0 0 16px ${C.cyan}` }} />
         <Label size={30} color={C.text}>{cut.label}</Label>
       </div>
-      <div style={{ position: "absolute", right: 130, top: 78 }}>
+      <div style={{ position: "absolute", right: 110, top: 44, padding: "10px 20px", borderRadius: 999, background: "rgba(4,5,13,0.82)", border: "1px solid rgba(255,255,255,0.14)", boxShadow: "0 8px 30px rgba(0,0,0,0.5)" }}>
         <Mono size={22} color={C.muted}>{String(i + 1).padStart(2, "0")} / {String(CUTS.length).padStart(2, "0")}</Mono>
       </div>
     </AbsoluteFill>

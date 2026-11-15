@@ -1,7 +1,7 @@
 import React from "react";
 import { AbsoluteFill, Easing, interpolate, OffthreadVideo, spring, useCurrentFrame, useVideoConfig } from "remotion";
 import { noise2D } from "@remotion/noise";
-import { C, clipSrc, DISPLAY, MONO, SANS } from "./theme";
+import { C, clipSrc, clipTrack, DISPLAY, MONO, SANS, type Track } from "./theme";
 
 export const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
 export const easeOut = Easing.bezier(0.16, 1, 0.3, 1);
@@ -144,17 +144,72 @@ const Placeholder: React.FC<{ name: string }> = ({ name }) => {
   );
 };
 
-// zoom crops into one part of the capture (transformOrigin), for small UI such as Rocky's bubble
-export type Zoom = { scale: number; origin: string };
-export const ClipView: React.FC<{ name: string; trimBefore?: number; zoom?: Zoom }> = ({ name, trimBefore = 0, zoom }) => {
+// Camera inside a clip. zoom > 1 crops in; without focus it glides after the cursor the capture recorded,
+// focus pins a point (capture pixels), fit centres the rect the capture recorded (the flight's 3D panel).
+export type Camera = { zoom: number; focus?: [number, number]; fit?: boolean };
+
+export const CAMERA: Record<string, Camera> = {
+  intro: { zoom: 1.15, focus: [800, 470] },
+  rocky: { zoom: 1.4, focus: [1600, 900] },
+  missions: { zoom: 1.2 },
+  coalition: { zoom: 1.3 },
+  design: { zoom: 1.3 },
+  nasalive: { zoom: 1.5 },
+  data: { zoom: 1.5 },
+  opentech: { zoom: 1.35 },
+  rideshare: { zoom: 1.35 },
+  review: { zoom: 1.3 },
+  sign: { zoom: 1.4 },
+  flight: { zoom: 1.45, fit: true },
+  ops: { zoom: 1.25 },
+  debrief: { zoom: 1.3 },
+};
+
+const cameraWindow = (track: Track | undefined, cam: Camera, frame: number) => {
+  const W = track?.w ?? 1600, H = track?.h ?? 900;
+  const z = Math.max(1, cam.zoom);
+  let fx = W / 2, fy = H / 2;
+  if (cam.fit && track?.rect) {
+    const [x, y, w, h] = track.rect;
+    fx = x + w / 2;
+    fy = y + h / 2;
+  } else if (cam.focus) {
+    [fx, fy] = cam.focus;
+  } else if (track?.moves.length) {
+    const moves = track.moves;
+    const at = (t: number) => {
+      let p = moves[0];
+      for (const m of moves) {
+        if (m[0] > t) break;
+        p = m;
+      }
+      return p;
+    };
+    [, fx, fy] = at(0);
+    // ease toward the cursor, frame by frame from the clip start (about half a second to catch up)
+    for (let f = 1; f <= frame; f++) {
+      const [, x, y] = at(f / 30);
+      fx += (x - fx) * 0.06;
+      fy += (y - fy) * 0.06;
+    }
+  }
+  const w = W / z, h = H / z;
+  const left = Math.min(Math.max(fx - w / 2, 0), W - w);
+  const top = Math.min(Math.max(fy - h / 2, 0), H - h);
+  return { z, L: left / W, T: top / H };
+};
+
+// zoom: null shows the whole capture; undefined uses the clip's CAMERA entry
+export const ClipView: React.FC<{ name: string; trimBefore?: number; zoom?: Camera | null }> = ({ name, trimBefore = 0, zoom }) => {
+  const frame = useCurrentFrame();
   const src = clipSrc(name);
   if (!src) return <Placeholder name={name} />;
   const video = <OffthreadVideo src={src} muted startFrom={trimBefore} style={{ width: "100%", height: "100%", objectFit: "cover" }} />;
-  return zoom ? <AbsoluteFill style={{ transform: `scale(${zoom.scale})`, transformOrigin: zoom.origin }}>{video}</AbsoluteFill> : video;
+  const cam = zoom === null ? null : zoom ?? CAMERA[name];
+  if (!cam) return video;
+  const { z, L, T } = cameraWindow(clipTrack(name), cam, frame + trimBefore);
+  return <AbsoluteFill style={{ transform: `scale(${z}) translate(${-L * 100}%, ${-T * 100}%)`, transformOrigin: "0 0" }}>{video}</AbsoluteFill>;
 };
-
-export const ROCKY_ZOOM: Zoom = { scale: 1.4, origin: "100% 100%" };
-export const LIVE_ZOOM: Zoom = { scale: 1.35, origin: "50% 85%" };
 
 // ---------------- wordmark ----------------
 export const Wordmark: React.FC<{ size: number; start: number; spacing?: number }> = ({ size, start, spacing = 0.2 }) => {

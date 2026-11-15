@@ -1,6 +1,6 @@
 // Resolves audio and clips that exist in public/ and writes src/assets.json (paths + durations).
 // Missing files are left out: audio stays silent and clips render a placeholder frame.
-import { existsSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -27,7 +27,11 @@ for (const f of readdirSync(path.join(PUB, "audio/sfx"))) if (f.endsWith(".mp3")
 const clips = {};
 for (const c of CLIPS) {
   const rel = `clips/${c}.mp4`;
-  if (existsSync(path.join(PUB, rel))) clips[c] = { src: rel, seconds: probe(path.join(PUB, rel)) };
+  if (!existsSync(path.join(PUB, rel))) continue;
+  clips[c] = { src: rel, seconds: probe(path.join(PUB, rel)) };
+  // cursor track written by capture/capture.mjs: the camera in ClipView follows it
+  const track = path.join(PUB, `clips/${c}.json`);
+  if (existsSync(track)) clips[c].track = JSON.parse(readFileSync(track, "utf8"));
 }
 
 writeFileSync(path.join(ROOT, "src/assets.json"), JSON.stringify({ audio, clips }, null, 2));

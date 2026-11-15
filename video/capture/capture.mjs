@@ -8,7 +8,7 @@
 // software and the 3D scenes stutter at about 13 fps).
 import { chromium } from "playwright";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, readdirSync, renameSync, rmSync } from "node:fs";
+import { mkdirSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -53,6 +53,8 @@ const CURSOR_JS = `
 // ---------------- helpers ----------------
 const wait = (page, ms) => page.waitForTimeout(ms);
 const mouse = new WeakMap();
+// cursor positions during the clip, saved next to it (<name>.json) so the video's camera can follow the action
+const tracks = new WeakMap();
 
 async function moveTo(page, target, steps = 22) {
   let x, y;
@@ -65,6 +67,8 @@ async function moveTo(page, target, steps = 22) {
   }
   await page.mouse.move(x, y, { steps });
   mouse.set(page, { x, y });
+  const log = tracks.get(page);
+  if (log?.t0) log.moves.push([+((Date.now() - log.t0) / 1000).toFixed(3), Math.round(x), Math.round(y)]);
   return true;
 }
 
@@ -282,6 +286,7 @@ const SHOTS = {
       await p.locator("[data-coach='flight.main'] canvas").first().waitFor({ timeout: 10000 });
     },
     lead: 0.1,
+    focus: (p) => p.locator("[data-coach='flight.main'] canvas").first(),
     steps: [],
   },
   ops: {
@@ -358,12 +363,18 @@ async function record(browser, name, shot) {
   page.on("pageerror", (e) => errors.push(e.message.split("\n")[0]));
   page.on("console", (m) => { if (m.type() === "error") errors.push(m.text().split("\n")[0].slice(0, 160)); });
   let t0 = 0;
+  const log = { t0: 0, moves: [], rect: null };
+  tracks.set(page, log);
   try {
     await page.goto(APP + shot.route, { waitUntil: "load", timeout: 30_000 });
     await page.waitForLoadState("networkidle", { timeout: 15_000 }).catch(() => {});
     await moveTo(page, { x: VIEW.width * 0.62, y: VIEW.height * 0.55 }, 2);
     if (shot.prep) await shot.prep(page);
+    if (shot.focus) log.rect = await shot.focus(page).boundingBox().catch(() => null);
     t0 = Date.now();
+    const m = mouse.get(page) ?? { x: VIEW.width / 2, y: VIEW.height / 2 };
+    log.t0 = t0;
+    log.moves.push([0, Math.round(m.x), Math.round(m.y)]);
     for (const [at, fn] of shot.steps) {
       const now = Date.now() - t0;
       if (at > now) await wait(page, at - now);
@@ -383,6 +394,9 @@ async function record(browser, name, shot) {
   const out = path.join(OUT, `${name}.mp4`);
   const start = Math.max(0, (t0 - rec0) / 1000 - (shot.lead ?? 0));
   execFileSync("ffmpeg", ["-v", "error", "-y", "-ss", start.toFixed(3), "-i", raw, "-t", String(shot.dur), "-vf", `fps=${FPS},scale=${W}:${H}:flags=lanczos,format=yuv420p`, "-c:v", "libx264", "-crf", "14", "-preset", "slow", "-an", out]);
+  const lead = shot.lead ?? 0;
+  const rect = log.rect && ["x", "y", "width", "height"].map((k) => Math.round(log.rect[k]));
+  writeFileSync(path.join(OUT, `${name}.json`), JSON.stringify({ w: VIEW.width, h: VIEW.height, rect, moves: log.moves.map(([t, x, y]) => [+(t + lead).toFixed(3), x, y]) }));
   const uniq = [...new Set(errors)];
   console.log(`${name}: ok (${shot.dur}s from ${start.toFixed(2)}s) -> ${path.relative(process.cwd(), out)}${uniq.length ? `\n  page errors: ${uniq.slice(0, 4).join(" | ")}` : ""}`);
 }
