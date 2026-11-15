@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { motion } from "motion/react";
 import { sfx } from "@/components/audio";
 import { Icon, InfoButton } from "@/components/ui";
-import { forecast, readinessAllGo, readinessChanges, readinessReview, readinessSeats, READINESS_SOURCES, RISK_RUNS, type ReadinessVoteDetail } from "@/engine";
+import { forecast, pollAllGo, readinessChanges, readinessReview, readinessSeats, READINESS_SOURCES, RISK_RUNS, VERDICT_LABEL, type ReadinessVoteDetail, type SeatCall } from "@/engine";
 import type { Catalog, DesignStep, Forecast, LiveContext, MissionDesign } from "@/engine/types";
+import { getActor } from "@/lib/catalog";
 import { fmtPct } from "@/lib/format";
 import { useGame } from "@/store/game";
 import type { StepId } from "@/store/steps";
@@ -96,13 +97,31 @@ export function CouncilStep() {
     setGoTo(null);
   };
 
-  const allGo = !!votes && fresh && readinessAllGo(votes);
+  // Team play: players hold the first seats, lead first, and call GO or NO-GO themselves.
+  // Calls belong to one design: any change to the design asks them again.
+  const [playerCount, setPlayerCount] = useState(1);
+  const players = useMemo(() => (playerCount > 1 ? [design.coalition.leadId, ...design.coalition.partnerIds].slice(0, playerCount) : []), [playerCount, design.coalition]);
+  const [called, setCalled] = useState<{ design: MissionDesign; calls: Partial<Record<string, SeatCall>> }>({ design, calls: {} });
+  const calls = called.design === design ? called.calls : {};
+  const onCall = (actorId: string, call: SeatCall | undefined) => {
+    setCalled({ design, calls: { ...calls, [actorId]: call } });
+    if (!call) return;
+    sfx(call === "go" ? "select" : "warning");
+    setChanges([`${getActor(actorId)?.shortName ?? actorId} (Player ${players.indexOf(actorId) + 1}): ${VERDICT_LABEL[call]}`]);
+  };
+  const onPlayers = (n: number) => {
+    setPlayerCount(n);
+    setCalled({ design, calls: {} });
+  };
+
+  const allGo = !!votes && fresh && pollAllGo(votes, players, calls);
 
   return (
     <div className="space-y-5">
       <StepTitle title="Go / No-Go review" chip="All 4 must say GO" />
       <RiskAssessment risk={risk} fresh={fresh} />
-      <ReviewFeed votes={votes} seats={seats} changes={changes} onFix={onFix} onNegotiate={onNegotiate} />
+      <ReviewFeed votes={votes} seats={seats} changes={changes} playerCount={playerCount} players={players} calls={calls}
+        onPlayers={onPlayers} onCall={onCall} onFix={onFix} onNegotiate={onNegotiate} />
       {goTo && changes.length > 0 && (
         <button type="button" className="inline-flex items-center gap-1.5 text-xs underline-offset-2 hover:underline" style={{ color: "var(--cyan)" }} onClick={() => setStep(STEP_OF[goTo])}>
           See the change in {STEP_OF[goTo] === "values" ? "Values" : goTo.charAt(0).toUpperCase() + goTo.slice(1)} <Icon name="arrow" size={13} />
