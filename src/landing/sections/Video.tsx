@@ -13,7 +13,7 @@ export function VideoSection({ id, video }: { id: string; video: Slot }) {
         <div className="glass overflow-hidden p-2 shadow-[0_0_80px_rgba(139,92,246,0.25)]">
           <video className="aspect-video w-full rounded-[10px] bg-black" controls playsInline preload="none" poster={video.poster}>
             <source src={video.src} type="video/mp4" />
-            <track kind="captions" srcLang="en" label="English" src={video.captions} default />
+            <track kind="captions" srcLang="en" label="English" src={video.captions} />
           </video>
         </div>
       </Reveal>
