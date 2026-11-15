@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 import { Icon } from "@/components/ui/Icon";
 import { LogoMark } from "@/components/brand/Logo";
+import { JourneyBar } from "./JourneyBar";
+import { NasaLiveChip } from "./NasaLiveChip";
 
 interface Props {
   title?: string;
@@ -11,6 +13,7 @@ interface Props {
 
 export function TopBar({ title, onBack, backLabel = "Back", right }: Props) {
   return (
+    <>
     <header className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-4 py-4 sm:px-6">
       <div className="flex min-w-0 items-center gap-3">
         {onBack && (
@@ -21,7 +24,9 @@ export function TopBar({ title, onBack, backLabel = "Back", right }: Props) {
         <LogoMark size={32} className="shrink-0" />
         {title && <h1 className="font-display truncate text-sm sm:text-base">{title}</h1>}
       </div>
-      <div className="flex shrink-0 items-center gap-2">{right}</div>
+      <div className="flex shrink-0 items-center gap-2"><NasaLiveChip />{right}</div>
     </header>
+    <JourneyBar />
+    </>
   );
 }
