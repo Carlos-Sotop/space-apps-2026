@@ -8,6 +8,7 @@ const HeroScene = lazy(() => import("@/scene/HeroScene"));
 
 export default function Intro() {
   const go = useGame((s) => s.go);
+  const begin = useGame((s) => s.beginOnboarding);
   const fallback = <LogoMark size={192} className="mx-auto opacity-80" />;
 
   return (
@@ -25,7 +26,7 @@ export default function Intro() {
         </h1>
         <p className="font-display text-[11px] leading-relaxed text-muted sm:text-sm">Space is too big for any one nation.</p>
         <div className="flex flex-wrap items-center justify-center gap-3">
-          <Button variant="primary" size="lg" onClick={() => go("missions")}>Begin mission</Button>
+          <Button variant="primary" size="lg" onClick={begin}>Begin mission</Button>
           <Button size="lg" onClick={() => go("story")}>What is SpaceDAO?</Button>
           <Button size="lg" onClick={() => go("leaderboard")}><Icon name="trophy" size={16} /> Leaderboard</Button>
         </div>

@@ -159,7 +159,7 @@ export default function MissionSelect() {
   return (
     <div className="pb-10">
       <TopBar title="Choose a mission" onBack={() => go("intro")} />
-      <div className="mx-auto grid max-w-7xl gap-4 px-4 sm:px-6 lg:grid-cols-3 lg:gap-5">
+      <div data-coach="missions.cards" className="mx-auto grid max-w-7xl gap-4 px-4 sm:px-6 lg:grid-cols-3 lg:gap-5">
         {catalog.missions.map((m, i) => {
           const line = liveLine(m.id, iss.altitudeKm, live?.moonDistanceKm, live?.earthEvents.length);
           const orbit = m.destinations[0]?.orbitClass;

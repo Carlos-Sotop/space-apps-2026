@@ -1,10 +1,11 @@
 import { useEffect } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { CoalitionBar } from "@/components/hud/CoalitionBar";
-import { IssueChips, ResourceHud, useIssues } from "@/components/hud/ResourceHud";
+import { ResourceHud, useIssues } from "@/components/hud/ResourceHud";
 import { StepRail } from "@/components/hud/StepRail";
 import { TopBar } from "@/components/hud/TopBar";
-import { Button, Icon } from "@/components/ui";
+import { WarningsPanel } from "@/components/hud/WarningsPanel";
+import { ActionBar, Button, Icon, StepHeader } from "@/components/ui";
 import { LearnChip } from "@/components/learn/Primer";
 import { STEP_CONCEPTS } from "@/components/learn/concepts";
 import { useGame } from "@/store/game";
@@ -35,21 +36,22 @@ function Inner() {
   if (issues.some((i) => i.severity === "blocker")) blockerSteps.push("council");
 
   return (
-    <div className="pb-10">
+    <div>
       <div className="lg:sticky lg:top-0 lg:z-30">
         <div className="border-b border-line bg-bg/80 backdrop-blur-xl">
           <TopBar title={mission.name} onBack={() => go("coalition")} backLabel="Back to coalition" right={<CoalitionBar coalition={design.coalition} />} />
           <div className="mx-auto max-w-7xl space-y-3 px-4 pb-3 sm:px-6">
             <ResourceHud design={design} />
-            <IssueChips issues={issues} />
           </div>
         </div>
       </div>
       <div className="mx-auto mt-6 grid max-w-7xl gap-6 px-4 sm:px-6 lg:grid-cols-[210px_1fr]">
-        <aside><StepRail steps={STEPS} current={step} onSelect={setStep} flagged={blockerSteps} /></aside>
-        <section className="min-w-0">
+        <aside data-coach="control.steps"><StepRail steps={STEPS} current={step} onSelect={setStep} flagged={blockerSteps} /></aside>
+        <section data-coach="control.body" className="min-w-0">
           <AnimatePresence mode="wait">
             <motion.div key={step} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.22 }}>
+              <StepHeader eyebrow={`Step ${idx + 1} of ${STEPS.length}`} title={STEPS[idx].title} subtitle={STEPS[idx].hint} />
+              <div className="mb-5" data-coach="control.issues-panel"><WarningsPanel issues={issues} /></div>
               {STEP_CONCEPTS[step] && (
                 <div className="mb-4 flex flex-wrap gap-2">
                   {STEP_CONCEPTS[step]!.map((c) => <LearnChip key={c} id={c} />)}
@@ -58,12 +60,14 @@ function Inner() {
               <View />
             </motion.div>
           </AnimatePresence>
-          <div className="mt-8 flex items-center justify-between">
-            <Button disabled={idx === 0} onClick={() => setStep(STEPS[idx - 1].id)}><Icon name="back" size={16} /> Back</Button>
-            {idx < STEPS.length - 1 && <Button variant="primary" onClick={() => setStep(STEPS[idx + 1].id)}>Next: {STEPS[idx + 1].label} <Icon name="arrow" size={16} /></Button>}
-          </div>
         </section>
       </div>
+      <ActionBar
+        className="mt-8"
+        left={<Button disabled={idx === 0} onClick={() => setStep(STEPS[idx - 1].id)}><Icon name="back" size={16} /> <span className="hidden sm:inline">Back</span></Button>}
+      >
+        {idx < STEPS.length - 1 && <Button variant="primary" data-coach="control.next" onClick={() => setStep(STEPS[idx + 1].id)}>Next: {STEPS[idx + 1].label} <Icon name="arrow" size={16} /></Button>}
+      </ActionBar>
     </div>
   );
 }

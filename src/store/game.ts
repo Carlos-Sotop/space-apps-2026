@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { useMemo } from "react";
 import { catalog as baseCatalog } from "@/data";
-import { councilValues, defaultDesign, simulateFlight } from "@/engine";
+import { autoDesign, councilValues, defaultDesign, simulateFlight } from "@/engine";
 import { MAX_SECONDARY } from "@/engine/types";
 import type { Blueprint, Catalog, Coalition, FlightResult, LiveContext, MissionDesign, MissionId, Ratification, Values } from "@/engine/types";
 import { getMission } from "@/lib/catalog";
@@ -15,6 +15,9 @@ import { SCREENS, type Screen, type StepId } from "./steps";
 const EQUAL: Values = { science: 1 / 3, safety: 1 / 3, cost: 1 / 3 };
 
 export type LiveStatus = "idle" | "loading" | "live" | "snapshot";
+export type PlayMode = "guided" | "quick";
+/** Onboarding overlay: the 3-frame intro, then the Guided / Quick choice */
+export type Onboarding = null | "frames" | "mode";
 
 interface GameState {
   screen: Screen;
@@ -34,6 +37,10 @@ interface GameState {
   ops: OpsState | null;
   opsSeed: number;
   opsLive: OpsLive | null;
+  playMode: PlayMode;
+  /** Rocky coach marks on or off */
+  tutorial: boolean;
+  onboarding: Onboarding;
 
   go: (screen: Screen) => void;
   setStep: (step: StepId) => void;
@@ -59,6 +66,11 @@ interface GameState {
   publish: (bp: Blueprint) => void;
   newMission: () => void;
   devJump: (params: URLSearchParams) => void;
+  beginOnboarding: () => void;
+  setOnboarding: (o: Onboarding) => void;
+  /** Pick a play mode, close the onboarding overlay and go to mission select */
+  choosePlayMode: (m: PlayMode) => void;
+  setTutorial: (on: boolean) => void;
 }
 
 const newSeed = () => 1 + Math.floor(Math.random() * 2_000_000_000);
@@ -103,6 +115,9 @@ export const useGame = create<GameState>()(
       ops: null,
       opsSeed: 1,
       opsLive: null,
+      playMode: "guided",
+      tutorial: false,
+      onboarding: null,
 
       go: (screen) => set({ screen }),
       setStep: (step) => set({ step }),
@@ -122,7 +137,7 @@ export const useGame = create<GameState>()(
         if (!s.missionId || !coalition) return;
         const cat = catalogWith(s.published);
         set({
-          design: withValues(defaultDesign(s.missionId, coalition, cat), s.playerValues, s.published),
+          design: withValues((s.playMode === "quick" ? autoDesign : defaultDesign)(s.missionId, coalition, cat), s.playerValues, s.published),
           result: null, ratification: null, step: "values", screen: "control",
         });
       },
@@ -176,7 +191,16 @@ export const useGame = create<GameState>()(
 
       newMission: () => set({ missionId: null, leadId: null, partnerIds: [], design: null, result: null, ratification: null, step: "values", screen: "missions" }),
 
+      beginOnboarding: () => set({ onboarding: "frames" }),
+      setOnboarding: (onboarding) => set({ onboarding }),
+      choosePlayMode: (playMode) => set({ playMode, tutorial: playMode === "guided", onboarding: null, screen: "missions" }),
+      setTutorial: (tutorial) => set({ tutorial }),
+
       devJump: (params) => {
+        const mode = params.get("mode");
+        if (mode === "guided" || mode === "quick") set({ playMode: mode, tutorial: mode === "guided" });
+        const ob = params.get("onboarding");
+        if (ob === "frames" || ob === "mode") set({ onboarding: ob });
         const screen = params.get("screen") as Screen | null;
         if (!screen || !SCREENS.includes(screen)) return;
         const s = get();
@@ -198,7 +222,7 @@ export const useGame = create<GameState>()(
       name: "spacedao-v1",
       version: 1,
       storage: createJSONStorage(() => safeStorage),
-      partialize: (s) => ({ missionId: s.missionId, leadId: s.leadId, partnerIds: s.partnerIds, playerValues: s.playerValues, design: s.design, published: s.published }),
+      partialize: (s) => ({ playMode: s.playMode, tutorial: s.tutorial, missionId: s.missionId, leadId: s.leadId, partnerIds: s.partnerIds, playerValues: s.playerValues, design: s.design, published: s.published }),
       // Drop saved state that no longer matches the catalog (data lanes replace catalog files often).
       merge: (saved, current) => {
         const p = (saved ?? {}) as Partial<GameState>;
@@ -206,6 +230,8 @@ export const useGame = create<GameState>()(
         const valid = !!p.design && !!getMission(p.design.missionId) && [p.design.coalition.leadId, ...p.design.coalition.partnerIds].every((id) => known(id, actorIds));
         return {
           ...current,
+          playMode: p.playMode === "quick" ? "quick" : "guided",
+          tutorial: p.tutorial === true,
           missionId: p.missionId && getMission(p.missionId) ? p.missionId : null,
           leadId: p.leadId && known(p.leadId, actorIds) ? p.leadId : null,
           partnerIds: (p.partnerIds ?? []).filter((id) => known(id, actorIds)),
