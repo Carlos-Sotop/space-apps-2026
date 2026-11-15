@@ -34,7 +34,6 @@ const SFX: [string, number, number][] = [
   ["impact", g + SIGN_SEALS[3].at + 4, 0.45],
   ["riser", fl - 60, 0.45],
   ["whoosh", fl, 0.5],
-  ["roar", fl, 0.32],
   ...[0, 1, 2, 3, 4, 5].map((i): [string, number, number] => ["click", m + i * 20, 0.55]),
   ...[0, 2, 4].map((i): [string, number, number] => ["whoosh", m + i * 20, 0.3]),
   ["riser", en - 78, 0.5],
