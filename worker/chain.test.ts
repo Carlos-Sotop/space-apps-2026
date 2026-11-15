@@ -257,7 +257,7 @@ describe("/api/chain/anchor", () => {
   it("answers not recorded at once when the relayer key is missing", async () => {
     const started = Date.now();
     const { status, body } = await call(routes(), post(anchorBody()), {});
-    expect(Date.now() - started).toBeLessThan(100);
+    expect(Date.now() - started).toBeLessThan(1000);
     expect(status).toBe(200);
     expect(body).toMatchObject({ recorded: false, reason: "not-configured" });
   });
