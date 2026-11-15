@@ -1,4 +1,5 @@
 import type { ButtonHTMLAttributes } from "react";
+import { sfx } from "@/components/audio";
 
 type Variant = "primary" | "ghost" | "danger";
 type Size = "sm" | "md" | "lg";
@@ -15,11 +16,12 @@ const VARIANT: Record<Variant, string> = {
 };
 const SIZE: Record<Size, string> = { sm: "h-8 px-3 text-[13px]", md: "h-10 px-4 text-sm", lg: "h-12 px-7 text-base" };
 
-export function Button({ variant = "ghost", size = "md", className = "", type = "button", ...rest }: Props) {
+export function Button({ variant = "ghost", size = "md", className = "", type = "button", onClick, ...rest }: Props) {
   return (
     <button
       type={type}
       {...rest}
+      onClick={(e) => { sfx(variant === "primary" ? "confirm" : "click"); onClick?.(e); }}
       className={`inline-flex items-center justify-center gap-2 rounded-ctl whitespace-nowrap transition duration-200 active:scale-[0.98] ${VARIANT[variant]} ${SIZE[size]} ${className}`}
     />
   );
