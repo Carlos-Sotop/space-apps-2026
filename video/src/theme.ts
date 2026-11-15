@@ -42,7 +42,7 @@ export const T = {
   end: [718, 840], // "Space belongs to humanity." + wordmark + URL
 } as const;
 
-type AudioEntry = { src: string; seconds: number };
+type AudioEntry = { src: string; seconds: number; speech?: [number, number][] };
 // written by capture/capture.mjs: capture size, an optional focus rect [x, y, w, h], cursor moves [t, x, y]
 export type Track = { w: number; h: number; rect: [number, number, number, number] | null; moves: [number, number, number][] };
 type ClipEntry = AudioEntry & { track?: Track };

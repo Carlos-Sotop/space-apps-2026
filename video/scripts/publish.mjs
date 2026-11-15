@@ -18,19 +18,21 @@ if (!target) {
 mkdirSync(target, { recursive: true });
 
 const LIMIT = 24 * 1024 * 1024; // a margin under 25 MiB
-const AUDIO_KBPS = 128;
+const AUDIO_KBPS = 320;
+const LOUDNORM = "loudnorm=I=-14:TP=-1.5:LRA=11";
 // poster: a frame of the reveal (30 s: the climax lands on frame 300; 3 min: on frame 1350).
-// copy: keep the render's video stream as is (the 30 s master already fits under the limit) and only
-// re-encode the audio, AAC at audioKbps, raised gainDb under a -1.5 dBFS limiter (the mix renders near -20.6 LUFS).
+// copy: keep the render's video stream as is (when the master already fits under the limit) and only re-encode
+// the audio. Both get Dayon's web loudness, loudnorm I=-14 TP=-1.5 LRA=11, as AAC 320 kb/s.
 const VIDEOS = [
-  { id: "30s", poster: 345, copy: true, audioKbps: 320, gainDb: 4 },
-  { id: "3min", poster: 1386 },
+  { id: "30s", poster: 345, copy: true },
+  { id: "3min", poster: 980 },
 ];
 
 // AudioToolbox AAC (macOS) holds a constant bitrate; ffmpeg's own AAC encoder averages under the target
 const AAC = execFileSync("ffmpeg", ["-hide_banner", "-encoders"]).toString().includes("aac_at") ? ["-c:a", "aac_at", "-aac_at_mode", "cbr"] : ["-c:a", "aac"];
 const run = (args) => execFileSync("ffmpeg", ["-v", "error", "-y", ...args], { stdio: "inherit" });
 const seconds = (file) => +execFileSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", file]).toString().trim();
+const videoSeconds = (file) => +execFileSync("ffprobe", ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=duration", "-of", "csv=p=0", file]).toString().trim();
 const mib = (file) => (statSync(file).size / 1024 / 1024).toFixed(1);
 
 for (const v of VIDEOS) {
@@ -41,7 +43,8 @@ for (const v of VIDEOS) {
     continue;
   }
   const mp4 = path.join(target, `spacedao-${v.id}.mp4`);
-  const audioArgs = [...AAC, "-b:a", `${v.audioKbps ?? AUDIO_KBPS}k`, ...(v.gainDb ? ["-af", `volume=${v.gainDb}dB,alimiter=limit=0.84:level=false`] : [])];
+  // loudnorm and the AAC encoder pad the end; cut the audio at the picture's last frame
+  const audioArgs = [...AAC, "-b:a", `${AUDIO_KBPS}k`, "-ar", "48000", "-af", LOUDNORM, "-t", String(videoSeconds(src))];
   const common = ["-pix_fmt", "yuv420p", "-movflags", "+faststart", ...audioArgs];
   if (v.copy) run(["-i", src, "-c:v", "copy", "-movflags", "+faststart", ...audioArgs, mp4]);
   else run(["-i", src, "-c:v", "libx264", "-preset", "slow", "-crf", "23", ...common, mp4]);
