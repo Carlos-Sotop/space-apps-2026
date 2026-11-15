@@ -12,7 +12,7 @@ import {
   type ResourceStatus,
 } from "./types";
 import { resolveDesign, type ResolvedDesign } from "./design";
-import { applyStat, effectiveModifiers } from "./modifiers";
+import { applyStat, effectiveModifiers, fittedBlueprints } from "./modifiers";
 
 const scope = (m: Module, missionId: MissionId) => ({ category: m.category, missionId });
 
@@ -68,11 +68,18 @@ export function computeResources(design: MissionDesign, catalog: Catalog): Resou
   const mid = design.missionId;
   const { mission, vehicle, destination, modules, carrier, payload, rideshares, members } = r;
   const sunlight = destination?.sunlightFraction ?? 1;
+  // adopting an open design costs its integration hardware, power and work (only when it fits)
+  const fitted = fittedBlueprints(design, catalog);
+  const integration = (key: "massKg" | "powerW" | "costMUsd"): ResourceLine[] =>
+    fitted
+      .filter((b) => (b.integration?.[key] ?? 0) > 0)
+      .map((b) => ({ label: `Integrating ${b.name} (open tech)`, amount: b.integration?.[key] ?? 0 }));
 
   // mass
   const massUsedBy: ResourceLine[] = [
     ...payload.map((m) => ({ label: m.name, amount: moduleMassKg(m, mods, mid) })),
     ...rideshares.map((o) => ({ label: `${o.payloadName} (rideshare)`, amount: o.massKg })),
+    ...integration("massKg"),
   ];
   const massUsed = massUsedBy.reduce((s, l) => s + l.amount, 0);
   const massProvided: ResourceLine[] = [];
@@ -104,6 +111,7 @@ export function computeResources(design: MissionDesign, catalog: Catalog): Resou
   const powerUsedBy: ResourceLine[] = [
     ...modules.map((m) => ({ label: m.name, amount: modulePowerW(m, mods, mid) })),
     ...rideshares.map((o) => ({ label: `${o.payloadName} (rideshare)`, amount: o.powerW })),
+    ...integration("powerW"),
   ].filter((l) => l.amount > 0);
 
   // budget
@@ -119,6 +127,7 @@ export function computeResources(design: MissionDesign, catalog: Catalog): Resou
       ? [{ label: vehicle.name, amount: applyStat(vehicle.costMUsd, "launchCost", mods, { missionId: mid }) }]
       : []),
     ...modules.map((m) => ({ label: m.name, amount: moduleCostMUsd(m, mods, mid) })),
+    ...integration("costMUsd"),
   ];
 
   // data and comms

@@ -1,3 +1,4 @@
+import { recommendedCoalitions } from "@/lib/coalition";
 import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { ActorCard } from "@/components/ActorCard";
@@ -11,11 +12,6 @@ import { fmtMUsd } from "@/lib/format";
 import { useCatalog, useGame } from "@/store/game";
 
 /** Best-fit partners per mission, in order of preference (the lead is skipped when it appears here). */
-const RECOMMENDED: Record<string, string[]> = {
-  "orbital-lab": ["nasa", "spacex", "axiom", "esa", "jaxa"],
-  "earth-guardian": ["esa", "iceye", "isro", "aee", "aeb"],
-  "moon-base-zero": ["nasa", "intuitive-machines", "spacex", "firefly", "jaxa"],
-};
 
 type Filter = "all" | ActorKind;
 const FILTERS: { id: Filter; label: string }[] = [{ id: "all", label: "All" }, { id: "agency", label: "Agencies" }, { id: "company", label: "Companies" }];
@@ -65,7 +61,7 @@ export default function Coalition() {
   const [filter, setFilter] = useState<Filter>("all");
 
   const actors = useMemo(() => catalog.actors.filter((a) => filter === "all" || a.kind === filter), [catalog, filter]);
-  const recommended = useMemo(() => (RECOMMENDED[mission?.id ?? ""] ?? []).filter((id) => id !== leadId && catalog.actors.some((a) => a.id === id)).slice(0, 3), [mission, leadId, catalog]);
+  const options = useMemo(() => (leadId ? recommendedCoalitions(mission, leadId) : []), [mission, leadId]);
   const ready = partnerIds.length === 3;
   const members = [leadId, ...partnerIds];
 
@@ -80,7 +76,7 @@ export default function Coalition() {
         />
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <Tabs value={filter} onChange={setFilter} />
-          {sub === "partners" && <RecommendedButton data-coach="coalition.recommended" label="Use recommended coalition" disabled={recommended.length < 3} onClick={() => setPartners(recommended)} />}
+          {sub === "partners" && options.length > 0 && <div className="flex flex-wrap gap-2" data-coach="coalition.recommended">{options.map((o) => <RecommendedButton key={o.id} label={o.label} onClick={() => setPartners([...o.partnerIds])} />)}</div>}
         </div>
         <AnimatePresence mode="wait">
           <motion.div key={sub} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.22 }} className="grid gap-6 lg:grid-cols-[1fr_320px]">

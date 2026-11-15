@@ -23,6 +23,7 @@ export const rideshareOffers: RideshareOffer[] = [
     paysMUsd: 6, // game value
     scienceValue: 40, // game value
     blurb: "Paraguay's student cube logs radiation inside the station.",
+    example: true,
     sources: [S_GUARANI],
     verified: false,
   },
@@ -36,6 +37,7 @@ export const rideshareOffers: RideshareOffer[] = [
     paysMUsd: 10, // game value
     scienceValue: 60, // game value
     blurb: "Bahrain's detector hunts gamma flashes from thunderstorms.",
+    example: true,
     sources: [S_LIGHT1],
     verified: false,
   },
@@ -49,6 +51,7 @@ export const rideshareOffers: RideshareOffer[] = [
     paysMUsd: 6, // game value: fictional proposal; GaindeSAT shows Senegal's student-led small payload skills
     scienceValue: 40, // game value
     blurb: "Senegal tests millet and cowpea seeds in microgravity.",
+    example: true,
     sources: [S_GAINDE, S_EXPRESS],
     verified: false,
   },
@@ -62,6 +65,7 @@ export const rideshareOffers: RideshareOffer[] = [
     paysMUsd: 14, // game value: fictional proposal; Turkiye flew its first astronaut to the ISS in 2024
     scienceValue: 70, // game value
     blurb: "Türkiye's set of small experiments on materials and cells.",
+    example: true,
     sources: [S_TUA],
     verified: false,
   },
@@ -77,6 +81,7 @@ export const rideshareOffers: RideshareOffer[] = [
     paysMUsd: 12, // game value
     scienceValue: 60, // game value
     blurb: "Nigeria adds a wide camera for flood and fire damage maps.",
+    example: true,
     sources: [S_NIGERIA],
     verified: false,
   },
@@ -90,6 +95,7 @@ export const rideshareOffers: RideshareOffer[] = [
     paysMUsd: 8, // game value: fictional proposal; Angola is building its first EO satellite ANGEO-1
     scienceValue: 45, // game value
     blurb: "Angola wants crop images for small farms in the highlands.",
+    example: true,
     sources: [S_ANGEO],
     verified: false,
   },
@@ -103,6 +109,7 @@ export const rideshareOffers: RideshareOffer[] = [
     paysMUsd: 5, // game value
     scienceValue: 30, // game value
     blurb: "Senegal's low-cost camera watches its coast and fisheries.",
+    example: true,
     sources: [S_GAINDE],
     verified: false,
   },
@@ -116,6 +123,7 @@ export const rideshareOffers: RideshareOffer[] = [
     paysMUsd: 30, // game value
     scienceValue: 100, // game value
     blurb: "Argentina shares a soil-moisture radar for its farms.",
+    example: true,
     sources: [S_SAOCOM],
     verified: false,
   },
@@ -131,6 +139,7 @@ export const rideshareOffers: RideshareOffer[] = [
     paysMUsd: 30, // game value
     scienceValue: 90, // game value
     blurb: "The UAE tries again after Rashid was lost with Hakuto-R.",
+    example: true,
     sources: [S_RASHID],
     verified: false,
   },
@@ -144,6 +153,7 @@ export const rideshareOffers: RideshareOffer[] = [
     paysMUsd: 25, // game value
     scienceValue: 80, // game value
     blurb: "Korea's camera maps boulders near the landing zone.",
+    example: true,
     sources: [S_DANURI],
     verified: false,
   },
@@ -157,6 +167,7 @@ export const rideshareOffers: RideshareOffer[] = [
     paysMUsd: 18, // game value
     scienceValue: 60, // game value: Türkiye's first lunar mission carries high-resolution and wide-angle cameras
     blurb: "Türkiye's first surface cameras, after its lunar orbiter flight.",
+    example: true,
     sources: [S_TUA],
     verified: false,
   },
@@ -170,6 +181,7 @@ export const rideshareOffers: RideshareOffer[] = [
     paysMUsd: 8, // game value
     scienceValue: 40, // game value
     blurb: "Bahrain's small detector reads the radiation on the surface.",
+    example: true,
     sources: [S_LIGHT1],
     verified: false,
   },

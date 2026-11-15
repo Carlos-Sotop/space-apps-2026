@@ -160,6 +160,19 @@ export interface LaunchVehicle extends Sourced {
   status: "operational" | "in-development";
   /** one line shown on the card */
   blurb: string;
+  /** numbers for the spec card; payload comes from capacityKg and the owner from providerId */
+  specs?: LaunchVehicleSpecs;
+}
+
+export interface LaunchVehicleSpecs {
+  /** height to the tip of the fairing, m */
+  heightM: number;
+  stages: number;
+  /** orbital launches flown and fully successful, counted on recordAsOf */
+  flights: number;
+  successes: number;
+  /** ISO date the flight record was read */
+  recordAsOf: string;
 }
 
 /* ------------------------------------------------------------------ */
@@ -310,6 +323,8 @@ export interface RideshareOffer extends Sourced {
   paysMUsd: number;
   scienceValue: number;
   blurb: string;
+  /** true when the request is made up, built on the real satellite its sources describe */
+  example?: boolean;
 }
 
 export interface Mission extends Sourced {
@@ -367,6 +382,16 @@ export interface Blueprint {
   txHash?: string;
   /** missions that adopted it (grows as people play) */
   adoptions: number;
+  /** module ids it attaches to; absent means any module of its category */
+  hostIds?: string[];
+  /** what adopting it costs the spacecraft: integration hardware, power and work */
+  integration?: { massKg?: number; powerW?: number; costMUsd?: number };
+  /** the real technology behind it */
+  sources?: Source[];
+  /** true when the entry illustrates a real technology instead of a design its author published */
+  example?: boolean;
+  /** one line on its real-world use, backed by its sources, e.g. "Powered 40+ NASA missions" */
+  provenance?: string;
 }
 
 /* ------------------------------------------------------------------ */
@@ -422,38 +447,17 @@ export interface Review {
 }
 
 /* ------------------------------------------------------------------ */
-/* Futarchy: vote on values, bet on beliefs                            */
+/* Risk assessment: Monte Carlo over the flight engine                 */
 /* ------------------------------------------------------------------ */
 
-/** A design decision the council settles with a decision market. */
-export interface DecisionMarket {
-  id: string;
-  question: string;
-  options: {
-    id: string;
-    label: string;
-    /** the design the option would produce */
-    design: MissionDesign;
-  }[];
-}
-
+/** What `forecast()` returns; the player reads it as the risk assessment (probabilistic risk assessment). */
 export interface Forecast {
-  /** Monte Carlo over many seeds */
+  /** share of simulated flights that succeed, over many seeds */
   successProbability: number;
   expectedScore: number;
   p10: number;
   p90: number;
   runs: number;
-}
-
-/** Play credits a member stakes on an option's predicted score. Play only: never real money. */
-export interface Stake {
-  marketId: string;
-  optionId: string;
-  actorId: string;
-  credits: number;
-  /** the score the member predicts for this option */
-  predictedScore: number;
 }
 
 /* ------------------------------------------------------------------ */
