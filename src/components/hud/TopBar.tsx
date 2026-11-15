@@ -5,6 +5,7 @@ import { useTutorial } from "@/components/tutorial";
 import { LevelPicker } from "@/components/tutorial/LevelPicker";
 import { Modal } from "@/components/ui/Modal";
 import { useGame } from "@/store/game";
+import { SoundToggle } from "@/components/audio/SoundToggle";
 import { JourneyBar } from "./JourneyBar";
 import { NasaLiveChip } from "./NasaLiveChip";
 
@@ -45,6 +46,7 @@ export function TopBar({ title, onBack, backLabel = "Back", right }: Props) {
           <Icon name="star" size={15} />
         </button>
         <NasaLiveChip />
+        <SoundToggle />
         {right}
       </div>
     </header>
