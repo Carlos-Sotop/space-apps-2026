@@ -1,5 +1,5 @@
 import React from "react";
-import { AbsoluteFill, Easing, interpolate, useCurrentFrame } from "remotion";
+import { AbsoluteFill, Easing, interpolate, Sequence, useCurrentFrame } from "remotion";
 import { C, MONO, SANS, T } from "./theme";
 import { ClipView, Flash, GlassFrame, LIVE_ZOOM, Label, Mono, ROCKY_ZOOM, SceneFade, Shockwave, Wordmark, clamp, keys, ramp, useSpring, type Zoom } from "./components";
 
@@ -193,14 +193,14 @@ export const Flight: React.FC = () => {
 };
 
 // ---------------- 8: montage ----------------
-// trim is added to the montage frame: cut i shows clip frames [i * CUT_LEN + trim, (i + 1) * CUT_LEN + trim)
+// trim: the clip frame each cut starts on (cuts last CUT_LEN frames)
 const CUTS: { name: string; label: string; trim: number; zoom?: Zoom }[] = [
   { name: "missions", label: "MISSION SELECT", trim: 0 },
-  { name: "rocky", label: "ROCKY", trim: 0, zoom: ROCKY_ZOOM },
-  { name: "ops", label: "MOON OPERATIONS", trim: 0 },
-  { name: "debrief", label: "DEBRIEF NETWORK", trim: 0 },
-  { name: "missions", label: "LIVE NASA DATA", trim: 60, zoom: { scale: 1.35, origin: "20% 85%" } },
-  { name: "rocky", label: "PLAY", trim: 60, zoom: ROCKY_ZOOM },
+  { name: "rocky", label: "ROCKY", trim: 20, zoom: ROCKY_ZOOM },
+  { name: "ops", label: "MOON OPERATIONS", trim: 160 },
+  { name: "debrief", label: "DEBRIEF NETWORK", trim: 60 },
+  { name: "missions", label: "LIVE NASA DATA", trim: 140, zoom: { scale: 1.35, origin: "20% 85%" } },
+  { name: "intro", label: "PLAY", trim: 20 },
 ];
 const CUT_LEN = 20;
 
@@ -219,7 +219,9 @@ export const Montage: React.FC = () => {
       <AbsoluteFill style={{ alignItems: "center", justifyContent: "center" }}>
         <div style={{ transform: `scale(${1.1 - 0.1 * punch + local * 0.0012}) rotateY(${dir * (4 - 4 * punch)}deg) rotateZ(${dir * (1.2 - 1.2 * punch)}deg)`, marginTop: -30 }}>
           <GlassFrame w={w} h={h} glow={i % 2 ? C.cyan : C.violetBright} strength={0.9}>
-            <ClipView name={cut.name} trimBefore={cut.trim} zoom={cut.zoom} />
+            <Sequence key={i} from={i * CUT_LEN} layout="none">
+              <ClipView name={cut.name} trimBefore={cut.trim} zoom={cut.zoom} />
+            </Sequence>
           </GlassFrame>
         </div>
       </AbsoluteFill>
