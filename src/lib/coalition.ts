@@ -21,6 +21,7 @@ export function coverage(members: Actor[]): Record<string, number> {
 export const treasury = (mission: Mission | undefined, members: Actor[]) =>
   (mission?.baseTreasuryMUsd ?? 0) + members.reduce((s, a) => s + a.contributionMUsd, 0);
 
+/** What each mission needs most, first the one it cannot fly without. */
 const FOCUS: Record<string, Capability[]> = {
   "orbital-lab": ["habitat", "science", "launch", "robotics"],
   "earth-guardian": ["earth-observation", "comms", "ground-segment", "science"],
@@ -33,31 +34,54 @@ export interface RecommendedCoalition {
   partnerIds: [string, string, string];
 }
 
-function topN(pool: Actor[], score: (a: Actor) => number): Actor[] {
-  return [...pool].sort((a, b) => score(b) - score(a)).slice(0, 3);
-}
+const strength = (a: Actor, c: Capability) => a.capabilities[c] ?? 0;
+const setKey = (xs: Actor[]) => xs.map((a) => a.id).sort().join(",");
 
-/** Three one-click coalitions derived from the catalog for the chosen lead. */
+/**
+ * Three one-click coalitions derived from the catalog for the chosen lead, always three different sets:
+ * - Mission specialists: the strongest in what the mission needs.
+ * - Best coverage: each pick adds the most strength the council still lacks in the mission's needs and the five card areas.
+ * - Deep pockets: the biggest contributions, keeping one world-class partner in the mission's first need
+ *   (a world-class lander team for the Moon, a station-module builder for the lab, an Earth-observation agency for Earth Guardian).
+ */
 export function recommendedCoalitions(mission: Mission | undefined, leadId: string): RecommendedCoalition[] {
   const lead = getActor(leadId);
   const pool = catalog.actors.filter((a) => a.id !== leadId);
   if (!lead || pool.length < 3) return [];
   const focus = FOCUS[mission?.id ?? ""] ?? ["science"];
+  const focusOf = (a: Actor) => focus.reduce((s, c) => s + strength(a, c), 0);
+  const taken = new Set<string>();
+  /** Picks in order of preference; the last pick skips any candidate that would repeat an offered set. */
+  const pickThree = (ranked: (picked: Actor[]) => Actor[]): Actor[] => {
+    const picked: Actor[] = [];
+    while (picked.length < 3) {
+      const options = ranked(picked).filter((a) => !picked.includes(a));
+      const next = picked.length < 2 ? options[0] : options.find((a) => !taken.has(setKey([...picked, a])));
+      if (!next) break;
+      picked.push(next);
+    }
+    taken.add(setKey(picked));
+    return picked;
+  };
 
-  const specialists = topN(pool, (a) => focus.reduce((s, c) => s + (a.capabilities[c] ?? 0), 0));
+  const bySpecialty = [...pool].sort((a, b) => focusOf(b) - focusOf(a) || b.contributionMUsd - a.contributionMUsd || a.id.localeCompare(b.id));
+  const specialists = pickThree(() => bySpecialty);
 
-  const covered = new Set<string>();
-  const greedy: Actor[] = [];
-  const have = (a: Actor) => COVERAGE.filter((c) => (a.capabilities[c.key] ?? 0) >= 2).map((c) => c.key as string);
-  have(lead).forEach((k) => covered.add(k));
-  while (greedy.length < 3) {
-    const rest = pool.filter((a) => !greedy.includes(a));
-    const next = [...rest].sort((a, b) => have(b).filter((k) => !covered.has(k)).length - have(a).filter((k) => !covered.has(k)).length || b.contributionMUsd - a.contributionMUsd)[0];
-    greedy.push(next);
-    have(next).forEach((k) => covered.add(k));
-  }
+  const areas = [...new Set<Capability>([...focus, ...COVERAGE.map((c) => c.key)])];
+  const greedy = pickThree((picked) => {
+    const have = (c: Capability) => Math.max(strength(lead, c), ...picked.map((a) => strength(a, c)));
+    const gain = (a: Actor) => areas.reduce((s, c) => s + Math.max(0, strength(a, c) - have(c)), 0);
+    return [...pool].sort((a, b) => gain(b) - gain(a) || focusOf(b) - focusOf(a) || b.contributionMUsd - a.contributionMUsd || a.id.localeCompare(b.id));
+  });
 
-  const deep = topN(pool, (a) => a.contributionMUsd);
+  const must = focus[0]!;
+  const byMoney = [...pool].sort((a, b) => b.contributionMUsd - a.contributionMUsd || focusOf(b) - focusOf(a) || a.id.localeCompare(b.id));
+  const deep = pickThree((picked) => {
+    // the last seat goes to the richest world-class partner in the first need when no member has it yet
+    const covered = [lead, ...picked].some((a) => strength(a, must) >= 3);
+    if (picked.length < 2 || covered) return byMoney;
+    return [...byMoney.filter((a) => strength(a, must) >= 3), ...byMoney];
+  });
 
   const ids = (xs: Actor[]) => xs.map((a) => a.id) as [string, string, string];
   return [
