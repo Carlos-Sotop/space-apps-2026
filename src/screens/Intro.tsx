@@ -27,7 +27,7 @@ export default function Intro() {
         <div className="flex flex-wrap items-center justify-center gap-3">
           <Button variant="primary" size="lg" onClick={() => go("missions")}>Begin mission</Button>
           <Button size="lg" onClick={() => go("story")}>What is SpaceDAO?</Button>
-          <Button size="lg" onClick={() => go("leaderboard")}><Icon name="trophy" size={16} /> Ranking</Button>
+          <Button size="lg" onClick={() => go("leaderboard")}><Icon name="trophy" size={16} /> Leaderboard</Button>
         </div>
       </div>
     </section>

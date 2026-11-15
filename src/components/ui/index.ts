@@ -1,5 +1,7 @@
+export { ActionBar } from "./ActionBar";
 export { Badge, type Tone } from "./Badge";
 export { Button } from "./Button";
+export { Flag } from "./Flag";
 export { Gauge } from "./Gauge";
 export { GlassCard } from "./GlassCard";
 export { Icon, hasIcon, type IconName } from "./Icon";
@@ -7,6 +9,8 @@ export { InfoButton, InfoDrawerHost } from "./InfoDrawer";
 export { LiveBadge } from "./LiveBadge";
 export { Modal } from "./Modal";
 export { MonogramBadge } from "./MonogramBadge";
+export { RecommendedButton } from "./RecommendedButton";
 export { Slider } from "./Slider";
 export { Starfield } from "./Starfield";
+export { StepHeader } from "./StepHeader";
 export { toast, ToastHost } from "./Toast";
