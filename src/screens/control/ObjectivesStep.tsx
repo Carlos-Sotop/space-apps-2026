@@ -1,8 +1,9 @@
-import { Badge, GlassCard, Icon, InfoButton } from "@/components/ui";
+import { Badge, GlassCard, Icon, InfoButton, RecommendedButton } from "@/components/ui";
+import { recommendStep } from "@/engine";
 import { MAX_SECONDARY, type Objective } from "@/engine/types";
 import { CATEGORY_LABEL, getModule } from "@/lib/catalog";
 import { useGame } from "@/store/game";
-import { StepTitle, useDesign } from "./useDesign";
+import { useDesign } from "./useDesign";
 
 function needs(o: Objective): string {
   const mods = (o.requires.moduleIds ?? []).map((id) => getModule(id)?.name ?? id);
@@ -21,14 +22,18 @@ function ObjectiveInfo({ o }: { o: Objective }) {
 }
 
 export function ObjectivesStep() {
-  const { design, mission } = useDesign();
+  const { design, mission, catalog } = useDesign();
+  const patchDesign = useGame((s) => s.patchDesign);
   const toggle = useGame((s) => s.toggleSecondary);
   const chosen = design.secondaryObjectiveIds;
   const p = mission.primaryObjective;
 
   return (
     <div>
-      <StepTitle title="Pick your science goals" chip={`${chosen.length} of ${MAX_SECONDARY} extra goals`} />
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <span className="rounded-full border border-cyan/40 bg-cyan/10 px-3 py-0.5 text-xs text-cyan" data-coach="objectives.count">{chosen.length} of {MAX_SECONDARY} extra goals</span>
+        <RecommendedButton data-coach="objectives.recommended" onClick={() => patchDesign(recommendStep("objectives", design, catalog))} />
+      </div>
       <GlassCard className="mb-5 border-violet/40 p-4">
         <div className="flex items-center gap-3">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-violet/20 text-violet-bright"><Icon name="lock" size={18} /></span>
@@ -39,7 +44,7 @@ export function ObjectivesStep() {
           <InfoButton title={p.title} body={<ObjectiveInfo o={p} />} />
         </div>
       </GlassCard>
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2" data-coach="objectives.list">
         {mission.secondaryObjectives.map((o) => {
           const on = chosen.includes(o.id);
           return (
