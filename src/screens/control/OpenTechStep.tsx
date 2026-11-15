@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from "motion/react";
 import { sfx } from "@/components/audio";
 import { Badge, GlassCard, Icon, InfoButton, MonogramBadge, StepHeader, type IconName } from "@/components/ui";
-import { blueprintFit, reciprocityDue } from "@/engine";
+import { blueprintFit, computeResources, reciprocityDue } from "@/engine";
 import type { Blueprint, ModuleCategory, StatKey } from "@/engine/types";
 import { actorName, getActor, getModule } from "@/lib/catalog";
 import { fmtKg, fmtMUsd, fmtW } from "@/lib/format";
@@ -85,6 +85,14 @@ export function OpenTechStep() {
   const credited = new Set<string>();
   adopted.forEach((b) => { for (let cur: Blueprint | undefined = b, n = 0; cur && n < 8; cur = cur.parentId ? byId.get(cur.parentId) : undefined, n++) credited.add(cur.authorId); });
   const owed = reciprocityDue(design);
+  const now = computeResources(design, catalog);
+  /** The gauge a design would push over the limit, if any: the same check the rideshare cards make. */
+  const breaks = (b: Blueprint): string | null => {
+    const r = computeResources({ ...design, blueprintIds: [...design.blueprintIds, b.id] }, catalog);
+    if (r.mass.status === "over" && now.mass.status !== "over") return `${fmtKg(r.mass.used - r.mass.capacity)} too heavy`;
+    if (r.power.status === "over" && now.power.status !== "over") return `${fmtW(r.power.used - r.power.capacity)} short on power`;
+    return null;
+  };
   const idx = STEPS.findIndex((s) => s.id === "opentech");
 
   const onToggle = (b: Blueprint) => {
@@ -121,8 +129,9 @@ export function OpenTechStep() {
             const hostCat = getModule(fit.optionIds[0] ?? "")?.category;
             const needs = `Needs ${(hostCat && HOST[hostCat]) ?? "a host module"}`;
             const a = getActor(b.authorId);
+            const tooMuch = !on && fit.ok ? breaks(b) : null;
             return (
-              <GlassCard key={b.id} selected={on} disabled={!fit.ok && !on} onSelect={() => onToggle(b)} label={`${on ? "Remove" : "Adopt"} ${b.name}`} className="flex flex-col p-4">
+              <GlassCard key={b.id} selected={on} disabled={!on && (!fit.ok || !!tooMuch)} onSelect={() => onToggle(b)} label={`${on ? "Remove" : "Adopt"} ${b.name}`} className="flex flex-col p-4">
                 <div className="flex items-start gap-3">
                   <MonogramBadge actor={a} fallbackName={b.authorId} size={36} />
                   <div className="min-w-0 flex-1">
@@ -142,7 +151,7 @@ export function OpenTechStep() {
                 </div>
                 <div className="mt-auto flex items-center justify-between gap-2 pt-3">
                   {b.example ? <Badge>Example</Badge> : <Badge tone="cyan">Real design</Badge>}
-                  {fit.ok ? (
+                  {tooMuch ? <span className="truncate text-xs text-over">{tooMuch}</span> : fit.ok ? (
                     <span className={`flex shrink-0 items-center gap-1 rounded-full border px-3 py-1 text-xs ${on ? "border-cyan/60 bg-cyan/10 text-cyan" : "border-white/15 text-muted"}`}>{on ? <><Icon name="check" size={14} /> Adopted</> : "Adopt"}</span>
                   ) : (
                     <button type="button" onClick={(e) => { e.stopPropagation(); setStep("build"); }} className="pointer-events-auto relative z-10 flex shrink-0 items-center gap-1 rounded-full border border-over/50 bg-over/10 px-3 py-1 text-xs text-over hover:bg-over/20">
