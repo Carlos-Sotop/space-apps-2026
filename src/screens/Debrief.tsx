@@ -61,7 +61,7 @@ export default function Debrief() {
   };
 
   return (
-    <div className="pb-12">
+    <div data-coach="debrief.main" className="pb-12">
       <TopBar title="Debrief" right={<Badge>{mission.name}</Badge>} />
       <div className="mx-auto max-w-5xl space-y-5 px-4 sm:px-6">
         <div className="glass grid items-center gap-6 p-5 sm:grid-cols-[auto_1fr] sm:p-6">

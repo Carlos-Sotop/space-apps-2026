@@ -70,7 +70,7 @@ export default function Flight() {
   const skip = () => { pRef.current = end; setP(end); };
 
   return (
-    <div className="pb-10">
+    <div data-coach="flight.main" className="pb-10">
       <TopBar title={mission.name} right={
         <>
           {[1, 4].map((v) => (
