@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PUB = path.join(ROOT, "public");
-const CLIPS = ["opentech", "data", "rideshare", "review", "sign", "flight", "missions", "rocky", "ops", "debrief"];
+const CLIPS = ["opentech", "data", "rideshare", "review", "sign", "flight", "missions", "rocky", "ops", "debrief", "intro", "coalition", "design", "nasalive"];
 const VO = Array.from({ length: 9 }, (_, i) => `vo_${String(i + 1).padStart(2, "0")}`);
 
 const probe = (file) =>

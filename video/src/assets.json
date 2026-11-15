@@ -8,6 +8,10 @@
       "src": "audio/sfx/click.mp3",
       "seconds": 0.09712
     },
+    "sfx_countdown": {
+      "src": "audio/sfx/countdown.mp3",
+      "seconds": 6
+    },
     "sfx_glass": {
       "src": "audio/sfx/glass.mp3",
       "seconds": 0.275533

@@ -73,6 +73,37 @@ const SHOTS = {
     await wait(p, 1200);
     await p.mouse.move(900, 500, { steps: 20 });
   }],
+  intro: ["", async (p) => {
+    await wait(p, 1200);
+    for (let i = 0; i < 3; i++) {
+      if (!(await clickText(p, /start|play|next|continue|begin|skip/i))) break;
+      await wait(p, 900);
+    }
+  }],
+  coalition: [`/?mode=quick&screen=coalition&mission=moon-base-zero`, async (p) => {
+    await wait(p, 800);
+    await hoverFirst(p, "[data-coach*='coalition']");
+    await scroll(p, 260);
+    await wait(p, 1200);
+    await p.mouse.move(1000, 520, { steps: 20 });
+  }],
+  design: [`/?mode=quick&screen=control&${MOON}&step=build`, async (p) => {
+    await wait(p, 800);
+    await hoverFirst(p, "[data-coach*='build'] >> nth=0");
+    await wait(p, 900);
+    await scroll(p, 300);
+    await wait(p, 1000);
+  }],
+  nasalive: [`/?mode=quick&screen=control&${MOON}&step=build`, async (p) => {
+    await wait(p, 900);
+    const chip = p.getByRole("button", { name: /nasa live/i }).first();
+    if (await chip.count()) {
+      await moveTo(p, chip).catch(() => {});
+      await wait(p, 300);
+      await chip.click({ timeout: 2000 }).catch(() => {});
+    }
+    await wait(p, 1800);
+  }],
   opentech: [`/?mode=quick&screen=control&${MOON}&step=opentech`, async (p) => {
     await wait(p, 600);
     await hoverFirst(p, "[data-coach*='opentech'] >> nth=0");

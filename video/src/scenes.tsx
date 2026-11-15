@@ -4,8 +4,9 @@ import { C, MONO, SANS, T } from "./theme";
 import { ClipView, Flash, GlassFrame, Label, Mono, SceneFade, Shockwave, Wordmark, clamp, keys, ramp, useSpring } from "./components";
 
 // ---------------- 1-3: globe hud ----------------
-export const Hud: React.FC = () => {
-  const f = useCurrentFrame();
+export const Hud: React.FC<{ tl?: (f: number) => number }> = ({ tl }) => {
+  const raw = useCurrentFrame();
+  const f = tl ? tl(raw) : raw;
   const nodes = Math.min(12, Math.max(0, Math.floor(ramp(f, 126, 210, 0, 12.99))));
   const links =
     f < 214 ? Math.floor(ramp(f, 126, 206, 0, 9.99)) : f < 300 ? Math.round(keys(f, [[214, 9], [240, 3], [300, 3]])) : Math.round(ramp(f, 304, 350, 3, 66));
@@ -110,11 +111,45 @@ const SEALS = [
   { label: "FUNDER", at: 78 },
 ];
 
+export const SealRow: React.FC<{ seals?: { label: string; at: number }[]; top?: number }> = ({ seals = SEALS, top = 700 }) => {
+  const f = useCurrentFrame();
+  const lit = seals.filter((s) => f >= s.at).length;
+  return (
+  <div style={{ position: "absolute", left: 0, right: 0, top, display: "flex", justifyContent: "center", alignItems: "center", gap: 46 }}>
+    {seals.map((s, i) => {
+      const k = ramp(f, s.at, s.at + 10);
+      const on = f >= s.at;
+      return (
+        <div key={s.label} style={{ textAlign: "center", width: 150 }}>
+          <div style={{ position: "relative", width: 96, height: 96, margin: "0 auto" }}>
+            {on && f < s.at + 22 && (
+              <div style={{ position: "absolute", inset: -((f - s.at) * 2.4), borderRadius: "50%", border: `2px solid ${C.cyan}`, opacity: 1 - (f - s.at) / 22 }} />
+            )}
+            <svg width="96" height="96" viewBox="0 0 96 96">
+              <circle cx="48" cy="48" r="42" fill={on ? "rgba(10,40,52,0.85)" : "rgba(8,10,26,0.8)"} stroke={on ? C.cyan : "rgba(255,255,255,0.18)"} strokeWidth="2.5" style={{ filter: on ? `drop-shadow(0 0 ${14 * k}px ${C.cyan})` : undefined }} />
+              <circle cx="48" cy="48" r="32" fill="none" stroke={on ? "rgba(103,232,249,0.5)" : "rgba(255,255,255,0.08)"} strokeWidth="1" strokeDasharray="3 5" />
+              <path d="M31 49 L43 61 L66 36" fill="none" stroke={C.cyanBright} strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="60" strokeDashoffset={60 * (1 - k)} style={{ filter: `drop-shadow(0 0 8px ${C.cyan})` }} />
+            </svg>
+          </div>
+          <Mono size={16} color={on ? C.cyanBright : C.muted} style={{ marginTop: 14, letterSpacing: "0.2em" }}>{s.label}</Mono>
+          {i < 3 && null}
+        </div>
+      );
+    })}
+    <div style={{ marginLeft: 30, paddingLeft: 40, borderLeft: `1px solid ${C.line}` }}>
+      <Mono size={16} color={C.faint}>SIGNATURES</Mono>
+      <div style={{ fontFamily: MONO, fontWeight: 700, fontSize: 72, color: lit === 4 ? C.cyanBright : C.text, textShadow: lit === 4 ? "0 0 34px rgba(34,211,238,0.7)" : undefined }}>
+        {lit}<span style={{ color: C.faint }}> / 4</span>
+      </div>
+    </div>
+  </div>
+  );
+};
+
 export const Sign: React.FC = () => {
   const f = useCurrentFrame();
   const a = useSpring(2, { damping: 18, stiffness: 110 });
   const b = useSpring(18, { damping: 18, stiffness: 110 });
-  const lit = SEALS.filter((s) => f >= s.at).length;
   return (
     <SceneFade dur={T.sign[1] - T.sign[0]} outF={6}>
       <AbsoluteFill style={{ perspective: 2400 }}>
@@ -128,34 +163,7 @@ export const Sign: React.FC = () => {
             <ClipView name="sign" />
           </GlassFrame>
         </div>
-        <div style={{ position: "absolute", left: 0, right: 0, top: 700, display: "flex", justifyContent: "center", alignItems: "center", gap: 46 }}>
-          {SEALS.map((s, i) => {
-            const k = ramp(f, s.at, s.at + 10);
-            const on = f >= s.at;
-            return (
-              <div key={s.label} style={{ textAlign: "center", width: 150 }}>
-                <div style={{ position: "relative", width: 96, height: 96, margin: "0 auto" }}>
-                  {on && f < s.at + 22 && (
-                    <div style={{ position: "absolute", inset: -((f - s.at) * 2.4), borderRadius: "50%", border: `2px solid ${C.cyan}`, opacity: 1 - (f - s.at) / 22 }} />
-                  )}
-                  <svg width="96" height="96" viewBox="0 0 96 96">
-                    <circle cx="48" cy="48" r="42" fill={on ? "rgba(10,40,52,0.85)" : "rgba(8,10,26,0.8)"} stroke={on ? C.cyan : "rgba(255,255,255,0.18)"} strokeWidth="2.5" style={{ filter: on ? `drop-shadow(0 0 ${14 * k}px ${C.cyan})` : undefined }} />
-                    <circle cx="48" cy="48" r="32" fill="none" stroke={on ? "rgba(103,232,249,0.5)" : "rgba(255,255,255,0.08)"} strokeWidth="1" strokeDasharray="3 5" />
-                    <path d="M31 49 L43 61 L66 36" fill="none" stroke={C.cyanBright} strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="60" strokeDashoffset={60 * (1 - k)} style={{ filter: `drop-shadow(0 0 8px ${C.cyan})` }} />
-                  </svg>
-                </div>
-                <Mono size={16} color={on ? C.cyanBright : C.muted} style={{ marginTop: 14, letterSpacing: "0.2em" }}>{s.label}</Mono>
-                {i < 3 && null}
-              </div>
-            );
-          })}
-          <div style={{ marginLeft: 30, paddingLeft: 40, borderLeft: `1px solid ${C.line}` }}>
-            <Mono size={16} color={C.faint}>SIGNATURES</Mono>
-            <div style={{ fontFamily: MONO, fontWeight: 700, fontSize: 72, color: lit === 4 ? C.cyanBright : C.text, textShadow: lit === 4 ? "0 0 34px rgba(34,211,238,0.7)" : undefined }}>
-              {lit}<span style={{ color: C.faint }}> / 4</span>
-            </div>
-          </div>
-        </div>
+        <SealRow />
       </AbsoluteFill>
     </SceneFade>
   );

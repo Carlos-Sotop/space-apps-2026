@@ -26,6 +26,7 @@ export const C = {
   glass: "rgba(12,14,34,0.72)",
   line: "rgba(255,255,255,0.12)",
   over: "#fb7185",
+  ok: "#34d399",
 };
 
 // scene spans in frames [from, to)
@@ -54,13 +55,17 @@ export const clipSrc = (name: string): string | undefined => {
   return c ? staticFile(c.src) : undefined;
 };
 
-// 3-minute cut (placeholder spans until the script arrives), frames at 30 fps
+// 3-minute cut: one span per voice-over line (vo180_01 ... vo180_10), frames at 30 fps
 export const TOTAL180 = 5400;
 export const T180 = {
-  intro: [0, 600],
-  problem: [600, 1350],
-  idea: [1350, 2250],
-  how: [2250, 4200],
-  nasa: [4200, 4800],
-  closing: [4800, 5400],
+  s01: [0, 600],
+  s02: [600, 1350],
+  s03: [1350, 2250],
+  s04: [2250, 2700],
+  s05: [2700, 3300],
+  s06: [3300, 3750],
+  s07: [3750, 4350],
+  s08: [4350, 4800],
+  s09: [4800, 5160],
+  s10: [5160, 5400],
 } as const;
