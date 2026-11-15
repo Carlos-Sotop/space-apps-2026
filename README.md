@@ -54,7 +54,7 @@ No NASA or agency logos, insignia or mission patches are used. SpaceDAO is not e
 
 ## Libraries and licenses
 
-React, React DOM (MIT) · Vite (MIT) · TypeScript (Apache-2.0) · Tailwind CSS (MIT) · zustand (MIT) · motion (MIT) · three.js, @react-three/fiber, @react-three/drei (MIT) · @noble/curves, @noble/hashes, @noble/post-quantum (MIT) · Cloudflare Workers SDK / wrangler, @cloudflare/vite-plugin (MIT OR Apache-2.0) · Vitest (MIT) · ESLint (MIT) · Fonts via Fontsource: Michroma, Inter, JetBrains Mono (SIL Open Font License 1.1).
+React, React DOM (MIT) · Vite (MIT) · TypeScript (Apache-2.0) · Tailwind CSS (MIT) · zustand (MIT) · motion (MIT) · three.js, @react-three/fiber, @react-three/drei (MIT) · @noble/curves, @noble/hashes, @noble/post-quantum (MIT) · Cloudflare Workers SDK / wrangler, @cloudflare/vite-plugin (MIT OR Apache-2.0) · flag-icons (MIT) · Vitest (MIT) · ESLint (MIT) · Fonts via Fontsource: Michroma, Inter, JetBrains Mono (SIL Open Font License 1.1).
 
 ## Use of AI
 
