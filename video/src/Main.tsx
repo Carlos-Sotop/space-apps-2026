@@ -40,7 +40,8 @@ export const Soundtrack: React.FC<SoundtrackProps> = ({ music: musicName, vo: VO
       ? a.speech.map(([x, y]) => [at + Math.round(x * FPS), at + Math.round(y * FPS)] as const)
       : [[at, at + Math.round(a.seconds * FPS)] as const];
   });
-  const voActive = (f: number) => voIntervals.some(([a, z]) => f >= a - 2 && f <= z + 2);
+  // the duck lands 8 frames before each word so a soft first consonant is never under a music swell
+  const voActive = (f: number) => voIntervals.some(([a, z]) => f >= a - 8 && f <= z + 3);
   const volume = (f: number) => {
     // share of the 9 frames around f where the voice speaks: an ~8-frame ramp in and out of the duck
     let duck = 0;

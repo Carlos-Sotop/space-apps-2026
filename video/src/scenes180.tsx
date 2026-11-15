@@ -319,14 +319,14 @@ export const Trust: React.FC = () => {
           <div
             key={t.title}
             style={{
-              position: "absolute", left: 150 + i * 560, top: 300, width: 500, height: 330, boxSizing: "border-box", padding: "48px 40px", borderRadius: 28,
+              position: "absolute", left: 140 + i * 560, top: 300, width: 520, height: 330, boxSizing: "border-box", padding: "48px 40px", borderRadius: 28,
               opacity: Math.min(k * 1.5, 1), transform: `translateY(${(1 - k) * 60}px) scale(${0.94 + 0.06 * k})`,
               background: "linear-gradient(150deg, rgba(139,92,246,0.18), rgba(34,211,238,0.06))", border: `1px solid rgba(167,139,250,${0.25 + 0.35 * lit})`,
               boxShadow: `0 0 ${50 * lit}px rgba(34,211,238,0.25), inset 0 1px 0 rgba(255,255,255,0.18)`, backdropFilter: "blur(18px)",
             }}
           >
             <Mono size={18} color={C.faint} style={{ letterSpacing: "0.3em" }}>{`0${i + 1}`}</Mono>
-            <div style={{ marginTop: 22, fontFamily: DISPLAY, fontSize: 50, letterSpacing: "0.08em", color: C.text, textShadow: "0 0 34px rgba(139,92,246,0.5)" }}>{t.title}</div>
+            <div style={{ marginTop: 22, fontFamily: DISPLAY, fontSize: 38, letterSpacing: "0.06em", whiteSpace: "nowrap", color: C.text, textShadow: "0 0 34px rgba(139,92,246,0.5)" }}>{t.title}</div>
             {t.note && <div style={{ marginTop: 10, fontFamily: DISPLAY, fontSize: 26, letterSpacing: "0.12em", background: grad, WebkitBackgroundClip: "text", color: "transparent" }}>({t.note})</div>}
             <div style={{ margin: "24px 0 20px", height: 3, width: 90 * lit, background: grad, borderRadius: 3, boxShadow: "0 0 14px rgba(34,211,238,0.6)" }} />
             <Mono size={17} color={C.cyanBright} style={{ letterSpacing: "0.16em", lineHeight: 1.6 }}>{t.sub}</Mono>

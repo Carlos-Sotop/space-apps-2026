@@ -124,7 +124,7 @@ export const SpaceDAO180: React.FC = () => (
           w={1100} top={80}
           items={[
             { name: "review", from: 0, to: at("s06", "a vault") + 10, label: "GO / NO-GO REVIEW" },
-            { name: "sign", from: at("s06", "a vault") - 6, to: len("s06"), label: "FOUR-OF-FOUR SIGNATURE" },
+            { name: "sign", from: at("s06", "a vault") - 6, to: len("s06"), label: "4-OF-4 MULTI-SIGNATURE" },
           ]}
         />
         <SealRow top={745} seals={SEALS} title="4-OF-4 MULTI-SIGNATURE" />
