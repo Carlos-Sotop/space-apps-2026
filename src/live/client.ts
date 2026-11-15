@@ -5,6 +5,7 @@ import moonSnapshot from "@/data/snapshots/moon.json";
 import issSnapshot from "@/data/snapshots/iss.json";
 import dsnSnapshot from "@/data/snapshots/dsn.json";
 import apodSnapshot from "@/data/snapshots/apod.json";
+import { issAt, issTrackUrl, parseSscTrack } from "./iss";
 import type { LiveApod, LiveDsn, LiveIss, LiveMoon } from "./types";
 
 export function snapshotContext(): LiveContext {
@@ -45,11 +46,48 @@ export const snapshots = {
   apod: apodSnapshot as LiveApod & Meta,
 };
 
+// The ISS track read straight from NASA SSCWeb, which answers browsers, when the Worker could only give the snapshot.
+const ISS_TRACK_REFRESH_MS = 30 * 60_000;
+let issTrack: { fetchedAt: number; points: LiveIss[] } | null = null;
+let issLoading: Promise<void> | null = null;
+
+/** Tests start from an empty memory. */
+export function forgetBrowserIssTrack(): void {
+  issTrack = null;
+  issLoading = null;
+}
+
+async function issFromSscWeb(now: number): Promise<LiveIss | null> {
+  if (!issTrack || now - issTrack.fetchedAt > ISS_TRACK_REFRESH_MS || !issAt(issTrack.points, now)) {
+    issLoading ??= (async () => {
+      const res = await fetch(issTrackUrl(now), { signal: AbortSignal.timeout(5000) });
+      if (!res.ok) throw new Error(String(res.status));
+      const points = parseSscTrack(await res.text());
+      if (points.length) issTrack = { fetchedAt: now, points };
+    })().finally(() => {
+      issLoading = null;
+    });
+    await issLoading;
+  }
+  return issTrack ? issAt(issTrack.points, now) : null;
+}
+
 /** One small live route (moon, iss, dsn, apod) with its snapshot as fallback. */
 export async function fetchLiveRoute<K extends keyof typeof snapshots>(name: K): Promise<(typeof snapshots)[K]> {
+  let answer: (typeof snapshots)[K];
   try {
-    return await get<(typeof snapshots)[K]>(`/api/live/${name}`);
+    answer = await get<(typeof snapshots)[K]>(`/api/live/${name}`);
   } catch {
-    return snapshots[name];
+    answer = snapshots[name];
   }
+  if (name === "iss" && answer.snapshot) {
+    try {
+      const now = Date.now();
+      const point = await issFromSscWeb(now);
+      if (point) return { ...point, snapshot: false, fetchedAt: new Date(now).toISOString() } as (typeof snapshots)[K];
+    } catch {
+      // SSCWeb did not answer either: keep the snapshot
+    }
+  }
+  return answer;
 }

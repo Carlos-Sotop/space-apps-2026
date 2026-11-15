@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import worker from "./index.ts";
 import { forgetIssTrack, issAt, issNow, issTrackUrl, ISS_TRACK_REFRESH_MS } from "./iss.ts";
 import { forgetAll } from "./memory.ts";
-import { parseSscTrack } from "./normalize.ts";
+import { parseSscTrack } from "../src/live/iss.ts";
 
 type Env = Parameters<typeof worker.fetch>[1];
 
