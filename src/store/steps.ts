@@ -11,5 +11,5 @@ export const STEPS: { id: StepId; label: string; hint: string }[] = [
   { id: "build", label: "Build", hint: "Assemble the spacecraft" },
   { id: "opentech", label: "Open tech", hint: "Adopt shared designs" },
   { id: "rideshare", label: "Rideshare", hint: "Share spare capacity" },
-  { id: "council", label: "Council", hint: "Review, bet and sign" },
+  { id: "council", label: "Council", hint: "Review, Go / No-Go, sign" },
 ];

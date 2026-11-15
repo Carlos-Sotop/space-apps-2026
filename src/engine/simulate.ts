@@ -70,7 +70,7 @@ export function simulateFlight(
   if (blockers.length > 0) {
     for (const b of blockers) push(0, "launch", "failure", "Launch scrubbed", `${b.text} ${b.fix}`);
     const lessons = blockers.slice(0, 4).map((b) => `${b.text} ${b.fix}`);
-    lessons.push("A design with a blocker never reaches the pad, so it scores zero. Clear every red issue before you trust a forecast.");
+    lessons.push("A design with a blocker never reaches the pad, so it scores zero. Clear every red issue before you trust the risk assessment.");
     while (lessons.length < 3) lessons.push("Check the council review: each partner names the problems in its own area.");
     return {
       seed,
@@ -460,7 +460,7 @@ export function simulateFlight(
   if (tightest)
     lessons.push(`Your tightest resource was ${tightest.key} at ${fmt((tightest.used / (tightest.capacity || 1)) * 100)}% used. Real missions keep 10-20% margin because problems always show up late.`);
   if (success && throttledDays === 0 && failedUnits.length === 0) lessons.unshift("Everything worked: power, comms and the carrier all held, so the instruments returned what they were built for.");
-  lessons.push("One flight is one roll of the dice, so run the forecast to see the odds across many seeds before you commit.");
+  lessons.push("One flight is one roll of the dice, so check the risk assessment to see the odds across many flights before you commit.");
 
   return {
     seed,

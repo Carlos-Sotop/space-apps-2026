@@ -34,14 +34,22 @@ export function ConceptVisual({ id, size = 160 }: { id: ConceptId; size?: number
             {[0, 1, 2].map((k) => <motion.rect key={k} x="70" y={70 + k * 7} width="20" height="3" rx="1.5" fill="#c4b5fd" initial={{ width: 0 }} animate={{ width: 20 }} transition={{ delay: 0.6 + k * 0.15 }} />)}
           </>
         );
-      case "futarchy":
+      case "go-no-go":
+        // Four consoles answer the poll: three GO, one NO-GO that turns GO, then the rocket lights up.
         return (
           <>
-            {[{ x: 40, h: 70, c: "#a78bfa" }, { x: 95, h: 100, c: "#34d399" }].map((b, i) => (
-              <motion.rect key={i} x={b.x} width="30" rx="4" fill={b.c} opacity="0.75" initial={{ y: 140, height: 0 }} animate={{ y: 140 - b.h, height: b.h }} transition={{ delay: 0.2 * i, duration: 0.7, type: "spring" }} />
+            <motion.path d="M80 18c14 12 20 30 20 48l-7 14H67l-7-14c0-18 6-36 20-48Z" fill="rgba(52,211,153,0.08)" stroke="#a78bfa" strokeWidth="2"
+              initial={{ stroke: "#a78bfa" }} animate={{ stroke: ["#a78bfa", "#a78bfa", "#34d399"] }} transition={{ delay: 1.4, duration: 0.8, times: [0, 0.5, 1] }} />
+            <motion.path d="M72 82q8 26 16 0Z" fill="#22d3ee" initial={{ opacity: 0 }} animate={{ opacity: [0, 1, 0.7, 1] }} transition={{ delay: 2.2, duration: 0.8 }} />
+            {[32, 64, 96, 128].map((x, i) => (
+              <g key={x}>
+                <rect x={x - 13} y="112" width="26" height="30" rx="5" fill="rgba(255,255,255,0.04)" stroke="#5d6390" strokeWidth="1.5" />
+                <motion.circle cx={x} cy="127" r="7"
+                  initial={{ fill: "#3b3f52" }}
+                  animate={{ fill: i === 2 ? ["#3b3f52", "#fb7185", "#fb7185", "#34d399"] : ["#3b3f52", "#34d399"] }}
+                  transition={i === 2 ? { delay: 0.3 + i * 0.25, duration: 1.2, times: [0, 0.1, 0.6, 1] } : { delay: 0.3 + i * 0.25, duration: 0.2 }} />
+              </g>
             ))}
-            <motion.path d="M30 140h105" stroke="#5d6390" strokeWidth="2" />
-            <motion.path d="m100 26 10-10 10 10" fill="none" stroke="#34d399" strokeWidth="3" strokeLinecap="round" {...draw} transition={{ delay: 0.9 }} />
           </>
         );
       case "multisig":
