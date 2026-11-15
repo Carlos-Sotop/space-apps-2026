@@ -4,9 +4,9 @@ export { effectiveModifiers, applyStat, blueprintFit, reciprocityDue, type Bluep
 export { computeResources } from "./resources";
 export { validateDesign } from "./validate";
 export {
-  councilValues, councilReview, readinessReview, readinessSeats, readinessAllGo, readinessChanges,
+  councilValues, councilReview, readinessReview, readinessSeats, readinessAllGo, readinessChanges, allowedCalls, seatVerdict, pollAllGo,
   VERDICT_LABEL, READINESS_SOURCES, READY_MARGIN, READY_SUCCESS, NO_GO_SUCCESS, NO_GO_NIGHT_COVER, RISK_RUNS,
-  type ReadinessVote, type ReadinessVoteDetail, type ReadinessCheck, type ReadinessVerdict,
+  type ReadinessVote, type ReadinessVoteDetail, type ReadinessCheck, type ReadinessVerdict, type SeatCall,
 } from "./council";
 export { recommendStep, autoDesign } from "./recommend";
 export { simulateFlight } from "./simulate";
