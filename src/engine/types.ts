@@ -249,6 +249,10 @@ export interface Objective {
   requires: { categories?: ModuleCategory[]; moduleIds?: string[] };
   /** points if achieved */
   scienceValue: number;
+  /** one line on why it matters, for the info card */
+  why?: string;
+  /** the primary source behind the objective */
+  source?: Source;
 }
 
 export interface Destination {
