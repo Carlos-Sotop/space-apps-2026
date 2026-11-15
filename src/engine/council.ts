@@ -3,6 +3,8 @@ import type {
   Capability,
   Catalog,
   Coalition,
+  DesignPatch,
+  DesignStep,
   Domain,
   Issue,
   MissionDesign,
@@ -11,11 +13,25 @@ import type {
   ResourceKey,
   ResourceReport,
   Review,
+  Source,
   Values,
 } from "./types";
 import { designMoves, fmt, getActor, getMission, strongCapabilities, type DesignMove } from "./design";
 import { computeResources } from "./resources";
 import { validateDesign } from "./validate";
+
+/**
+ * One partner's vote in the Go / No-Go readiness review (Sunday sprint contract, C0; the review itself is C2).
+ * Modeled on NASA flight readiness reviews and the launch Go/No-Go poll: each partner runs one check with
+ * real numbers, and a single NO-GO holds the launch.
+ */
+export interface ReadinessVote {
+  actorId: string; verdict: "go" | "no-go" | "go-with-condition";
+  check: "mass" | "power" | "comms" | "budget" | "reliability" | "objectives" | "values";
+  reason: string; numbers: string; source?: Source;
+  fix?: { label: string; patch: DesignPatch; goTo?: DesignStep };
+  concession?: { label: string; cost: string; patch: DesignPatch };
+}
 
 const CAPABILITY_DOMAIN: Record<Capability, Domain> = {
   launch: "launch",

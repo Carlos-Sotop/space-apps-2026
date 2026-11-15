@@ -231,7 +231,29 @@ export interface OpsState {
   flags: Record<string, number>;
   /** every accepted action, in order; the Worker replays this */
   actions: OpsAction[];
+  /** what the last turn did, for the 3D scene and the UI to animate (set by every advance from C4 on) */
+  lastReport?: OpsTurnReport;
 }
+
+/* ---------------- Turn report (Sunday sprint contract, C0) ---------------- */
+
+/** What one turn did. Eric's 3D scene and Dayon's UI animate `effects` in order. */
+export interface OpsTurnReport {
+  turn: number; fromDay: number; toDay: number;
+  delta: { energyWh: number; waterKg: number; dataStoredGb: number; dataReturnedGb: number; sciencePoints: number };
+  effects: OpsEffect[];      // in order; Eric's 3D scene and Dayon's UI animate these
+  warnings: OpsWarning[];    // forward-looking
+}
+export type OpsEffect =
+  | { kind: "daylight"; sunFactor: number; earthUp: boolean }
+  | { kind: "storm"; severity: 1 | 2 | 3; shieldedIds: string[]; hitIds: string[]; liveSource?: Source }
+  | { kind: "impact"; tileId: string; hitIds: string[]; damage: number }
+  | { kind: "power-out"; structureIds: string[] }
+  | { kind: "downlink"; gb: number; fromId: string }
+  | { kind: "science"; points: number; fromIds: string[] }
+  | { kind: "goal-done"; goalId: string }
+  | { kind: "discovery"; tileId: string; goalId: string };
+export interface OpsWarning { id: string; severity: "info" | "warn" | "danger"; text: string; fix?: string; turnsLeft?: number }
 
 /** Live NASA inputs, already normalized. Missing fields fall back to seeded values. */
 export interface OpsLive {
