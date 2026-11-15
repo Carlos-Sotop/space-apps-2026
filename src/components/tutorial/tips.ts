@@ -56,8 +56,8 @@ export const TIPS: Record<string, Tip[]> = {
     { anchor: "flight.main", pose: "cheer", text: "Liftoff! Watch your spacecraft fly its route. Real NASA data feeds the simulation." },
   ],
   ops: [
-    { anchor: "ops.panel", pose: "point", text: "You arrived! Now run the base. Each turn you have a few action points to spend." },
-    { anchor: "ops.panel", pose: "worried", text: "Keep energy up and data flowing home. Storms and impacts can happen any day." },
+    { anchor: "ops.actions", pose: "point", text: "You arrived! Now run the base. Each turn you have a few action points to spend." },
+    { anchor: "ops.energy", pose: "worried", text: "Keep energy up and data flowing home. Storms and impacts can happen any day." },
   ],
   debrief: [
     { anchor: "debrief.main", pose: "cheer", text: "Mission report! See your grades and why things worked or failed." },

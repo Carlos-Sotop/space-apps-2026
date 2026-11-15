@@ -38,7 +38,7 @@ export function RankingSubmit() {
   };
 
   return (
-    <div className="glass flex flex-col gap-3 p-5 sm:flex-row sm:items-end">
+    <div className="glass flex flex-col gap-3 p-5 sm:flex-row sm:items-end" data-coach="debrief.leaderboard">
       <div className="flex-1">
         <h2 className="font-display mb-1 flex items-center gap-2 text-sm"><Icon name="trophy" size={16} className="text-tight" /> Global leaderboard</h2>
         <p className="m-0 text-xs text-muted">{state === "done" ? `You are #${rank || "?"} on this mission. The server replayed your run to check it.` : "Use a nickname, not your real name. The server replays your run before it counts."}</p>

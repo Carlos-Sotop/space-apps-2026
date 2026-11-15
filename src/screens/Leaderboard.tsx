@@ -79,7 +79,7 @@ export default function Leaderboard() {
   return (
     <div className="pb-12">
       <TopBar title="Global leaderboard" onBack={() => go("intro")} backLabel="Back to start" />
-      <div className="mx-auto max-w-4xl space-y-4 px-4 sm:px-6">
+      <div className="mx-auto max-w-4xl space-y-4 px-4 sm:px-6" data-coach="leaderboard.list">
         <p className="m-0 text-sm text-muted">Every score is checked: the server replays the mission with the same design, seed and decisions before it counts.</p>
         <div className="flex flex-wrap gap-2" role="tablist" aria-label="Mission">
           {tabs.map((t) => (
