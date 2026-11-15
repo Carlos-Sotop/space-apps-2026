@@ -1,7 +1,7 @@
 // The recommended design (Quick play and the "Use recommended" buttons), on the real catalog.
 import { describe, expect, it } from "vitest";
 import { catalog } from "@/data";
-import { autoDesign, computeResources, councilReview, defaultDesign, forecast, recommendStep, validateDesign } from "./index";
+import { autoDesign, computeResources, councilReview, defaultDesign, forecast, readinessAllGo, readinessReview, recommendStep, validateDesign } from "./index";
 import { DESIGN_STEPS, RECOMMENDED_MARGIN, STEP_FIELDS } from "./recommend";
 import type { Coalition, MissionDesign, MissionId } from "./types";
 
@@ -26,6 +26,12 @@ describe("autoDesign: the recommended design", () => {
     expect(validateDesign(d, catalog)).toEqual([]);
     expect(withinMargin(d)).toBe(true);
     expect(councilReview(d, catalog).map((r) => r.verdict)).toEqual(["approve", "approve", "approve"]);
+  });
+
+  it.each(MISSIONS)("%s gets a unanimous GO in the readiness review", (m) => {
+    const votes = readinessReview(autoDesign(m, SPECIALISTS[m], catalog), catalog);
+    expect(votes.filter((v) => v.verdict !== "go").map((v) => `${v.actorId}: ${v.reason}`)).toEqual([]);
+    expect(readinessAllGo(votes)).toBe(true);
   });
 
   it.each(MISSIONS)("%s wins at least 70% of the risk assessment and scores above the cheapest starting design", (m) => {

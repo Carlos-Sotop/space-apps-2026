@@ -1027,3 +1027,24 @@ export function readinessChanges(before: ReadinessVoteDetail[], after: Readiness
     return [`${head}, ${lowerFirst(a.reason)}`];
   });
 }
+
+/* ------------------------------------------------------------------ */
+/* Team play: players take seats and call GO or NO-GO themselves (C9)  */
+/* ------------------------------------------------------------------ */
+
+export type SeatCall = "go" | "no-go";
+
+/** What a player at a seat may call: the numbers' NO-GO can only be held; anything else is the player's call. */
+export const allowedCalls = (vote: ReadinessVote): SeatCall[] => (vote.verdict === "no-go" ? ["no-go"] : ["go", "no-go"]);
+
+/** A seat's verdict in the poll: its player's call when a player sits there, else the console's. */
+export function seatVerdict(vote: ReadinessVote, players: string[], calls: Partial<Record<string, SeatCall>>): ReadinessVerdict | undefined {
+  if (!players.includes(vote.actorId)) return vote.verdict;
+  const call = calls[vote.actorId];
+  return call && allowedCalls(vote).includes(call) ? call : undefined;
+}
+
+/** True when every seat says GO: players by their own call, the other seats by their console. */
+export function pollAllGo(votes: ReadinessVote[], players: string[] = [], calls: Partial<Record<string, SeatCall>> = {}): boolean {
+  return votes.length > 0 && votes.every((v) => seatVerdict(v, players, calls) === "go");
+}
