@@ -6,7 +6,7 @@ import { CATEGORY_LABEL, getActor, missionModules } from "@/lib/catalog";
 import { fmtKg, fmtMUsd, fmtW } from "@/lib/format";
 import { useGame } from "@/store/game";
 import { SpacecraftStack } from "./SpacecraftStack";
-import { StepTitle, useDesign } from "./useDesign";
+import { useDesign } from "./useDesign";
 
 /** What a module is for, in the player's words. Tabs group the catalog by job, not by code. */
 const FUNCTIONS = ["Power", "Comms", "Science", "Life", "Structure"] as const;
@@ -85,9 +85,11 @@ export function BuildStep() {
 
   return (
     <div>
-      <StepTitle title="Build the spacecraft" chip={`${flown.length} modules`}>
-        <RecommendedButton onClick={() => patchDesign(recommendStep("build", design, catalog))} />
-      </StepTitle>
+      {/* no title here: Mission Control already heads every step with a big one */}
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <span className="rounded-full border border-violet/40 bg-violet/10 px-3 py-0.5 text-xs text-violet-bright">{flown.length} modules</span>
+        <RecommendedButton data-coach="build.recommended" onClick={() => patchDesign(recommendStep("build", design, catalog))} />
+      </div>
       <div className="grid gap-6 xl:grid-cols-[1fr_300px]">
         <div className="min-w-0">
           <div role="tablist" aria-label="What the module is for" className="mb-4 flex flex-wrap gap-1.5">
