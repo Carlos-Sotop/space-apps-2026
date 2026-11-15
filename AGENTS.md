@@ -43,7 +43,7 @@ If your change needs another owner's folder, ask them or open a PR and tag them.
 - No NASA insignia ("meatball"), logotype ("worm"), mission patches, or any space agency or company logo. Actors are shown with an SVG flag and their name (never letter monograms, never emoji). Do not imply NASA or any agency endorses SpaceDAO.
 - At least one NASA dataset or API must be used and credited. Every API and dataset goes in `docs/DATA_SOURCES.md` and the README.
 - Every real-world number in `src/data/` has a source (title + URL). `verified` stays `false` until a human checked it.
-- Avoid AI-generated media: draw art in code (SVG/three.js); music and SFX come from Envato Elements (licensed, listed in References). Any AI-generated image or video left carries a visible "AI-generated" watermark. AI-written code is disclosed in the README "Use of AI" section.
+- Avoid AI-generated media: draw art in code (SVG/three.js); music and SFX come from free licensed sources (CC0 / CC BY / NASA public domain, listed in README "Audio credits"). Any AI-generated image or video left carries a visible "AI-generated" watermark. AI-written code is disclosed in the README "Use of AI" section.
 - Play credits only, test networks only. No real money, no token sale, no investment language.
 - English everywhere in the product: UI, docs, code, commits.
 - Every library, font, image or sound must be free to use; note its license in the README.
