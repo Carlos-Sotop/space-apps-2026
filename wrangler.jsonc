@@ -5,6 +5,8 @@
   "compatibility_date": "2026-11-01",
   // Public config only; secrets (NASA_API_KEY, SOLANA_RELAYER_SECRET, SUPABASE_SECRET_KEY) are Worker secrets.
   "vars": { "SUPABASE_URL": "https://qkzgubwmqriglpzblfmo.supabase.co" },
+  // once a day: one tiny read so Supabase never pauses the free project for inactivity (it does after 7 days)
+  "triggers": { "crons": ["17 9 * * *"] },
   "assets": {
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",

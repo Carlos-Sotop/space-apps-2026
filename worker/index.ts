@@ -2,7 +2,7 @@
 // see chain.ts); everything else is static assets.
 import type { LiveContext, LiveEarthEvent, LiveSpaceWeather } from "../src/engine/types.ts";
 import type { LiveApod, LiveDsn, LiveIss, LiveMoon } from "../src/live/types.ts";
-import { handleScores, type ScoresEnv } from "./scores.ts";
+import { handleScores, keepAlive, type ScoresEnv } from "./scores.ts";
 import { isoDay, normalizeApod, normalizeCme, normalizeEonet, normalizeGst, parseDsn, parseHorizons } from "./normalize.ts";
 import spaceWeatherSnap from "../src/data/snapshots/space-weather.json";
 import earthEventsSnap from "../src/data/snapshots/earth-events.json";
@@ -211,6 +211,10 @@ export default {
     } catch {
       return json({ error: "internal" }, 0, 500);
     }
+  },
+  /** Daily cron (wrangler.jsonc "triggers"): keeps the Supabase project from pausing for inactivity. */
+  async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    ctx.waitUntil(keepAlive(env).then((status) => console.log(`supabase keep-alive: ${status || "skipped"}`)));
   },
 } satisfies ExportedHandler<Env>;
 

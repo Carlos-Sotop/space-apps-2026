@@ -36,6 +36,21 @@ function db(env: ScoresEnv, path: string, init: RequestInit = {}): Promise<Respo
   return fetch(`${env.SUPABASE_URL!.replace(/\/$/, "")}/rest/v1/${path}`, { ...init, headers, signal: AbortSignal.timeout(8000) });
 }
 
+/**
+ * Supabase pauses a free project after 7 days without activity, and the judges may open the game
+ * weeks after the event. A cron trigger (wrangler.jsonc) calls this once a day: one tiny read keeps
+ * the database awake. Returns the HTTP status, or 0 when the ranking is not configured or Supabase did not answer.
+ */
+export async function keepAlive(env: ScoresEnv): Promise<number> {
+  if (!env.SUPABASE_URL || !env.SUPABASE_SECRET_KEY) return 0;
+  try {
+    const res = await db(env, "scores?select=id&limit=1");
+    return res.status;
+  } catch {
+    return 0;
+  }
+}
+
 /** GET /api/scores?mission=&limit= : the public ranking. POST /api/scores : replay, then store. */
 export async function handleScores(request: Request, env: ScoresEnv): Promise<Response> {
   if (!env.SUPABASE_URL || !env.SUPABASE_SECRET_KEY) return reply({ error: "ranking offline" }, 503);
