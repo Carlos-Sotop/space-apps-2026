@@ -8,7 +8,7 @@ import { getActor } from "@/lib/catalog";
 import { fmtPct } from "@/lib/format";
 import { useGame } from "@/store/game";
 import type { StepId } from "@/store/steps";
-import { StepTitle, useDesign } from "./useDesign";
+import { useDesign } from "./useDesign";
 import { ReviewFeed } from "./ReviewFeed";
 import { SignPanel } from "./SignPanel";
 
@@ -118,7 +118,6 @@ export function CouncilStep() {
 
   return (
     <div className="space-y-5">
-      <StepTitle title="Go / No-Go review" chip="All 4 must say GO" />
       <RiskAssessment risk={risk} fresh={fresh} />
       <ReviewFeed votes={votes} seats={seats} changes={changes} playerCount={playerCount} players={players} calls={calls}
         onPlayers={onPlayers} onCall={onCall} onFix={onFix} onNegotiate={onNegotiate} />
