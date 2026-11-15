@@ -39,6 +39,8 @@ export const actorHq: Record<string, [number, number]> = {
   "airbus-defence-space": [48.054, 11.619],
   iceye: [60.176, 24.829],
   ula: [39.580, -104.877],
+  "bizu-space": [-23.179, -45.887],
+  visiona: [-23.179, -45.887],
 };
 
 export const actors: Actor[] = [
@@ -865,6 +867,67 @@ export const actors: Actor[] = [
     priorities: { science: 0.2, safety: 0.55, cost: 0.25 }, // game value
     persona: "Conservative and precise, famous for caring more about the right orbit than the fast launch.",
     sources: [{ title: "ULA Vulcan Centaur performance table", url: "https://www.ulalaunch.com/rockets/vulcan-centaur" }],
+    verified: false,
+  },
+  /* Brazilian space companies (C7). Facts checked against the cited pages on 2026-11-15. */
+  {
+    id: "bizu-space",
+    kind: "company",
+    name: "Bizu Space",
+    shortName: "Bizu",
+    country: "BR",
+    flag: "",
+    color: "#22c55e",
+    tagline: "Liquid rocket engines built in Brazil",
+    highlights: [
+      "Founded in 2023 in São José dos Campos, Brazil's aerospace hub",
+      "Builds the liquid engine for the third stage of the Brazilian Microlauncher (MLBR)",
+      "Flew FTL-Perseu, a liquid-propellant rocket, from Virgínia (Minas Gerais) on 29 May 2026",
+    ],
+    capabilities: { launch: 1 },
+    contributionMUsd: 8, // game value: an early startup
+    perk: {
+      name: "Home-grown engines",
+      description: "Bizu Space builds liquid rocket engines in Brazil, for the national microlauncher's upper stage.",
+      modifiers: [{ stat: "launchCost", op: "mul", value: 0.98 }], // game value
+    },
+    priorities: { science: 0.2, safety: 0.3, cost: 0.5 }, // game value
+    persona: "A young engine team, proud of its test fires and always counting the cost per kilogram.",
+    sources: [
+      { title: "NewSpace Tracker: Bizu Space (founded 2023; MLBR third-stage liquid engine)", url: "https://newspacetracker.com/company/bizu-space/" },
+      { title: "Metrópoles: Bizu Space flies FTL-Perseu, a liquid-propellant rocket, 29 May 2026", url: "https://metropoles.com/sao-paulo/brasil-1o-foguete-propulsao-liquida" },
+      { title: "Bizu Space", url: "https://bizu.space/en" },
+    ],
+    verified: false,
+  },
+  {
+    id: "visiona",
+    kind: "company",
+    name: "Visiona Tecnologia Espacial",
+    shortName: "Visiona",
+    country: "BR",
+    flag: "",
+    color: "#38bdf8",
+    tagline: "Brazil's satellite integrator, an Embraer and Telebras venture",
+    highlights: [
+      "Founded in 2012 by Embraer and Telebras, based in São José dos Campos",
+      "Brazilian integrator of SGDC, the national defense and communications satellite",
+      "VCUB1, launched 15 April 2023, is the first Earth observation satellite fully designed in Brazil",
+    ],
+    capabilities: { spacecraft: 2, "earth-observation": 1, comms: 1 },
+    contributionMUsd: 15, // game value
+    perk: {
+      name: "Small-satellite integrator",
+      description: "Visiona designed and integrated VCUB1, so bus integration costs less with it on the team.",
+      modifiers: [{ stat: "moduleCost", op: "mul", value: 0.95, scope: { category: "bus" } }], // game value
+    },
+    priorities: { science: 0.3, safety: 0.35, cost: 0.35 }, // game value
+    persona: "A careful systems integrator who thinks in requirements, margins and who flies the satellite after launch.",
+    sources: [
+      { title: "NewSpace Tracker: Visiona (Embraer and Telebras joint venture, 2012, SGDC integrator)", url: "https://newspacetracker.com/company/visiona-tecnologia-espacial/" },
+      { title: "Embraer: Visiona and VCUB1, the first Earth observation satellite fully designed in Brazil", url: "https://www.embraer.com/defense-security-space/overview/en" },
+      { title: "Teletime: VCUB1 launched on Falcon 9 from Vandenberg, 15 April 2023", url: "https://teletime.com.br/17/04/2023/desenvolvido-no-brasil-satelite-de-observacao-da-visiona-e-lancado-com-sucesso/" },
+    ],
     verified: false,
   },
 ];
