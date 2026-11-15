@@ -4,14 +4,16 @@ import { TopBar } from "@/components/hud/TopBar";
 import { Badge, Button, Icon, LiveBadge } from "@/components/ui";
 import type { FlightEvent } from "@/engine/types";
 import { getMission } from "@/lib/catalog";
-import { fmtGb, fmtW } from "@/lib/format";
+import { fmtGb, fmtKm, fmtW } from "@/lib/format";
 import { useGame } from "@/store/game";
+import { useLiveRoute } from "@/live/useLive";
 import { FlightScene } from "./FlightScene";
-import { FlightHud } from "./FlightHud";
+import { FlightHud, type LiveItem } from "./FlightHud";
 import { Sparkline } from "./FlightTelemetry";
 import { buildTimeline, dayAt, endProgress, phaseAt, type Outcome } from "./flightTimeline";
 
-const DURATION_S = 26;
+/** The whole flight plays in under half a minute, per the sprint brief. */
+const DURATION_S = 24;
 const KIND_COLOR: Record<FlightEvent["kind"], string> = { info: "var(--fg-faint)", success: "var(--ok)", warning: "var(--tight)", failure: "var(--over)" };
 const OUTCOME: Record<Outcome, { label: string; color: string; line: string }> = {
   success: { label: "Success", color: "var(--ok)", line: "Mission accomplished. The data is on its way to the world." },
@@ -30,6 +32,8 @@ export default function Flight() {
   const go = useGame((s) => s.go);
   const afterFlight = useGame((s) => s.afterFlight);
   const mission = design ? getMission(design.missionId) : undefined;
+  const moon = useLiveRoute("moon");
+  const dsn = useLiveRoute("dsn");
   const [p, setP] = useState(0);
   const [speed, setSpeed] = useState(1);
   const pRef = useRef(0);
@@ -69,6 +73,31 @@ export default function Flight() {
   const outcome: Outcome = result.lostAt ? "lost" : result.success ? "success" : "partial";
   const skip = () => { pRef.current = end; setP(end); };
 
+  // The NASA data this flight is running on, shown on the view rather than buried in a panel.
+  const liveItems: LiveItem[] = [];
+  if (lunar && moon.moonDistanceKm) {
+    liveItems.push({
+      icon: "moon", label: "Moon now", value: fmtKm(moon.moonDistanceKm),
+      href: "https://ssd.jpl.nasa.gov/horizons/app.html", snapshot: moon.snapshot,
+    });
+  }
+  const dishes = dsn.stations.flatMap((st) => st.dishes);
+  const tracking = dishes.find((d) => d.downlinkActive && d.targets.length) ?? dishes.find((d) => d.targets.length);
+  if (tracking) {
+    liveItems.push({
+      icon: "antenna", label: "DSN", value: `${tracking.name} to ${tracking.targets[0]}`,
+      href: "https://eyes.nasa.gov/apps/dsn-now/dsn.html", snapshot: dsn.snapshot,
+    });
+  }
+  const storm = live?.spaceWeather?.[0];
+  if (storm) {
+    liveItems.push({
+      icon: "storm", label: storm.kind === "GST" ? "Geomagnetic storm" : storm.kind === "FLR" ? "Solar flare" : "Coronal mass ejection",
+      value: storm.magnitude ?? new Date(storm.time).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+      href: storm.link, snapshot: live?.snapshot,
+    });
+  }
+
   return (
     <div data-coach="flight.main" className="pb-10">
       <TopBar title={mission.name} right={
@@ -96,7 +125,7 @@ export default function Flight() {
           <div className="min-w-0 space-y-4">
             <div className="glass relative aspect-[4/3] overflow-hidden sm:aspect-[2/1]">
               <FlightScene timeline={timeline} p={p} lunar={lunar} lostAt={result.lostAt} ended={ended} />
-              <FlightHud timeline={timeline} index={index} p={p} day={day} ended={ended} lost={!!result.lostAt && ended} calm={calm} />
+              <FlightHud timeline={timeline} index={index} p={p} day={day} ended={ended} lost={!!result.lostAt && ended} calm={calm} live={liveItems} />
             </div>
             <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
               <Sparkline label="Power" values={seen.map((s) => s.powerW)} now={fmtW(last?.powerW ?? 0)} color="var(--tight)" />

@@ -1,5 +1,16 @@
 import { AnimatePresence, motion } from "motion/react";
+import { Icon, type IconName } from "@/components/ui";
 import type { Timeline } from "./flightTimeline";
+
+/** A real measurement the flight is using right now, with the record it came from. */
+export interface LiveItem {
+  icon: IconName;
+  label: string;
+  value: string;
+  href?: string;
+  /** true when the value came from the bundled snapshot instead of a live call */
+  snapshot?: boolean;
+}
 
 interface Props {
   timeline: Timeline;
@@ -12,6 +23,8 @@ interface Props {
   /** set when the mission was lost, to switch the frame to the alarm colour */
   lost: boolean;
   calm: boolean;
+  /** NASA data in use for this flight: shown so it is visible, not decoration */
+  live?: LiveItem[];
 }
 
 const pad = (n: number, w = 2) => String(Math.max(0, Math.floor(n))).padStart(w, "0");
@@ -44,7 +57,7 @@ function Corner({ at, color }: { at: "tl" | "tr" | "bl" | "br"; color: string })
 }
 
 /** Motion-graphics layer over the 3D flight: frame, phase callout, mission clock, progress ticks. */
-export function FlightHud({ timeline, index, p, day, ended, lost, calm }: Props) {
+export function FlightHud({ timeline, index, p, day, ended, lost, calm, live = [] }: Props) {
   const phase = timeline.phases[index];
   const color = lost ? "var(--over)" : "var(--violet-bright)";
   const total = timeline.phases.length;
@@ -93,6 +106,31 @@ export function FlightHud({ timeline, index, p, day, ended, lost, calm }: Props)
           <span className="text-faint">d</span>
         </div>
       </div>
+
+      {/* the NASA data this flight is actually running on */}
+      {live.length > 0 && (
+        <div className="pointer-events-none absolute bottom-14 left-3 flex flex-col items-start gap-1.5 sm:bottom-16 sm:left-6">
+          {live.map((it) => {
+            const body = (
+              <>
+                <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${it.snapshot ? "bg-faint" : "pulse-dot bg-cyan"}`} />
+                <Icon name={it.icon} size={12} className="shrink-0 text-faint" />
+                <span className="text-[10px] uppercase tracking-wider text-faint">{it.label}</span>
+                <span className="num text-[11px] text-fg">{it.value}</span>
+              </>
+            );
+            const cls = "flex items-center gap-1.5 rounded-full border border-line bg-[#070a18]/80 px-2.5 py-1 backdrop-blur-sm";
+            return it.href ? (
+              <a key={it.label} href={it.href} target="_blank" rel="noreferrer noopener" className={`pointer-events-auto ${cls} hover:border-cyan/50`} title={`Open the ${it.label} record`}>
+                {body}
+                <Icon name="external" size={10} className="shrink-0 text-faint" />
+              </a>
+            ) : (
+              <div key={it.label} className={cls}>{body}</div>
+            );
+          })}
+        </div>
+      )}
 
       {/* progress ticks */}
       <div className="absolute inset-x-3 bottom-8 sm:inset-x-6 sm:bottom-9">
