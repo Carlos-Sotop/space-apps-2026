@@ -146,6 +146,13 @@ export default function OpsScreen() {
     setSelected(t.id === selected ? null : t.id);
   };
 
+  /** What the pending action would put on the tile, so the board can preview it. */
+  const ghostKind =
+    pending?.kind === "build" ? pending.build
+    : pending?.kind === "deploy" ? ops.inventory.find((it) => it.moduleId === pending.moduleId)?.kind ?? null
+    : pending?.kind === "move" ? ops.structures.find((st) => st.id === pending.structureId)?.kind ?? null
+    : null;
+
   const selTile = ops.tiles.find((t) => t.id === selected) ?? null;
   const selStructs = ops.structures.filter((st) => st.tileId === selected);
   const defOf = (kind: string) => sc.structures.find((d) => d.kind === kind);
@@ -260,6 +267,9 @@ export default function OpsScreen() {
                   validTileIds={validIds}
                   selectedTileId={selected}
                   onTileClick={onTile}
+                  report={ops.lastReport}
+                  scenario={sc}
+                  ghostKind={ghostKind}
                 />
               </Suspense>
             </ErrorBoundary>
