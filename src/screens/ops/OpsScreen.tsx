@@ -200,7 +200,7 @@ export default function OpsScreen() {
           )}
         </div>
 
-        <aside className="space-y-4 border-l border-line bg-bg/70 p-4 backdrop-blur-xl">
+        <aside data-coach="ops.panel" className="space-y-4 border-l border-line bg-bg/70 p-4 backdrop-blur-xl">
           <div className="flex items-center justify-between">
             <div className="text-sm text-muted">Day <span className="num text-fg">{ops.env.day}</span></div>
             <div className="flex items-center gap-1" aria-label={`${ops.ap} action points left`}>

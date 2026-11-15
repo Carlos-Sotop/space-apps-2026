@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Icon } from "@/components/ui/Icon";
 import { LogoMark } from "@/components/brand/Logo";
+import { useTutorial } from "@/components/tutorial";
 
 interface Props {
   title?: string;
@@ -10,6 +11,7 @@ interface Props {
 }
 
 export function TopBar({ title, onBack, backLabel = "Back", right }: Props) {
+  const tutorial = useTutorial();
   return (
     <header className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-4 py-4 sm:px-6">
       <div className="flex min-w-0 items-center gap-3">
@@ -21,7 +23,15 @@ export function TopBar({ title, onBack, backLabel = "Back", right }: Props) {
         <LogoMark size={32} className="shrink-0" />
         {title && <h1 className="font-display truncate text-sm sm:text-base">{title}</h1>}
       </div>
-      <div className="flex shrink-0 items-center gap-2">{right}</div>
+      <div className="flex shrink-0 items-center gap-2">
+        <button
+          type="button" onClick={tutorial.toggle} aria-pressed={tutorial.enabled} aria-label="Tutorial"
+          className={`inline-flex h-9 items-center gap-1.5 rounded-full border px-3 text-[13px] transition ${tutorial.enabled ? "border-cyan bg-cyan/15 text-cyan-bright" : "border-line bg-glass text-muted hover:text-fg"}`}
+        >
+          <Icon name="sparkle" size={15} /> <span className="hidden sm:inline">Tutorial</span>
+        </button>
+        {right}
+      </div>
     </header>
   );
 }

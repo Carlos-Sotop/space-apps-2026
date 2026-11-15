@@ -46,8 +46,8 @@ function Inner() {
         </div>
       </div>
       <div className="mx-auto mt-6 grid max-w-7xl gap-6 px-4 sm:px-6 lg:grid-cols-[210px_1fr]">
-        <aside><StepRail steps={STEPS} current={step} onSelect={setStep} flagged={blockerSteps} /></aside>
-        <section className="min-w-0">
+        <aside data-coach="control.steps"><StepRail steps={STEPS} current={step} onSelect={setStep} flagged={blockerSteps} /></aside>
+        <section data-coach="control.body" className="min-w-0">
           <AnimatePresence mode="wait">
             <motion.div key={step} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.22 }}>
               {STEP_CONCEPTS[step] && (
@@ -58,7 +58,7 @@ function Inner() {
               <View />
             </motion.div>
           </AnimatePresence>
-          <div className="mt-8 flex items-center justify-between">
+          <div data-coach="control.nav" className="mt-8 flex items-center justify-between">
             <Button disabled={idx === 0} onClick={() => setStep(STEPS[idx - 1].id)}><Icon name="back" size={16} /> Back</Button>
             {idx < STEPS.length - 1 && <Button variant="primary" onClick={() => setStep(STEPS[idx + 1].id)}>Next: {STEPS[idx + 1].label} <Icon name="arrow" size={16} /></Button>}
           </div>

@@ -65,7 +65,7 @@ export default function Coalition() {
   return (
     <div className="pb-28 lg:pb-10">
       <TopBar title={sub === "lead" ? "Who do you represent?" : "Choose 3 partners"} onBack={() => (sub === "partners" ? setSub("lead") : go("missions"))} right={mission && <Badge tone="violet">{mission.name}</Badge>} />
-      <div className="mx-auto max-w-7xl px-4 sm:px-6">
+      <div data-coach="coalition.main" className="mx-auto max-w-7xl px-4 sm:px-6">
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <Tabs value={filter} onChange={setFilter} />
           <span className="num text-sm text-muted">Step {sub === "lead" ? "A" : "B"} of 2</span>

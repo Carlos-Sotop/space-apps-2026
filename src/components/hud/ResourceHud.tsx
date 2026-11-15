@@ -11,7 +11,7 @@ export function ResourceHud({ design }: { design: MissionDesign }) {
   const catalog = useCatalog();
   const report = useMemo(() => computeResources(design, catalog), [design, catalog]);
   return (
-    <div className="grid grid-cols-2 gap-x-5 gap-y-3 sm:grid-cols-3 lg:grid-cols-6">
+    <div data-coach="control.gauges" className="grid grid-cols-2 gap-x-5 gap-y-3 sm:grid-cols-3 lg:grid-cols-6">
       {ORDER.map((k, i) => <Gauge key={k} gauge={report[k]} alignRight={i % 3 === 2 || i >= 4} />)}
     </div>
   );
