@@ -1,6 +1,8 @@
 // The live routes against a fake NASA and a fake Workers cache: how many upstream calls each request costs.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import worker, { KEYED_SNAPSHOT_TTL_S } from "./index.ts";
+import { forgetIssTrack } from "./iss.ts";
+import { forgetAll } from "./memory.ts";
 
 type Env = Parameters<typeof worker.fetch>[1];
 
@@ -38,6 +40,8 @@ beforeEach(() => {
   pending = [];
   nasaStatus = 200;
   store.clear();
+  forgetAll();
+  forgetIssTrack();
   vi.stubGlobal("fetch", fakeFetch);
   vi.stubGlobal("caches", {
     default: {

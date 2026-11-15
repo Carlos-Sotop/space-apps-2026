@@ -3,7 +3,7 @@
 import type { LiveContext, LiveEarthEvent, LiveSpaceWeather } from "../src/engine/types.ts";
 import type { LiveApod, LiveDsn, LiveIss, LiveMoon } from "../src/live/types.ts";
 import { handleScores, type ScoresEnv } from "./scores.ts";
-import { isoDay, normalizeApod, normalizeCme, normalizeEonet, normalizeGst, parseDsn, parseHorizons, parseSsc, sscStamp } from "./normalize.ts";
+import { isoDay, normalizeApod, normalizeCme, normalizeEonet, normalizeGst, parseDsn, parseHorizons } from "./normalize.ts";
 import spaceWeatherSnap from "../src/data/snapshots/space-weather.json";
 import earthEventsSnap from "../src/data/snapshots/earth-events.json";
 import moonSnap from "../src/data/snapshots/moon.json";
@@ -11,6 +11,8 @@ import issSnap from "../src/data/snapshots/iss.json";
 import dsnSnap from "../src/data/snapshots/dsn.json";
 import apodSnap from "../src/data/snapshots/apod.json";
 import { chainRoutes, type ChainEnv } from "./chain.ts";
+import { issNow } from "./iss.ts";
+import { recall, remember } from "./memory.ts";
 
 interface Env extends ChainEnv, ScoresEnv {
   ASSETS?: Fetcher;
@@ -31,14 +33,14 @@ export const KEYED_SNAPSHOT_TTL_S = 1800;
 /** keyless routes retry a failed upstream soon, so a recovered service shows up quickly */
 const SNAPSHOT_TTL_S = 60;
 
-async function upstream(url: string): Promise<Response> {
-  const res = await fetch(url, { signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS), headers: { "user-agent": "spacedao-worker" } });
+async function upstream(url: string, timeoutMs = UPSTREAM_TIMEOUT_MS): Promise<Response> {
+  const res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs), headers: { "user-agent": "spacedao-worker" } });
   if (!res.ok) throw new Error(`upstream ${res.status}`);
   return res;
 }
 
 const upstreamJson = async (url: string): Promise<unknown> => (await upstream(url)).json();
-const upstreamText = async (url: string): Promise<string> => (await upstream(url)).text();
+const upstreamText = async (url: string, timeoutMs?: number): Promise<string> => (await upstream(url, timeoutMs)).text();
 
 const byTime = (a: { time: string }, b: { time: string }) => b.time.localeCompare(a.time);
 
@@ -87,16 +89,10 @@ async function moon(): Promise<Result<LiveMoon>> {
 }
 
 async function iss(): Promise<Result<LiveIss>> {
-  const now = new Date();
-  try {
-    const xml = await upstreamText(`https://sscweb.gsfc.nasa.gov/WS/sscr/2/locations/iss/${sscStamp(new Date(now.getTime() - 300_000))},${sscStamp(now)}/geo/`);
-    const parsed = parseSsc(xml);
-    if (!parsed) throw new Error("parse");
-    return { data: parsed, snapshot: false };
-  } catch {
-    const { lat, lon, altitudeKm, time } = issSnap;
-    return { data: { lat, lon, altitudeKm, time }, snapshot: true };
-  }
+  const point = await issNow((url, timeoutMs) => upstreamText(url, timeoutMs));
+  if (point) return { data: point, snapshot: false };
+  const { lat, lon, altitudeKm, time } = issSnap;
+  return { data: { lat, lon, altitudeKm, time }, snapshot: true };
 }
 
 async function dsn(): Promise<Result<LiveDsn>> {
@@ -162,6 +158,9 @@ function json(body: unknown, ttlS: number, status = 200): Response {
 }
 
 async function handleLive(request: Request, env: Env, ctx: ExecutionContext, route: Route): Promise<Response> {
+  const path = new URL(request.url).pathname.replace(/\/$/, "");
+  const known = recall(path, Date.now());
+  if (known) return new Response(known.body, { headers: { "content-type": "application/json; charset=utf-8", "cache-control": `public, max-age=${known.ttlLeftS}` } });
   const cache = (caches as unknown as { default: Cache }).default;
   const cacheKey = new Request(new URL(request.url).toString(), { method: "GET" });
   try {
@@ -180,7 +179,9 @@ async function handleLive(request: Request, env: Env, ctx: ExecutionContext, rou
     const payload = Array.isArray(data) || typeof data !== "object" || data === null
       ? { items: data, snapshot, fetchedAt: new Date().toISOString() }
       : { ...(data as object), snapshot, fetchedAt: (data as { fetchedAt?: string }).fetchedAt ?? new Date().toISOString() };
-    const res = json(payload, snapshot ? (route.keyed ? KEYED_SNAPSHOT_TTL_S : SNAPSHOT_TTL_S) : route.ttlS);
+    const ttlS = snapshot ? (route.keyed ? KEYED_SNAPSHOT_TTL_S : SNAPSHOT_TTL_S) : route.ttlS;
+    const res = json(payload, ttlS);
+    remember(path, JSON.stringify(payload), ttlS, Date.now());
     try {
       ctx.waitUntil(cache.put(cacheKey, res.clone()));
     } catch {
@@ -198,6 +199,8 @@ export default {
       const url = new URL(request.url);
       if (url.pathname.startsWith("/api/chain/")) return await chainRoutes.handle(request, env);
       if (url.pathname.replace(/\/$/, "") === "/api/scores") return await handleScores(request, env);
+      // whether production has its own NASA key (DEMO_KEY runs out on Cloudflare's shared addresses); never the key
+      if (url.pathname.replace(/\/$/, "") === "/api/live/config") return json({ nasaApiKey: !!env.NASA_API_KEY && env.NASA_API_KEY !== "DEMO_KEY" }, 0);
       if (request.method === "GET" && url.pathname.startsWith("/api/")) {
         const route = ROUTES[url.pathname.replace(/\/$/, "")];
         if (route) return await handleLive(request, env, ctx, route);

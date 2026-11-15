@@ -153,5 +153,26 @@ export function normalizeApod(raw: unknown): LiveApod | null {
   };
 }
 
+/** Every SSCWeb sample, in time order: the ISS track, including the minutes ahead that SSCWeb predicts. */
+export function parseSscTrack(xml: string): LiveIss[] {
+  const lats = tagValues(xml, "Latitude");
+  const lons = tagValues(xml, "Longitude");
+  const radii = tagValues(xml, "RadialLength");
+  const x = tagValues(xml, "X"), y = tagValues(xml, "Y"), z = tagValues(xml, "Z");
+  const times = [...xml.matchAll(/<Time>([^<]+)<\/Time>/g)].map((m) => m[1]);
+  const out: LiveIss[] = [];
+  for (let i = 0; i < lats.length; i++) {
+    const lat = lats[i];
+    let lon = lons[i];
+    if (lat === undefined || lon === undefined || Number.isNaN(lat) || Number.isNaN(lon) || !times[i] || Number.isNaN(Date.parse(times[i]))) continue;
+    if (lon > 180) lon -= 360;
+    let radius = radii[i];
+    if (radius === undefined || Number.isNaN(radius)) radius = x[i] !== undefined ? Math.hypot(x[i], y[i], z[i]) : NaN;
+    if (!Number.isFinite(radius)) continue;
+    out.push({ lat: Math.round(lat * 1000) / 1000, lon: Math.round(lon * 1000) / 1000, altitudeKm: Math.round(radius - 6371), time: times[i] });
+  }
+  return out;
+}
+
 export const isoDay = (d: Date) => d.toISOString().slice(0, 10);
 export const sscStamp = (d: Date) => d.toISOString().replace(/[-:]/g, "").replace(/\.\d+Z$/, "Z");
