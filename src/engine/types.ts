@@ -568,6 +568,16 @@ export interface Ratification {
 }
 
 /* ------------------------------------------------------------------ */
+/* Design steps and patches (Sunday sprint contract, C0)               */
+/* ------------------------------------------------------------------ */
+
+/** A step of Mission Control a recommendation or a readiness fix can point at. */
+export type DesignStep = "charter" | "objectives" | "launch" | "build" | "opentech" | "rideshare";
+
+/** Fields a recommendation or a readiness fix changes. The mission and the coalition never change. */
+export type DesignPatch = Partial<Omit<MissionDesign, "missionId" | "coalition">>;
+
+/* ------------------------------------------------------------------ */
 /* Catalog: everything the engine reads                                */
 /* ------------------------------------------------------------------ */
 

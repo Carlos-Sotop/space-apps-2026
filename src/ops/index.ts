@@ -8,6 +8,7 @@ export { createOps, applyAction, whyNot, validTiles } from "./core";
 export { maxTurnsFor } from "./util";
 export { opsScore, finalScore, canRunOps } from "./score";
 export { getScenario } from "./scenarios";
+export { projectTurn } from "./report";
 
 /** Same as applying the actions one by one. The Worker uses this to check a score. */
 export function replay(design: MissionDesign, catalog: Catalog, init: OpsInit, actions: OpsAction[]): OpsState {
