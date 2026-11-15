@@ -114,6 +114,11 @@ const PATCH_FLY = `
     for (let i = 0; i < 60; i++) { orig(); const r = useGame.getState().result; if (r && r.success && !r.lostAt) break; }
   } });`;
 
+// The video names no company (Dayon, 2026-11-15): the council is four agencies, and the design is rebuilt for it.
+const COUNCIL = { lead: "nasa", partners: ["jaxa", "esa", "isro"] };
+const setCouncil = (page, step) =>
+  game(page, `const s = useGame.getState(); s.setLead(arg.lead); s.setPartners(arg.partners); useGame.getState().startControl(); useGame.getState().setStep(arg.step);`, { ...COUNCIL, step });
+
 // load the lazy flight and 3D modules so the liftoff is not lost behind a loading screen
 const WARM_FLIGHT = (page) =>
   page.evaluate(async () => {
@@ -174,6 +179,8 @@ const SHOTS = {
   design: {
     route: `?mode=quick&screen=control&${MOON}&step=build`, dur: 8,
     prep: async (p) => {
+      await waitCoach(p, "control.body");
+      await setCouncil(p, "build");
       await waitCoach(p, "control.gauges");
       await click(p, p.getByRole("tab", { name: /Power/ }).first());
       await wait(p, 900);
@@ -212,22 +219,28 @@ const SHOTS = {
       [3900, (p) => hover(p, p.getByRole("link", { name: /LIVE/ }).first())],
     ],
   },
+  // the list from the NASA designs down (the first row carries a company's fork)
   opentech: {
     route: `?mode=quick&screen=control&${MOON}&step=opentech`, dur: 5,
     prep: async (p) => {
-      await btn(p, /^(Adopt|Remove) /).waitFor({ timeout: 15000 });
-      await scrollToEl(p, btn(p, /^(Adopt|Remove) /), 260);
-      await wait(p, 900);
+      await waitCoach(p, "control.body");
+      await setCouncil(p, "opentech");
+      await p.getByText("DTN bundle stack").first().waitFor({ timeout: 15000 });
+      await scrollToEl(p, p.getByText("DTN bundle stack").first(), 250);
+      await wait(p, 1000);
     },
     steps: [
-      [200, (p) => click(p, btn(p, /^Adopt /))],
-      [2000, (p) => hover(p, p.getByText(/who built on whom/i).first())],
-      [3400, (p) => hover(p, btn(p, /^Remove /))],
+      [200, (p) => hover(p, p.getByText("DTN bundle stack").first())],
+      [1300, (p) => hover(p, p.getByText("core Flight System software").first())],
+      [2400, (p) => hover(p, p.getByText("DTN stack for small flight computers").first())],
+      [3500, (p) => hover(p, p.getByText("High-efficiency triple-junction array").first())],
     ],
   },
   rideshare: {
     route: `?mode=quick&screen=control&${MOON}&step=rideshare`, dur: 5,
     prep: async (p) => {
+      await waitCoach(p, "control.body");
+      await setCouncil(p, "rideshare");
       await btn(p, /^Accept /).waitFor({ timeout: 15000 });
       await scrollToEl(p, p.getByText(/spare room/i).first(), 150);
       await wait(p, 900);
@@ -242,6 +255,8 @@ const SHOTS = {
   review: {
     route: `?mode=quick&screen=control&${MOON}&step=council`, dur: 9,
     prep: async (p) => {
+      await waitCoach(p, "control.body");
+      await setCouncil(p, "council");
       await waitCoach(p, "council.vote");
       await scrollToEl(p, p.locator("[data-coach='council.risk']"), 150);
       await wait(p, 1200);
@@ -259,6 +274,8 @@ const SHOTS = {
   sign: {
     route: `?mode=quick&screen=control&${MOON}&step=council`, dur: 9,
     prep: async (p) => {
+      await waitCoach(p, "control.body");
+      await setCouncil(p, "council");
       await waitCoach(p, "council.sign");
       await scrollToEl(p, p.locator("[data-coach='council.sign']"), 160);
       await wait(p, 1200);
@@ -271,6 +288,8 @@ const SHOTS = {
   flight: {
     route: `?mode=quick&screen=control&${MOON}&step=council`, dur: 12,
     prep: async (p) => {
+      await waitCoach(p, "council.sign");
+      await setCouncil(p, "council");
       await waitCoach(p, "council.sign");
       await WARM_FLIGHT(p);
       await game(p, PATCH_FLY);
@@ -292,6 +311,8 @@ const SHOTS = {
   ops: {
     route: `?mode=quick&screen=control&${MOON}&step=council`, dur: 11,
     prep: async (p) => {
+      await waitCoach(p, "council.sign");
+      await setCouncil(p, "council");
       await waitCoach(p, "council.sign");
       await game(p, `${PATCH_FLY} useGame.getState().fly(); await useGame.getState().afterFlight();`);
       await waitCoach(p, "ops.actions");
@@ -324,6 +345,8 @@ const SHOTS = {
   debrief: {
     route: `?mode=quick&screen=control&${MOON}&step=council`, dur: 9,
     prep: async (p) => {
+      await waitCoach(p, "council.sign");
+      await setCouncil(p, "council");
       await waitCoach(p, "council.sign");
       await click(p, btn(p, /^Sign with the council$/));
       await btn(p, /^Launch$/).and(p.locator(":enabled")).waitFor({ timeout: 20000 });

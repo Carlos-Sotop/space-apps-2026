@@ -5,7 +5,7 @@ import { loadFont as loadMono } from "@remotion/google-fonts/JetBrainsMono";
 import data from "./assets.json";
 
 export const FPS = 30;
-export const TOTAL = 900;
+export const TOTAL = 840;
 
 export const DISPLAY = loadMichroma("normal", { subsets: ["latin"] }).fontFamily;
 export const SANS = loadInter("normal", { weights: ["400", "500", "600", "700"], subsets: ["latin"] }).fontFamily;
@@ -29,17 +29,17 @@ export const C = {
   ok: "#34d399",
 };
 
-// scene spans in frames [from, to)
+// scene spans in frames [from, to), retimed to the v2 narration (one take, vo30.wav from frame 24; Dayon 2026-11-15)
 export const T = {
-  earth: [0, 120],
-  belong: [120, 210],
-  treaty: [210, 300],
-  reveal: [300, 450],
-  share: [450, 570],
-  sign: [570, 660],
-  flight: [660, 720],
-  montage: [720, 840],
-  end: [840, 900],
+  earth: [0, 108], // "Space doesn't belong to one nation."
+  belong: [108, 172], // "It belongs to all of us."
+  treaty: [172, 300], // "Yet today, space exploration remains divided."
+  reveal: [300, 400], // impact on 300, "Enter SpaceDAO" on 304
+  share: [400, 498], // "...to share technology, resources, and knowledge."
+  sign: [498, 545], // "Decide together."
+  flight: [545, 588], // "Launch together."
+  montage: [588, 718], // "Design your mission with live NASA data. Play SpaceDAO."
+  end: [718, 840], // "Space belongs to humanity." + wordmark + URL
 } as const;
 
 type AudioEntry = { src: string; seconds: number };

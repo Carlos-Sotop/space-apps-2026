@@ -33,9 +33,10 @@ export const Hud: React.FC<{ tl?: (f: number) => number }> = ({ tl }) => {
 };
 
 // ---------------- 4: reveal ----------------
-export const Reveal: React.FC = () => {
+// dur: frames on screen; wordAt / tagAt: when the wordmark and the tagline come in (the 30 s cut says "Enter SpaceDAO" at once)
+export const Reveal: React.FC<{ dur?: number; wordAt?: number; tagAt?: number }> = ({ dur = 150, wordAt = 22, tagAt = 56 }) => {
   const f = useCurrentFrame();
-  const out = ramp(f, 138, 150, 1, 0, Easing.in(Easing.quad));
+  const out = ramp(f, dur - 12, dur, 1, 0, Easing.in(Easing.quad));
   const settle = ramp(f, 0, 50);
   return (
     <AbsoluteFill>
@@ -45,9 +46,9 @@ export const Reveal: React.FC = () => {
       <AbsoluteFill style={{ opacity: out * ramp(f, 16, 40), background: "radial-gradient(ellipse 52% 30% at 50% 50%, rgba(4,5,13,0.92) 0%, rgba(4,5,13,0.78) 45%, rgba(4,5,13,0) 100%)" }} />
       <AbsoluteFill style={{ alignItems: "center", justifyContent: "center", opacity: out, filter: `blur(${(1 - out) * 14}px)` }}>
         <div style={{ transform: `scale(${1.1 - settle * 0.1})`, marginTop: -40 }}>
-          <Wordmark size={132} start={22} spacing={0.16} />
+          <Wordmark size={132} start={wordAt} spacing={0.16} />
         </div>
-        <Mono size={24} color={C.cyanBright} style={{ marginTop: 34, opacity: ramp(f, 56, 80), letterSpacing: `${ramp(f, 56, 100, 0.6, 0.34)}em` }}>
+        <Mono size={24} color={C.cyanBright} style={{ marginTop: 34, opacity: ramp(f, tagAt, tagAt + 24), letterSpacing: `${ramp(f, tagAt, tagAt + 44, 0.6, 0.34)}em` }}>
           One open network for space
         </Mono>
       </AbsoluteFill>
@@ -58,11 +59,11 @@ export const Reveal: React.FC = () => {
 // ---------------- 5: share: a carousel, the card the narration names sits large in the centre ----------------
 const SHARE: { name: string; label: string }[] = [
   { name: "opentech", label: "OPEN TECH" },
-  { name: "data", label: "DATA" },
   { name: "rideshare", label: "RIDESHARE" },
+  { name: "data", label: "LIVE DATA" },
 ];
-// [scene frame, card in focus]: moves on "technology", "data", "spare rocket capacity"
-export const SHARE_FOCUS: [number, number][] = [[0, 0], [34, 0], [46, 1], [68, 1], [80, 2]];
+// [scene frame, card in focus]: "technology" (open tech), "resources" (spare rocket room) from 36, "knowledge" (data) from 70
+export const SHARE_FOCUS: [number, number][] = [[0, 0], [30, 0], [40, 1], [62, 1], [72, 2]];
 
 export const Share: React.FC = () => {
   const f = useCurrentFrame();
@@ -111,7 +112,7 @@ const SEALS = [
   { label: "FUNDER", at: 78 },
 ];
 
-export const SealRow: React.FC<{ seals?: { label: string; at: number }[]; top?: number }> = ({ seals = SEALS, top = 700 }) => {
+export const SealRow: React.FC<{ seals?: { label: string; at: number }[]; top?: number; title?: string }> = ({ seals = SEALS, top = 700, title = "SIGNATURES" }) => {
   const f = useCurrentFrame();
   const lit = seals.filter((s) => f >= s.at).length;
   return (
@@ -137,7 +138,7 @@ export const SealRow: React.FC<{ seals?: { label: string; at: number }[]; top?: 
       );
     })}
     <div style={{ marginLeft: 30, paddingLeft: 40, borderLeft: `1px solid ${C.line}` }}>
-      <Mono size={16} color={C.faint}>SIGNATURES</Mono>
+      <Mono size={16} color={C.faint}>{title}</Mono>
       <div style={{ fontFamily: MONO, fontWeight: 700, fontSize: 72, color: lit === 4 ? C.cyanBright : C.text, textShadow: lit === 4 ? "0 0 34px rgba(34,211,238,0.7)" : undefined }}>
         {lit}<span style={{ color: C.faint }}> / 4</span>
       </div>
@@ -146,30 +147,27 @@ export const SealRow: React.FC<{ seals?: { label: string; at: number }[]; top?: 
   );
 };
 
-// one large screen: the Go / No-Go poll on "Decide together", the signing on "Sign together"
-export const SIGN_SWAP = 38;
+// "Decide together": the Go / No-Go poll, large, while the council's four seals light (the video names no company)
+export const SIGN_SEALS = [
+  { label: "NASA", at: 8 },
+  { label: "JAXA", at: 16 },
+  { label: "ESA", at: 24 },
+  { label: "ISRO", at: 32 },
+];
 export const Sign: React.FC = () => {
   const f = useCurrentFrame();
   const a = useSpring(-5, { damping: 18, stiffness: 110 });
-  const swap = ramp(f, SIGN_SWAP, SIGN_SWAP + 12);
   const w = 1180;
   const h = (w * 9) / 16;
   return (
     <SceneFade dur={T.sign[1] - T.sign[0]} outF={6}>
       <AbsoluteFill style={{ perspective: 2400 }}>
         <div style={{ position: "absolute", left: (1920 - w) / 2, top: 50 + (1 - a) * 140, opacity: Math.min(a * 1.6, 1), transform: `rotateX(${(1 - a) * 8}deg) rotateY(${Math.sin(f * 0.03) * 1.2}deg)` }}>
-          <GlassFrame w={w} h={h} glow={swap > 0.5 ? C.cyan : C.violetBright} strength={0.8}>
-            <AbsoluteFill style={{ opacity: 1 - swap }}>
-              <ClipView name="review" />
-            </AbsoluteFill>
-            <AbsoluteFill style={{ opacity: swap }}>
-              <Sequence from={SIGN_SWAP - 2} layout="none">
-                <ClipView name="sign" />
-              </Sequence>
-            </AbsoluteFill>
+          <GlassFrame w={w} h={h} glow={C.cyan} strength={0.8}>
+            <ClipView name="review" />
           </GlassFrame>
         </div>
-        <SealRow top={748} />
+        <SealRow top={748} seals={SIGN_SEALS} title="GO / NO-GO" />
       </AbsoluteFill>
     </SceneFade>
   );
@@ -199,13 +197,14 @@ export const Flight: React.FC = () => {
 };
 
 // ---------------- 8: montage ----------------
-// trim: the clip frame each cut starts on (cuts last CUT_LEN frames)
+// trim: the clip frame each cut starts on (cuts last CUT_LEN frames); in order under
+// "Design | your mission with | live NASA | data. | Play | SpaceDAO."
 const CUTS: { name: string; label: string; trim: number; zoom?: Camera }[] = [
   { name: "missions", label: "MISSION SELECT", trim: 0 },
-  { name: "rocky", label: "ROCKY", trim: 20 },
   { name: "ops", label: "MOON OPERATIONS", trim: 160 },
+  { name: "flight", label: "LIVE NASA DATA", trim: 240, zoom: { zoom: 1.9, focus: [380, 490] } },
   { name: "debrief", label: "DEBRIEF NETWORK", trim: 60 },
-  { name: "missions", label: "LIVE NASA DATA", trim: 140, zoom: { zoom: 1.45 } },
+  { name: "rocky", label: "ROCKY", trim: 20 },
   { name: "intro", label: "PLAY", trim: 20 },
 ];
 const CUT_LEN = 20;
@@ -243,12 +242,13 @@ export const Montage: React.FC = () => {
 };
 
 // ---------------- 9: end card ----------------
-export const EndCard: React.FC = () => {
+// dur: frames on screen. The line arrives with the voice ("Space belongs to humanity." from frame 4) and holds to the fade.
+export const EndCard: React.FC<{ dur?: number }> = ({ dur = 60 }) => {
   const f = useCurrentFrame();
-  const s = useSpring(6, { damping: 14, stiffness: 120 });
-  const line = ramp(f, 18, 40);
-  const url = ramp(f, 36, 56);
-  const fade = ramp(f, 52, 60, 1, 0);
+  const s = useSpring(4, { damping: 14, stiffness: 120 });
+  const line = ramp(f, 6, 28);
+  const url = ramp(f, 40, 60);
+  const fade = ramp(f, dur - 8, dur, 1, 0);
   return (
     <AbsoluteFill style={{ opacity: fade }}>
       <AbsoluteFill style={{ background: "radial-gradient(ellipse 55% 34% at 50% 40%, rgba(4,5,13,0.92) 0%, rgba(4,5,13,0.75) 50%, rgba(4,5,13,0) 100%)" }} />

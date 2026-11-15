@@ -160,7 +160,8 @@ export const CAMERA: Record<string, Camera> = {
   rideshare: { zoom: 1.35 },
   review: { zoom: 1.3 },
   sign: { zoom: 1.4 },
-  flight: { zoom: 1.45, fit: true },
+  // stops just short of the event feed, which names the rocket
+  flight: { zoom: 1.5, focus: [543, 364] },
   ops: { zoom: 1.25 },
   debrief: { zoom: 1.3 },
 };

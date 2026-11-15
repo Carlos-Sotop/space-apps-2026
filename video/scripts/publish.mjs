@@ -19,12 +19,16 @@ mkdirSync(target, { recursive: true });
 
 const LIMIT = 24 * 1024 * 1024; // a margin under 25 MiB
 const AUDIO_KBPS = 128;
-// poster: a frame of the reveal (30 s: the climax lands on frame 300; 3 min: on frame 1350)
+// poster: a frame of the reveal (30 s: the climax lands on frame 300; 3 min: on frame 1350).
+// copy: keep the render's video stream as is (the 30 s master already fits under the limit) and only
+// re-encode the audio, AAC at audioKbps, raised gainDb under a -1.5 dBFS limiter (the mix renders near -20.6 LUFS).
 const VIDEOS = [
-  { id: "30s", poster: 336 },
+  { id: "30s", poster: 345, copy: true, audioKbps: 320, gainDb: 4 },
   { id: "3min", poster: 1386 },
 ];
 
+// AudioToolbox AAC (macOS) holds a constant bitrate; ffmpeg's own AAC encoder averages under the target
+const AAC = execFileSync("ffmpeg", ["-hide_banner", "-encoders"]).toString().includes("aac_at") ? ["-c:a", "aac_at", "-aac_at_mode", "cbr"] : ["-c:a", "aac"];
 const run = (args) => execFileSync("ffmpeg", ["-v", "error", "-y", ...args], { stdio: "inherit" });
 const seconds = (file) => +execFileSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", file]).toString().trim();
 const mib = (file) => (statSync(file).size / 1024 / 1024).toFixed(1);
@@ -37,8 +41,10 @@ for (const v of VIDEOS) {
     continue;
   }
   const mp4 = path.join(target, `spacedao-${v.id}.mp4`);
-  const common = ["-pix_fmt", "yuv420p", "-movflags", "+faststart", "-c:a", "aac", "-b:a", `${AUDIO_KBPS}k`];
-  run(["-i", src, "-c:v", "libx264", "-preset", "slow", "-crf", "23", ...common, mp4]);
+  const audioArgs = [...AAC, "-b:a", `${v.audioKbps ?? AUDIO_KBPS}k`, ...(v.gainDb ? ["-af", `volume=${v.gainDb}dB,alimiter=limit=0.84:level=false`] : [])];
+  const common = ["-pix_fmt", "yuv420p", "-movflags", "+faststart", ...audioArgs];
+  if (v.copy) run(["-i", src, "-c:v", "copy", "-movflags", "+faststart", ...audioArgs, mp4]);
+  else run(["-i", src, "-c:v", "libx264", "-preset", "slow", "-crf", "23", ...common, mp4]);
   // too big: two-pass sized to the limit (x264 overshoots a few percent, hence the 0.93), keeping 1080p,
   // which looked closer to the master than 720p at the same bitrate on the 3-minute cut
   for (let fit = 0.93; statSync(mp4).size > LIMIT && fit > 0.6; fit -= 0.08) {
