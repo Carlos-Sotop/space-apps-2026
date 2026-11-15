@@ -2,11 +2,13 @@
 
 Four people build this at NASA Space Apps 2026 (Founder House, Florianópolis), each with their own AI (Claude, Gemini, Codex, Cursor...). This file keeps all of them coherent. Read it fully before your first change, then read the doc for your area in `docs/`.
 
+**Sunday 2026-11-15 sprint: read `docs/sprint/SUNDAY.md` and your own file (`docs/sprint/CHARLIE.md`, `ERIC.md`, `DAYON.md`) first. For today they override the ownership table below. Manuel has left the project; Charlie owns his areas.**
+
 **Deadline: submission closes Sunday 2026-11-15, 23:59 local time (America/Sao_Paulo). Submission is final.**
 
 ## What we are building (30 seconds)
 
-SpaceDAO is a web game for the challenge [Space Mission Design Game](https://www.spaceappschallenge.org/2026/challenges/space-mission-design-game/). The player represents a space agency or company, forms a 4-member council with 3 bot partners, and designs a real mission: objectives, launch vehicle, orbit, spacecraft modules, budget, power, mass, data, comms, lifetime. The council governs it like a DAO: a values vote, a futarchy decision market, open-tech sharing (DeSci), a spare-capacity rideshare market, and a 4-of-4 quantum-safe signature before launch. Then the flight is simulated with live NASA data and the debrief explains why it succeeded or failed.
+SpaceDAO is a web game for the challenge [Space Mission Design Game](https://www.spaceappschallenge.org/2026/challenges/space-mission-design-game/). The player represents a space agency or company, forms a 4-member council with 3 bot partners, and designs a real mission: objectives, launch vehicle, orbit, spacecraft modules, budget, power, mass, data, comms, lifetime. The council governs it like a real collaborative mission: a mission charter, open-tech sharing (DeSci), a spare-capacity rideshare market, a Go / No-Go readiness review and a 4-of-4 quantum-safe signature before launch. (The futarchy decision market was removed on Sunday.) Then the flight is simulated with live NASA data and the debrief explains why it succeeded or failed.
 
 Three missions: **Orbital Lab** (ISS, easy), **Earth Guardian** (Earth observation for the Global South, medium), **Moon Base Zero** (lunar south pole, hard; the NASA build names no commercial client, `VITE_EDITION=moondao` builds the partner edition). Single player first. The judge is the main user: it must be clear, fast and beautiful within 5 minutes.
 
@@ -38,10 +40,10 @@ If your change needs another owner's folder, ask them or open a PR and tag them.
 
 ## Rules from NASA Space Apps (break one and the project can't be judged or embarrasses us)
 
-- No NASA insignia ("meatball"), logotype ("worm"), mission patches, or any space agency or company logo. Actors are shown with a monogram badge and a flag emoji. Do not imply NASA or any agency endorses SpaceDAO.
+- No NASA insignia ("meatball"), logotype ("worm"), mission patches, or any space agency or company logo. Actors are shown with an SVG flag and their name (never letter monograms, never emoji). Do not imply NASA or any agency endorses SpaceDAO.
 - At least one NASA dataset or API must be used and credited. Every API and dataset goes in `docs/DATA_SOURCES.md` and the README.
 - Every real-world number in `src/data/` has a source (title + URL). `verified` stays `false` until a human checked it.
-- AI-generated images or video carry a visible "AI-generated" watermark. AI-written code is disclosed in the README "Use of AI" section.
+- Avoid AI-generated media: draw art in code (SVG/three.js); music and SFX come from Envato Elements (licensed, listed in References). Any AI-generated image or video left carries a visible "AI-generated" watermark. AI-written code is disclosed in the README "Use of AI" section.
 - Play credits only, test networks only. No real money, no token sale, no investment language.
 - English everywhere in the product: UI, docs, code, commits.
 - Every library, font, image or sound must be free to use; note its license in the README.
@@ -50,6 +52,9 @@ If your change needs another owner's folder, ask them or open a PR and tag them.
 
 ## Product rules
 
+- No emoji or unicode glyphs in the UI: SVG icons (`Icon.tsx`) and SVG flags only. Cyan is the accent for selected / active / happening now.
+- Every factual claim has a source behind its info button; vision statements read as proposals.
+- Add `data-coach="<screen>.<thing>"` to key elements so Rocky (the tutorial mascot) can point at them.
 - Visual first, text last. A card shows at most one line. Depth goes behind the info button (drawer). If you are writing a paragraph in the UI, stop.
 - Every decision has a visible consequence on the six gauges (mass, power, budget, data, comms, lifetime). Explain *why*, not just "wrong".
 - The game must work with no network and no keys: live NASA data falls back to bundled snapshots; the chain anchor is optional.

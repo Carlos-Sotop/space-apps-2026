@@ -1,3 +1,5 @@
+> **Sunday 2026-11-15:** the futarchy decision market is being removed. Governance becomes Mission Charter + Go / No-Go readiness review (NASA review gates and launch poll) + ISS-style barter + risk assessment + 4-of-4 signatures. See `docs/sprint/SUNDAY.md` and `docs/sprint/CHARLIE.md` (C1, C2); this file is updated in C1.
+
 # Governance: how the SpaceDAO council decides
 
 SpaceDAO's governance has to be understandable in a five-minute game and still be a serious proposal for real space cooperation. We combine four mechanisms, each doing one job. Owner of the code: Charlie (`src/engine/council.ts`, `src/screens/control/market.ts`, `src/chain/`), with Manuel on signatures (`src/crypto/`).

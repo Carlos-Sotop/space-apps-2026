@@ -1,5 +1,7 @@
 # Team plan
 
+> **Sunday 2026-11-15:** the current plan is in `docs/sprint/` (SUNDAY.md + one file per person). Timeline today: merge rounds 16:30 and 19:00, code freeze 20:30, submit 22:30. Project Demo = video of 30 s max or 7 slides max (2026 guide). Manuel has left; Charlie owns crypto and comms.
+
 Deadline: **Sunday 2026-11-15, 23:59 local (America/Sao_Paulo). Submit by 22:30** to keep a buffer. Submission is final.
 
 ## People and areas
