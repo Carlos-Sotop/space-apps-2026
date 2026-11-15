@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
+import { sfx } from "@/components/audio";
 import { TopBar } from "@/components/hud/TopBar";
 import { Badge, Button, Icon, LiveBadge } from "@/components/ui";
 import type { FlightEvent } from "@/engine/types";
@@ -38,6 +39,8 @@ export default function Flight() {
   const [speed, setSpeed] = useState(1);
   const pRef = useRef(0);
   const speedRef = useRef(1);
+  /** risk events the flight has already reached, so each one is heard once */
+  const heard = useRef(0);
 
   useEffect(() => { if (!result || !design) go("control"); }, [result, design, go]);
 
@@ -48,6 +51,9 @@ export default function Flight() {
   useEffect(() => {
     let raf = 0, last = performance.now();
     pRef.current = 0; setP(0);
+    heard.current = 0;
+    // the first phase of every mission is the launch, so the flight opens on the pad
+    sfx("launch");
     const tick = (now: number) => {
       const dt = Math.min(0.1, (now - last) / 1000); last = now;
       pRef.current = Math.min(end, pRef.current + (dt * speedRef.current) / (calm ? DURATION_S / 4 : DURATION_S));
@@ -59,6 +65,17 @@ export default function Flight() {
     // restarts only for a new result; speed is read through speedRef
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [result, end]);
+
+  // Something went wrong out there: a hit, a storm, a burn that did not light. One sound as the
+  // flight reaches each of them, counted rather than walked, so the order events come in cannot
+  // make one go missing or play twice.
+  useEffect(() => {
+    if (!result || !timeline.phases.length) return;
+    const until = dayAt(timeline, p) + 0.01;
+    const reached = result.events.filter((e) => (e.kind === "warning" || e.kind === "failure") && e.day <= until).length;
+    if (reached > heard.current) sfx("impact");
+    heard.current = reached;
+  }, [p, result, timeline]);
 
   if (!result || !design || !mission) return null;
 
