@@ -56,7 +56,7 @@ export function CoachMark() {
   }, [tip, update]);
 
   useEffect(() => {
-    if (!tip?.anchor || !box) return;
+    if (!tip?.anchor || !box || box.height > window.innerHeight * 0.6) return;
     const key = `${ctx}:${index}`;
     if (scrolledFor.current === key) return;
     scrolledFor.current = key;
@@ -76,16 +76,18 @@ export function CoachMark() {
   const tall = box ? box.height > vp.h * 0.6 : false;
   const docked = !box || narrow || tall;
 
-  let pos: { left?: number; right?: number; top?: number; bottom?: number } = { right: 12, bottom: 12 };
-  if (narrow) pos = { left: 12, bottom: 12 };
+  // docked bubbles sit above the sticky ActionBar so they never cover Continue / Next
+  const DOCK = 92;
+  let pos: { left?: number; right?: number; top?: number; bottom?: number } = { right: 12, bottom: DOCK };
+  if (narrow) pos = { left: 12, bottom: DOCK };
   else if (box && !tall) {
     const left = Math.min(Math.max(box.left, 12), vp.w - width - 12);
     if (vp.h - (box.top + box.height) > BUBBLE_H + GAP) pos = { left, top: Math.max(box.top, 0) + box.height + GAP };
     else if (box.top > BUBBLE_H + GAP) pos = { left, top: box.top - BUBBLE_H - GAP };
-    else pos = { right: 12, bottom: 12 };
+    else pos = { right: 12, bottom: DOCK };
   }
 
-  const ring = box && {
+  const ring = box && !tall && {
     left: Math.max(box.left - 6, 6),
     top: Math.max(box.top - 6, 6),
     width: Math.min(box.left + box.width + 6, vp.w - 6) - Math.max(box.left - 6, 6),
