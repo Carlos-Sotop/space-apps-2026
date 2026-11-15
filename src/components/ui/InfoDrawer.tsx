@@ -21,7 +21,7 @@ interface InfoStore {
 
 export const useInfo = create<InfoStore>((set) => ({ content: null, open: (content) => set({ content }), close: () => set({ content: null }) }));
 
-/** Small round "i" button; opens the shared side drawer with the given content. */
+/** Small round "i" button; opens the shared info card with the given content. */
 export function InfoButton({ title, body, sources, verified, className = "" }: InfoContent & { className?: string }) {
   const open = useInfo((s) => s.open);
   return (
@@ -57,20 +57,20 @@ export function InfoDrawerHost() {
   return (
     <AnimatePresence>
       {content && (
-        <div className="fixed inset-0 z-50">
-          <motion.div className="absolute inset-0 bg-black/50" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} onClick={close} />
+        <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-6">
+          <motion.div className="absolute inset-0 bg-[#02030a]/70 backdrop-blur-md" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} onClick={close} />
           <motion.aside
             role="dialog" aria-modal="true" aria-label={content.title}
-            className="glass-strong absolute right-0 top-0 flex h-full w-full max-w-md flex-col rounded-none border-y-0 border-r-0 bg-[#0b0d24]/95"
-            initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }} transition={{ duration: 0.28, ease: [0.22, 0.61, 0.36, 1] }}
+            className="glass-strong relative flex max-h-[80dvh] w-full max-w-[560px] flex-col overflow-hidden rounded-b-none sm:rounded-b-[var(--radius-card)]"
+            initial={{ opacity: 0, y: 24, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 24, scale: 0.97 }} transition={{ duration: 0.24, ease: [0.22, 0.61, 0.36, 1] }}
           >
-            <header className="flex items-start justify-between gap-4 border-b border-line p-5">
+            <header className="flex shrink-0 items-start justify-between gap-4 border-b border-line p-5">
               <h2 className="font-display text-base leading-snug">{content.title}</h2>
               <button ref={closeRef} type="button" aria-label="Close" onClick={close} className="rounded-full border border-line p-1.5 text-muted hover:text-fg">
                 <Icon name="x" size={16} />
               </button>
             </header>
-            <div className="flex-1 space-y-4 overflow-y-auto p-5 text-[15px] leading-relaxed text-fg/90">
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] text-[15px] leading-relaxed text-fg/90">
               {content.body}
               {content.verified === false && <Badge tone="tight">Placeholder data, not yet verified</Badge>}
               {content.sources && content.sources.length > 0 && (
