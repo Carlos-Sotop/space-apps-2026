@@ -1,102 +1,63 @@
+// Frames at 30 fps. v2 narration (Dayon, 2026-11-15): one continuous take, vo180, starting at frame 100.
+// Text from media/ELEVENLABS_3min_v2.md, timed word by word against the real audio.
 import type { Caption } from "./captions";
 
-// Exact VO text from media/ELEVENLABS_3min.md, split into readable lines (<= ~60 chars) and spread
-// across each span in proportion to length. [from, to, start offset, lines]
-const spans: [number, number, number, string[]][] = [
-  [0, 600, 100, [
-    "Every great leap in space was a team effort.",
-    "...",
-    "Today, five agencies from fifteen nations",
-    "run one space station together.",
-    "And more than seventy nations",
-    "have signed the Artemis Accords.",
-  ]],
-  [600, 1350, 12, [
-    "But the way we work together has barely changed.",
-    "...",
-    "Every partnership is still negotiated",
-    "one treaty at a time.",
-    "Designs stay behind export rules.",
-    "Data sits in separate archives.",
-    "...",
-    "And most of the world watches from outside.",
-  ]],
-  [1350, 2250, 40, [
-    "SpaceDAO is our proposal for a planetary space organization.",
-    "...",
-    "One open network where agencies, companies,",
-    "scientists and funders plan missions together.",
-    "Share technology as open blueprints.",
-    "Share spare capacity on every rocket.",
-    "Share the data that comes back.",
-    "And decide together, with rules anyone can verify.",
-    "...",
-    "A second brain for space exploration.",
-    "The more we connect, the farther we go.",
-  ]],
-  [2250, 2700, 12, [
-    "We can't build that organization in a weekend.",
-    "...",
-    "So we built the experience of it:",
-    "a mission design game where you can feel how it works.",
-  ]],
-  [2700, 3300, 12, [
-    "Pick a real mission: a lab on the space station,",
-    "a satellite that watches fires and floods,",
-    "or the first outpost at the lunar south pole.",
-    "Represent an agency or a company,",
-    "and invite three partners to your council.",
-    "Then design it: charter, objectives, rocket, orbit, spacecraft.",
-    "Six gauges react to every choice.",
-  ]],
-  [3300, 3750, 12, [
-    "Before launch, your partners review the design,",
-    "like a real flight readiness review.",
-    "Each one votes Go or No-Go, with numbers.",
-    "Only a unanimous Go unlocks the four-of-four signature:",
-    "quantum-safe, made right in your browser.",
-  ]],
-  [3750, 4350, 12, [
-    "Then you fly through real space weather",
-    "from the last thirty days.",
-    "...",
-    "On the Moon, you run the base turn by turn:",
-    "power through the long lunar night,",
-    "data home through the Deep Space Network,",
-    "solar storms, impacts... and discoveries.",
-  ]],
-  [4350, 4800, 12, [
-    "When it's over, the debrief explains why it worked...",
-    "or why it failed.",
-    "And when you publish your design, it joins the network,",
-    "so the next mission starts from yours.",
-  ]],
-  [4800, 5160, 12, [
-    "Everything runs on real data: NASA space weather,",
-    "Earth events, JPL Horizons,",
-    "the live position of the space station,",
-    "and the Deep Space Network.",
-    "Every number links to its source.",
-  ]],
-  [5160, 5400, 20, [
-    "Space belongs to humanity.",
-    "...",
-    "Let's explore it together.",
-    "...",
-    "Play SpaceDAO.",
-  ]],
+export const captions180: Caption[] = [
+  { text: "I've spent my life around rockets.", from: 100, to: 164 },
+  { text: "And every great leap I've seen was a team effort.", from: 164, to: 281 },
+  { text: "Five agencies from fifteen nations run one space station together.", from: 303, to: 437 },
+  { text: "But the way we work together has barely changed.", from: 449, to: 546 },
+  { text: "Every partnership is still negotiated one treaty at a time.", from: 566, to: 684 },
+  { text: "Designs stay behind export rules.", from: 691, to: 761 },
+  { text: "Data sits in separate archives.", from: 786, to: 836 },
+  { text: "And most of the world watches from outside.", from: 836, to: 926 },
+  { text: "Then I saw SpaceDAO.", from: 950, to: 1025 },
+  { text: "A planetary space organization, run as a DAO:", from: 1040, to: 1150 },
+  { text: "one open network where agencies, companies,", from: 1161, to: 1257 },
+  { text: "scientists and funders plan missions together.", from: 1283, to: 1361 },
+  { text: "Share technology as open blueprints.", from: 1379, to: 1445 },
+  { text: "Share spare capacity on every rocket,", from: 1462, to: 1530 },
+  { text: "so another nation's payload can ride along.", from: 1530, to: 1610 },
+  { text: "Share the data that comes back.", from: 1625, to: 1682 },
+  { text: "And decide together,", from: 1693, to: 1733 },
+  { text: "with smart contracts that carry out what the council agrees.", from: 1733, to: 1846 },
+  { text: "The more we connect, the farther we go.", from: 1870, to: 1956 },
+  { text: "You can't build that in a weekend.", from: 1976, to: 2033 },
+  { text: "So they built the experience of it:", from: 2050, to: 2115 },
+  { text: "a game. And I couldn't stop playing.", from: 2124, to: 2211 },
+  { text: "Pick a real mission, from the space station to the lunar south pole.", from: 2229, to: 2341 },
+  { text: "Invite three partners.", from: 2354, to: 2390 },
+  { text: "Design the rocket, the orbit and the spacecraft in 3D,", from: 2409, to: 2513 },
+  { text: "while six gauges react to every choice.", from: 2513, to: 2603 },
+  { text: "Before launch, your partners vote Go or No-Go.", from: 2627, to: 2724 },
+  { text: "Only a unanimous Go unlocks a four-of-four multi-signature:", from: 2738, to: 2859 },
+  { text: "a vault that opens only when all four keys turn.", from: 2879, to: 2976 },
+  { text: "And those keys are quantum-safe:", from: 2989, to: 3047 },
+  { text: "the new NIST standard, built to resist quantum computers", from: 3065, to: 3166 },
+  { text: "in a web browser.", from: 3166, to: 3210 },
+  { text: "In my day, that took a room full of lawyers.", from: 3249, to: 3325 },
+  { text: "Then you fly.", from: 3344, to: 3383 },
+  { text: "And here's what got me:", from: 3404, to: 3435 },
+  { text: "the solar storms that hit you are real,", from: 3449, to: 3516 },
+  { text: "from the last thirty days.", from: 3516, to: 3570 },
+  { text: "On the Moon,", from: 3584, to: 3603 },
+  { text: "your radio delay comes from today's real Earth-Moon distance.", from: 3614, to: 3721 },
+  { text: "You survive the long lunar night, impacts and discoveries.", from: 3737, to: 3865 },
+  { text: "Then the debrief tells you why it worked or why it failed.", from: 3887, to: 4001 },
+  { text: "And your design joins the network,", from: 4013, to: 4074 },
+  { text: "for the next mission to build on.", from: 4074, to: 4137 },
+  { text: "Now picture what a blockchain gives an organization like this.", from: 4137, to: 4261 },
+  { text: "Transparency:", from: 4279, to: 4300 },
+  { text: "every decision on a permanent record no one can secretly rewrite.", from: 4304, to: 4414 },
+  { text: "Privacy: with zero-knowledge proofs,", from: 4435, to: 4497 },
+  { text: "a company can prove what it delivers without revealing its secrets.", from: 4512, to: 4630 },
+  { text: "No tokens.", from: 4653, to: 4674 },
+  { text: "No money.", from: 4689, to: 4707 },
+  { text: "Just trust you can verify.", from: 4720, to: 4770 },
+  { text: "All of it runs on live NASA data:", from: 4787, to: 4866 },
+  { text: "solar storms, wildfires burning right now, the Deep Space Network.", from: 4866, to: 5019 },
+  { text: "I've waited my whole life for this.", from: 5042, to: 5108 },
+  { text: "Space belongs to humanity.", from: 5132, to: 5181 },
+  { text: "Let's explore it together.", from: 5207, to: 5243 },
+  { text: "Play SpaceDAO.", from: 5268, to: 5288 },
 ];
-
-export const captions180: Caption[] = spans.flatMap(([from, to, offset, lines], si) => {
-  const start = from + offset;
-  const end = to - 14;
-  const total = lines.reduce((n, l) => n + (l === "..." ? 12 : l.length), 0);
-  let cursor = start;
-  const out: Caption[] = [];
-  for (const l of lines) {
-    const len = ((l === "..." ? 12 : l.length) / total) * (end - start);
-    if (l !== "...") out.push({ text: l, from: Math.round(cursor), to: Math.round(cursor + len - 3), burn: si === 9 ? false : undefined });
-    cursor += len;
-  }
-  return out;
-});

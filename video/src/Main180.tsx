@@ -1,55 +1,37 @@
 import React from "react";
 import { AbsoluteFill, Sequence, useCurrentFrame } from "remotion";
-import { C, T180, TOTAL180 } from "./theme";
+import { C, MONO, T180, TOTAL180 } from "./theme";
 import { Background, Grain, SceneFade, Vignette, keys, ramp } from "./components";
 import { Globe } from "./Globe";
 import { Hud, Reveal, SealRow } from "./scenes";
-import { Closing180, ClipShow, DataChips, Facts, Network, Pillars, Treaty, cue } from "./scenes180";
+import { Closing180, ClipShow, DataChips, Facts, Network, Pillars, Treaty, Trust, cue } from "./scenes180";
 import { EndFade, Scene, Soundtrack } from "./Main";
 import { Subtitles } from "./Subtitles";
 import { captions180 } from "./captions180";
 
-// Seconds of music180.mp3 to skip at frame 0. Negative delays the music. Line the crescendo up with 0:45 (frame 1350).
-export const MUSIC180_START_SEC = 0;
+// Seconds of music180.mp3 (Scott Buckley, "Artemis", CC BY 4.0) to skip at frame 0: the track's build-up at 73.5 s
+// lands with "Then I saw SpaceDAO" (frame 950). Dayon approved these times, 2026-11-15.
+export const MUSIC180_START_SEC = 41.8;
 
-// [file, start frame]; vo180_01 starts after the Apollo countdown
-const VO180: [string, number][] = [
-  ["vo180_01", 100],
-  ...(["02", "03", "04", "05", "06", "07", "08", "09", "10"] as const).map((n, i): [string, number] => [`vo180_${n}`, Object.values(T180)[i + 1][0] + 6]),
-];
+// One continuous take after the Apollo 11 countdown: never cut, spaced or sped up; the picture follows it.
+const VO180: [string, number][] = [["vo180", 100]];
 
 const s = (k: keyof typeof T180) => T180[k][0];
+const len = (k: keyof typeof T180) => T180[k][1] - T180[k][0];
+// local frame (inside scene k) of the caption that begins with `prefix`
+const at = (k: keyof typeof T180, prefix: string) => cue(prefix, s(k)).from;
+
+// the four keys of the council in the clips (the video names no company)
+const SEALS = ["NASA", "JAXA", "ESA", "ISRO"].map((label, i) => ({ label, at: at("s06", "a vault") + 12 + i * 22 }));
+
+// Few effects, in the silences (Dayon, 2026-11-15): the countdown before the voice, the reveal's riser and impact,
+// low whooshes on scene changes, the four seals. Anything that lands on the voice plays at 0.4x (Soundtrack).
 const SFX180: [string, number, number][] = [
   ["countdown", 0, 1],
-  ...[0, 1, 2, 3, 4, 5, 6, 7, 8].map((i): [string, number, number] => ["ping", 230 + i * 36, 0.3]),
-  ["swell", 150, 0.35],
-  ["whoosh", s("s02"), 0.4],
-  ...["Designs stay", "Data sits", "And most of the world"].map((p): [string, number, number] => ["glitch", cue(p, 0).from - 2, 0.4]),
   ["riser", s("s03") - 80, 0.55],
   ["impact", s("s03"), 1],
-  ["swell", s("s03") + 3, 0.6],
-  ["whoosh", s("s03") + 2, 0.5],
-  ...["Share technology", "Share spare", "Share the data", "And decide"].map((p): [string, number, number] => ["pop", cue(p, 0).from - 4, 0.45]),
-  ["swell", cue("The more we connect", 0).from - 6, 0.5],
-  ["whoosh", s("s04"), 0.4],
-  ["whoosh", s("s05"), 0.35],
-  ["glass", s("s05") + 204, 0.3], ["glass", s("s05") + 404, 0.3],
-  ["whoosh", s("s06"), 0.35],
-  ...[250, 290, 330, 370].map((d): [string, number, number] => ["seal", s("s06") + d, 0.55]),
-  ["impact", s("s06") + 392, 0.45],
-  ["whoosh", s("s07"), 0.4],
-  ["roar", s("s07"), 0.25],
-  ["whoosh", s("s07") + 304, 0.3],
-  ["whoosh", s("s08"), 0.35],
-  ["swell", s("s08") + 296, 0.5],
-  ["ping", s("s08") + 300, 0.5],
-  ["whoosh", s("s09"), 0.35],
-  ...[0, 1, 2, 3, 4, 5].map((i): [string, number, number] => ["pop", s("s09") + 40 + i * 22, 0.35]),
-  ["riser", s("s10") - 78, 0.5],
-  ["impact", s("s10") + 36, 1],
-  ["swell", s("s10") + 40, 0.5],
-  ["roar", s("s10") + 40, 0.3],
-  ["impact", s("s10") + 176, 0.9],
+  ...(["s02", "s04", "s05", "s06", "s07", "s08", "s09", "s10"] as const).map((k): [string, number, number] => ["whoosh", s(k), 0.35]),
+  ...SEALS.map((x): [string, number, number] => ["seal", s("s06") + x.at, 0.55]),
 ];
 
 const lin = (f: number, pts: [number, number][]) => {
@@ -60,16 +42,17 @@ const lin = (f: number, pts: [number, number][]) => {
   return pts[pts.length - 1][1];
 };
 
-// composition frame -> globe timeline frame (the 30 s timeline: 0-120 earth, 126-210 arcs, 214-296 treaty, 300 reveal, 494+ horizon, 830+ end)
+// composition frame -> globe timeline frame (the 30 s beats: 0-120 earth, 126-210 arcs, 214-296 treaty, 300 reveal, 494+ horizon, 830+ end)
+const R = s("s03");
 const tl = (f: number) => {
-  if (f < 1545) return lin(f, [[0, 0], [200, 120], [560, 206], [600, 214], [1200, 298], [1349, 298], [1350, 300], [1500, 450], [1545, 494]]);
-  if (f < s("s10")) return 500 + ((f - 1545) % 300);
+  if (f < R + 195) return lin(f, [[0, 0], [150, 120], [s("s02") - 17, 206], [s("s02"), 214], [R - 38, 298], [R - 1, 298], [R, 300], [R + 150, 450], [R + 195, 494]]);
+  if (f < s("s10")) return 500 + ((f - (R + 195)) % 300);
   return 830 + (f - s("s10")) * 0.2;
 };
 
 const GlobeLayer180: React.FC = () => {
   const f = useCurrentFrame();
-  const o = keys(f, [[0, 0], [90, 0], [300, 1], [1500, 1], [1560, 0.85], [2230, 0.85], [2270, 0.5], [5100, 0.5], [5160, 1]]);
+  const o = keys(f, [[0, 0], [90, 0], [300, 1], [R + 150, 1], [R + 210, 0.85], [s("s04") - 20, 0.85], [s("s04") + 20, 0.5], [s("s10") - 60, 0.5], [s("s10"), 1]]);
   return (
     <AbsoluteFill style={{ opacity: o }}>
       <Globe tl={tl} />
@@ -84,7 +67,25 @@ const BlackOpen: React.FC = () => {
 
 const HudLayer: React.FC = () => {
   const f = useCurrentFrame();
-  return f < 1560 ? <Hud tl={tl} /> : null;
+  return f < R + 210 ? <Hud tl={tl} /> : null;
+};
+
+// a glass pill for the technology the narration names (scene 6)
+const TechPill: React.FC<{ from: number; children: React.ReactNode; top?: number }> = ({ from, children, top = 34 }) => {
+  const f = useCurrentFrame();
+  const o = ramp(f, from, from + 14);
+  if (o <= 0) return null;
+  return (
+    <div
+      style={{
+        position: "absolute", right: 110, top, opacity: o, transform: `translateY(${(1 - o) * -12}px)`, padding: "14px 28px", borderRadius: 999,
+        background: "rgba(8,10,26,0.86)", border: "1px solid rgba(34,211,238,0.45)", boxShadow: "0 0 30px rgba(34,211,238,0.25)",
+        fontFamily: MONO, fontWeight: 700, fontSize: 22, letterSpacing: "0.08em", color: C.cyanBright,
+      }}
+    >
+      {children}
+    </div>
+  );
 };
 
 export const SpaceDAO180: React.FC = () => (
@@ -93,51 +94,60 @@ export const SpaceDAO180: React.FC = () => (
     <GlobeLayer180 />
     <BlackOpen />
     <HudLayer />
-    <Scene span={T180.s01}><SceneFade dur={600} inF={1} outF={20}><Facts /></SceneFade></Scene>
-    <Scene span={T180.s02}><SceneFade dur={750} inF={20} outF={14}><Treaty /></SceneFade></Scene>
+    <Scene span={T180.s01}><SceneFade dur={len("s01")} inF={1} outF={20}><Facts /></SceneFade></Scene>
+    <Scene span={T180.s02}><SceneFade dur={len("s02")} inF={20} outF={14}><Treaty /></SceneFade></Scene>
     <Scene span={T180.s03}>
-      <Sequence from={0} durationInFrames={150}><Reveal /></Sequence>
-      <SceneFade dur={900} inF={1} outF={16}><Pillars /></SceneFade>
+      <Sequence from={0} durationInFrames={230}>
+        <Reveal dur={230} wordAt={30} tagAt={at("s03", "A planetary") + 50} tagline="Run as a DAO · smart contracts" />
+      </Sequence>
+      <SceneFade dur={len("s03")} inF={1} outF={16}><Pillars /></SceneFade>
     </Scene>
     <Scene span={T180.s04}>
-      <SceneFade dur={450} inF={14} outF={12}>
-        <ClipShow items={[{ name: "intro", from: 0, to: 236, label: "THE GAME" }, { name: "rocky", from: 220, to: 450, label: "MEET ROCKY" }]} />
+      <SceneFade dur={len("s04")} inF={14} outF={12}>
+        <ClipShow items={[{ name: "intro", from: 0, to: 132, label: "THE GAME" }, { name: "rocky", from: 118, to: len("s04"), label: "MEET ROCKY" }]} />
       </SceneFade>
     </Scene>
     <Scene span={T180.s05}>
-      <SceneFade dur={600} inF={14} outF={12}>
+      <SceneFade dur={len("s05")} inF={14} outF={12}>
         <ClipShow
           items={[
-            { name: "missions", from: 0, to: 216, label: "PICK A REAL MISSION" },
-            { name: "coalition", from: 200, to: 416, label: "FORM YOUR COUNCIL" },
-            { name: "design", from: 400, to: 600, label: "DESIGN IT / SIX GAUGES" },
+            { name: "missions", from: 0, to: at("s05", "Invite") - 2, label: "PICK A REAL MISSION" },
+            { name: "coalition", from: at("s05", "Invite") - 16, to: at("s05", "Design the rocket") + 4, label: "FORM YOUR COUNCIL" },
+            { name: "design", from: at("s05", "Design the rocket") - 10, to: len("s05"), label: "DESIGN IT / SIX GAUGES" },
           ]}
         />
       </SceneFade>
     </Scene>
     <Scene span={T180.s06}>
-      <SceneFade dur={450} inF={14} outF={12}>
+      <SceneFade dur={len("s06")} inF={14} outF={12}>
         <ClipShow
           w={1100} top={80}
-          items={[{ name: "review", from: 0, to: 230, label: "GO / NO-GO REVIEW" }, { name: "sign", from: 214, to: 450, label: "FOUR-OF-FOUR SIGNATURE" }]}
+          items={[
+            { name: "review", from: 0, to: at("s06", "a vault") + 10, label: "GO / NO-GO REVIEW" },
+            { name: "sign", from: at("s06", "a vault") - 6, to: len("s06"), label: "FOUR-OF-FOUR SIGNATURE" },
+          ]}
         />
-        <SealRow top={745} seals={[{ label: "AGENCY", at: 250 }, { label: "COMPANY", at: 290 }, { label: "SCIENCE", at: 330 }, { label: "FUNDER", at: 370 }]} />
+        <SealRow top={745} seals={SEALS} title="4-OF-4 MULTI-SIGNATURE" />
+        <TechPill from={at("s06", "And those keys")}>QUANTUM-SAFE · ML-DSA-65 (NIST FIPS 204)</TechPill>
       </SceneFade>
     </Scene>
     <Scene span={T180.s07}>
-      <SceneFade dur={600} inF={14} outF={12}>
-        <ClipShow items={[{ name: "flight", from: 0, to: 320, label: "FLIGHT / REAL SPACE WEATHER" }, { name: "ops", from: 304, to: 600, label: "MOON OPERATIONS" }]} />
+      <SceneFade dur={len("s07")} inF={14} outF={12}>
+        <ClipShow items={[{ name: "flight", from: 0, to: at("s07", "On the Moon") + 4, label: "FLIGHT / REAL SPACE WEATHER" }, { name: "ops", from: at("s07", "On the Moon") - 12, to: len("s07"), label: "MOON OPERATIONS" }]} />
       </SceneFade>
     </Scene>
     <Scene span={T180.s08}>
-      <SceneFade dur={450} inF={14} outF={12}>
-        <ClipShow fadeLast items={[{ name: "debrief", from: 0, to: 236, label: "DEBRIEF" }]} />
-        <Sequence from={210} durationInFrames={240}><Network joinAt={50} /></Sequence>
+      <SceneFade dur={len("s08")} inF={14} outF={12}>
+        <ClipShow fadeLast items={[{ name: "debrief", from: 0, to: at("s08", "And your design") + 14, label: "DEBRIEF" }]} />
+        <Sequence from={at("s08", "And your design") - 12} durationInFrames={at("s08", "Now picture") - at("s08", "And your design") + 24}>
+          <Network joinAt={14} />
+        </Sequence>
+        <Trust />
       </SceneFade>
     </Scene>
     <Scene span={T180.s09}>
-      <SceneFade dur={360} inF={14} outF={12}>
-        <ClipShow items={[{ name: "nasalive", from: 0, to: 360, label: "EVERYTHING RUNS ON REAL DATA" }]} w={1000} left={80} top={250} labelTop={84} />
+      <SceneFade dur={len("s09")} inF={14} outF={12}>
+        <ClipShow items={[{ name: "nasalive", from: 0, to: len("s09"), label: "EVERYTHING RUNS ON LIVE NASA DATA" }]} w={1000} left={80} top={250} labelTop={84} />
         <DataChips />
       </SceneFade>
     </Scene>
@@ -146,6 +156,7 @@ export const SpaceDAO180: React.FC = () => (
     <Vignette />
     <Grain />
     <EndFade total={TOTAL180} />
-    <Soundtrack music="music180" vo={VO180} sfx={SFX180} total={TOTAL180} musicStartSec={MUSIC180_START_SEC} />
+    {/* the voice leads: music 0.12 under it, 0.45 in its pauses, rising before "Then I saw SpaceDAO" and after "Play SpaceDAO." */}
+    <Soundtrack music="music180" vo={VO180} sfx={SFX180} total={TOTAL180} musicStartSec={MUSIC180_START_SEC} duck={0.12} idle={0.45} lifts={[[900, 948, 0.7], [5290, 5385, 0.7]]} />
   </AbsoluteFill>
 );

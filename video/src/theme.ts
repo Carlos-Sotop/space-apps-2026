@@ -59,17 +59,18 @@ export const clipSrc = (name: string): string | undefined => {
   return c ? staticFile(c.src) : undefined;
 };
 
-// 3-minute cut: one span per voice-over line (vo180_01 ... vo180_10), frames at 30 fps
-export const TOTAL180 = 5400;
+// 3-minute cut, retimed to the v2 narration (one take, vo180.wav from frame 100; Dayon 2026-11-15).
+// Each span starts ~12 frames before its first word. Never above 3:00.
+export const TOTAL180 = 5385;
 export const T180 = {
-  s01: [0, 600],
-  s02: [600, 1350],
-  s03: [1350, 2250],
-  s04: [2250, 2700],
-  s05: [2700, 3300],
-  s06: [3300, 3750],
-  s07: [3750, 4350],
-  s08: [4350, 4800],
-  s09: [4800, 5160],
-  s10: [5160, 5400],
+  s01: [0, 437], // countdown + "I've spent my life around rockets... Five agencies..."
+  s02: [437, 938], // "But the way we work together has barely changed..."
+  s03: [938, 1964], // reveal: "Then I saw SpaceDAO..." (impact on 938, word on 950)
+  s04: [1964, 2217], // "You can't build that in a weekend..."
+  s05: [2217, 2615], // "Pick a real mission..."
+  s06: [2615, 3332], // "Before launch... four-of-four multi-signature... quantum-safe... room full of lawyers"
+  s07: [3332, 3875], // "Then you fly... solar storms are real..."
+  s08: [3875, 4775], // "Then the debrief... what a blockchain gives... No tokens. No money."
+  s09: [4775, 5030], // "All of it runs on live NASA data..."
+  s10: [5030, 5385], // "I've waited my whole life for this... Space belongs to humanity... Play SpaceDAO."
 } as const;

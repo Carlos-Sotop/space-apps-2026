@@ -34,7 +34,7 @@ export const Hud: React.FC<{ tl?: (f: number) => number }> = ({ tl }) => {
 
 // ---------------- 4: reveal ----------------
 // dur: frames on screen; wordAt / tagAt: when the wordmark and the tagline come in (the 30 s cut says "Enter SpaceDAO" at once)
-export const Reveal: React.FC<{ dur?: number; wordAt?: number; tagAt?: number }> = ({ dur = 150, wordAt = 22, tagAt = 56 }) => {
+export const Reveal: React.FC<{ dur?: number; wordAt?: number; tagAt?: number; tagline?: string }> = ({ dur = 150, wordAt = 22, tagAt = 56, tagline = "One open network for space" }) => {
   const f = useCurrentFrame();
   const out = ramp(f, dur - 12, dur, 1, 0, Easing.in(Easing.quad));
   const settle = ramp(f, 0, 50);
@@ -49,7 +49,7 @@ export const Reveal: React.FC<{ dur?: number; wordAt?: number; tagAt?: number }>
           <Wordmark size={132} start={wordAt} spacing={0.16} />
         </div>
         <Mono size={24} color={C.cyanBright} style={{ marginTop: 34, opacity: ramp(f, tagAt, tagAt + 24), letterSpacing: `${ramp(f, tagAt, tagAt + 44, 0.6, 0.34)}em` }}>
-          One open network for space
+          {tagline}
         </Mono>
       </AbsoluteFill>
     </AbsoluteFill>

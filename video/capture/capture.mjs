@@ -165,15 +165,22 @@ const SHOTS = {
       [6300, (p) => click(p, btn(p, /^Select Moon Base Zero$/))],
     ],
   },
+  // agencies only: the council is NASA, JAXA, ESA, ISRO and the list is filtered to agencies (no company on screen)
   coalition: {
     route: `?mode=quick&screen=coalition&${MOON}`, dur: 8.5,
-    prep: async (p) => { await waitCoach(p, "coalition.council"); await wait(p, 700); },
+    prep: async (p) => {
+      await waitCoach(p, "coalition.council");
+      await game(p, `const s = useGame.getState(); s.setLead(arg.lead); s.setPartners(arg.partners);`, COUNCIL);
+      await click(p, p.getByRole("tab", { name: /^Agencies$/ }).or(p.getByRole("button", { name: /^Agencies$/ })).first());
+      await wait(p, 900);
+    },
     steps: [
       [300, (p) => click(p, btn(p, /^ISRO:/))],
-      [1700, (p) => click(p, btn(p, /^ESA:/))],
-      [3300, (p) => click(p, btn(p, /^Best coverage$/))],
-      [5000, (p) => hover(p, p.locator("[data-coach='coalition.council']"))],
-      [6600, (p) => hover(p, btn(p, /^Enter mission control/))],
+      [1500, (p) => click(p, btn(p, /^CSA:/))],
+      [3000, (p) => hover(p, p.locator("[data-coach='coalition.council']"))],
+      [4300, (p) => click(p, btn(p, /^CSA:/))],
+      [5300, (p) => click(p, btn(p, /^ISRO:/))],
+      [6800, (p) => hover(p, btn(p, /^Enter mission control/))],
     ],
   },
   design: {

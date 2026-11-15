@@ -74,14 +74,8 @@ const Fact: React.FC<{ text: string; source: string; from: number; to: number }>
 };
 
 export const Facts: React.FC = () => {
-  const a = cue("Today, five", T180.s01[0]);
-  const b = cue("And more than", T180.s01[0]);
-  return (
-    <>
-      <Fact text="5 agencies · 15 nations · 1 station" source="SOURCE: NASA.GOV / INTERNATIONAL SPACE STATION" from={a.from} to={b.from - 4} />
-      <Fact text="70+ nations · Artemis Accords" source="SOURCE: NASA.GOV / ARTEMIS ACCORDS" from={b.from} to={b.to + 40} />
-    </>
-  );
+  const a = cue("Five agencies", T180.s01[0]);
+  return <Fact text="5 agencies · 15 nations · 1 station" source="SOURCE: NASA.GOV / INTERNATIONAL SPACE STATION" from={a.from} to={a.to - 4} />;
 };
 
 // ---------------- 02: kinetic cards ----------------
@@ -304,6 +298,45 @@ export const Network: React.FC<{ joinAt: number }> = ({ joinAt }) => {
   );
 };
 
+// ---------------- 08: what the council gets: transparent, private, verifiable ----------------
+const TRUST = [
+  { prefix: "Transparency", title: "TRANSPARENT", sub: "EVERY DECISION ON A PERMANENT RECORD" },
+  { prefix: "Privacy", title: "PRIVATE", note: "ZERO-KNOWLEDGE", sub: "PROVE WHAT YOU DELIVER, KEEP YOUR SECRETS" },
+  { prefix: "Just trust", title: "VERIFIABLE", sub: "NO TOKENS / NO MONEY" },
+];
+export const Trust: React.FC = () => {
+  const f = useCurrentFrame();
+  const t0 = T180.s08[0];
+  const head = cue("Now picture", t0).from;
+  return (
+    <AbsoluteFill>
+      <AbsoluteFill style={{ background: "radial-gradient(ellipse 72% 52% at 50% 46%, rgba(4,5,13,0.88) 0%, rgba(4,5,13,0.55) 60%, transparent 100%)", opacity: ramp(f, head - 10, head + 24) }} />
+      {TRUST.map((t, i) => {
+        const at = cue(t.prefix, t0).from - 4;
+        const k = useSpring(at, { damping: 16, stiffness: 120 });
+        const lit = ramp(f, at, at + 12);
+        return (
+          <div
+            key={t.title}
+            style={{
+              position: "absolute", left: 150 + i * 560, top: 300, width: 500, height: 330, boxSizing: "border-box", padding: "48px 40px", borderRadius: 28,
+              opacity: Math.min(k * 1.5, 1), transform: `translateY(${(1 - k) * 60}px) scale(${0.94 + 0.06 * k})`,
+              background: "linear-gradient(150deg, rgba(139,92,246,0.18), rgba(34,211,238,0.06))", border: `1px solid rgba(167,139,250,${0.25 + 0.35 * lit})`,
+              boxShadow: `0 0 ${50 * lit}px rgba(34,211,238,0.25), inset 0 1px 0 rgba(255,255,255,0.18)`, backdropFilter: "blur(18px)",
+            }}
+          >
+            <Mono size={18} color={C.faint} style={{ letterSpacing: "0.3em" }}>{`0${i + 1}`}</Mono>
+            <div style={{ marginTop: 22, fontFamily: DISPLAY, fontSize: 50, letterSpacing: "0.08em", color: C.text, textShadow: "0 0 34px rgba(139,92,246,0.5)" }}>{t.title}</div>
+            {t.note && <div style={{ marginTop: 10, fontFamily: DISPLAY, fontSize: 26, letterSpacing: "0.12em", background: grad, WebkitBackgroundClip: "text", color: "transparent" }}>({t.note})</div>}
+            <div style={{ margin: "24px 0 20px", height: 3, width: 90 * lit, background: grad, borderRadius: 3, boxShadow: "0 0 14px rgba(34,211,238,0.6)" }} />
+            <Mono size={17} color={C.cyanBright} style={{ letterSpacing: "0.16em", lineHeight: 1.6 }}>{t.sub}</Mono>
+          </div>
+        );
+      })}
+    </AbsoluteFill>
+  );
+};
+
 // ---------------- 09: data source chips ----------------
 const SOURCES = [
   ["NASA DONKI", "SPACE WEATHER"], ["NASA EONET", "EARTH EVENTS"], ["JPL HORIZONS", "EPHEMERIDES"],
@@ -346,18 +379,22 @@ export const DataChips: React.FC = () => {
 // ---------------- 10: closing ----------------
 export const Closing180: React.FC = () => {
   const f = useCurrentFrame();
+  const t0 = T180.s10[0];
+  const l1At = cue("Space belongs", t0).from - 2;
+  const l2At = cue("Let's explore", t0).from - 2;
+  const btnAt = cue("Play SpaceDAO", t0).from - 4;
   const w = useSpring(34, { damping: 14, stiffness: 120 });
-  const l1 = ramp(f, 62, 84);
-  const l2 = ramp(f, 122, 146);
-  const btn = useSpring(172, { damping: 13, stiffness: 140 });
+  const l1 = ramp(f, l1At, l1At + 22);
+  const l2 = ramp(f, l2At, l2At + 24);
+  const btn = useSpring(btnAt, { damping: 13, stiffness: 140 });
   const pulse = 0.5 + 0.5 * Math.sin(f * 0.14);
   return (
     <AbsoluteFill>
       <AbsoluteFill style={{ background: "radial-gradient(ellipse 58% 48% at 50% 38%, rgba(4,5,13,0.92) 0%, rgba(4,5,13,0.7) 55%, rgba(4,5,13,0) 100%)" }} />
       <Flash at={36} color="#ffffff" max={0.6} dur={20} />
       <Shockwave at={38} y={230} color={C.violetBright} size={2400} dur={44} />
-      <Shockwave at={176} y={560} color={C.cyan} size={1800} dur={40} />
-      <Flash at={176} color={C.cyanBright} max={0.35} dur={14} />
+      <Shockwave at={btnAt + 4} y={560} color={C.cyan} size={1800} dur={40} />
+      <Flash at={btnAt + 4} color={C.cyanBright} max={0.35} dur={14} />
       <AbsoluteFill style={{ alignItems: "center", paddingTop: 120 }}>
         <div style={{ transform: `scale(${1.18 - 0.18 * w})`, opacity: Math.min(w * 1.4, 1) }}>
           <Wordmark size={118} start={34} spacing={0.16} />
@@ -377,7 +414,7 @@ export const Closing180: React.FC = () => {
           <svg width="34" height="34" viewBox="0 0 34 34"><path d="M8 4 L29 17 L8 30 Z" fill="#fff" /></svg>
           <div style={{ fontFamily: DISPLAY, fontSize: 34, letterSpacing: "0.16em", color: "#fff" }}>PLAY SPACEDAO</div>
         </div>
-        <Mono size={20} color={C.muted} style={{ marginTop: 26, letterSpacing: "0.08em", textTransform: "none", opacity: ramp(f, 190, 210) }}>spacedao.dayon-x.workers.dev</Mono>
+        <Mono size={20} color={C.muted} style={{ marginTop: 26, letterSpacing: "0.08em", textTransform: "none", opacity: ramp(f, btnAt + 18, btnAt + 38) }}>spacedao.dayon-x.workers.dev</Mono>
       </AbsoluteFill>
     </AbsoluteFill>
   );
