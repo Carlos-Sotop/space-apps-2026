@@ -1,10 +1,12 @@
-import { useMemo, useState, type ReactNode } from "react";
-import { Badge, GlassCard, Icon, InfoButton, RecommendedButton, type IconName } from "@/components/ui";
-import { computeResources, recommendStep } from "@/engine";
-import type { Module, ModuleCategory } from "@/engine/types";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { Badge, Button, GlassCard, Icon, InfoButton, RecommendedButton, type IconName } from "@/components/ui";
+import { AnchoredBubble } from "@/components/tutorial";
+import { batteryShortWh, computeResources, recommendStep, validateDesign } from "@/engine";
+import type { MissionDesign, Module, ModuleCategory } from "@/engine/types";
 import { CATEGORY_LABEL, getActor, missionModules } from "@/lib/catalog";
 import { fmtKg, fmtMUsd, fmtW } from "@/lib/format";
 import { useGame } from "@/store/game";
+import { useGuide } from "@/store/guide";
 import { SpacecraftStack } from "./SpacecraftStack";
 import { useDesign } from "./useDesign";
 
@@ -63,13 +65,66 @@ function Chip({ icon, children, tone = "" }: { icon: IconName; children: ReactNo
   );
 }
 
+/**
+ * The night-power warning, right under the gauges: the player sees the shortfall while building,
+ * instead of meeting it as a refusal at the review.
+ */
+function NightPowerWarning({ design, shortWh, onShowMe }: { design: MissionDesign; shortWh: number; onShowMe: () => void }) {
+  void design;
+  return (
+    <div className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-tight/45 bg-tight/10 px-4 py-3" role="status" aria-live="polite">
+      <Icon name="warning" size={16} className="shrink-0 text-tight" />
+      <p className="m-0 min-w-0 flex-1 text-sm text-fg">
+        <span className="num">Night power short by {fmtWh(shortWh)}.</span> Add a bigger battery or cut the night load.
+      </p>
+      <Button size="sm" onClick={onShowMe}><Icon name="arrow" size={14} /> Show me</Button>
+    </div>
+  );
+}
+
+const fmtWh = (wh: number) => `${Math.round(wh).toLocaleString("en-US")} Wh`;
+
 export function BuildStep() {
   const { design, mission, catalog } = useDesign();
   const toggle = useGame((s) => s.toggleIn);
   const patchDesign = useGame((s) => s.patchDesign);
+  const focus = useGuide((s) => s.focus);
+  const showMe = useGuide((s) => s.showMe);
+  const clearFocus = useGuide((s) => s.clearFocus);
+  const flashGauges = useGuide((s) => s.flashGauges);
   const all = useMemo(() => missionModules(mission), [mission]);
   const [tab, setTab] = useState<Fn | "all">("all");
   const [hover, setHover] = useState<string | undefined>();
+
+  // what the dark period still needs, so the player can fix it before the council ever sees it
+  const issues = useMemo(() => validateDesign(design, catalog), [design, catalog]);
+  const shortWh = batteryShortWh(issues);
+
+  // the module "Show me where" asked us to point at, if it is one this mission offers
+  const spot = focus?.step === "build" && focus.moduleId && all.some((m) => m.id === focus.moduleId) ? focus : null;
+  // open the tab that holds it, so the card is on screen
+  useEffect(() => {
+    if (!spot?.moduleId) return;
+    const m = all.find((x) => x.id === spot.moduleId);
+    if (m) setTab(FUNCTION_OF[m.category]);
+  }, [spot?.moduleId, all]);
+  // the pointer is answered once the part is aboard
+  useEffect(() => {
+    if (spot?.moduleId && design.moduleIds.includes(spot.moduleId)) clearFocus();
+  }, [spot?.moduleId, design.moduleIds, clearFocus]);
+
+  const showBattery = () => {
+    const best = all
+      .filter((m) => (m.storageWh ?? 0) > 0 && !design.moduleIds.includes(m.id))
+      .sort((a, b) => (b.storageWh ?? 0) - (a.storageWh ?? 0))[0];
+    showMe({
+      step: "build",
+      moduleId: best?.id,
+      pose: "point",
+      text: best ? `The ${best.name} carries the base through the night. Tap to add it.` : "Open Power and cut what runs at night.",
+    });
+    if (!best) setTab("Power");
+  };
 
   const fns = useMemo(() => FUNCTIONS.filter((f) => all.some((m) => FUNCTION_OF[m.category] === f)), [all]);
   const shown = all.filter((m) => tab === "all" || FUNCTION_OF[m.category] === tab);
@@ -92,6 +147,7 @@ export function BuildStep() {
       </div>
       <div className="grid gap-6 xl:grid-cols-[1fr_300px]">
         <div className="min-w-0">
+          {shortWh > 0 && <NightPowerWarning design={design} shortWh={shortWh} onShowMe={showBattery} />}
           <div role="tablist" aria-label="What the module is for" className="mb-4 flex flex-wrap gap-1.5">
             {(["all", ...fns] as const).map((f) => {
               const on = tab === f;
@@ -118,13 +174,15 @@ export function BuildStep() {
           <div data-coach="build.modules" className="grid gap-3 sm:grid-cols-2">
             {shown.map((m) => {
               const on = design.moduleIds.includes(m.id);
+              const pointed = spot?.moduleId === m.id;
               return (
                 <GlassCard
                   key={m.id}
                   selected={on}
-                  onSelect={() => toggle("moduleIds", m.id)}
+                  data-coach={pointed ? "build.focus" : undefined}
+                  onSelect={() => { if (!on) flashGauges(["power", "mass", "budget"]); toggle("moduleIds", m.id); }}
                   label={`${on ? "Remove" : "Add"} ${m.name}`}
-                  className="p-3.5"
+                  className={`p-3.5 ${pointed ? "ring-2 ring-cyan" : ""}`}
                   onPointerEnter={() => setHover(m.id)}
                   onPointerLeave={() => setHover((c) => (c === m.id ? undefined : c))}
                   onFocus={() => setHover(m.id)}
@@ -170,6 +228,14 @@ export function BuildStep() {
           <SpacecraftStack design={design} modules={flown} spareMassKg={spareMassKg} highlightModuleId={hover} payloads={[]} />
         </aside>
       </div>
+      {spot && (
+        <AnchoredBubble anchor="build.focus" pose={spot.pose} tipKey={`build:${spot.moduleId ?? "step"}`} spotlight>
+          <p className="m-0 text-[15px] leading-snug text-fg">{spot.text}</p>
+          <div className="mt-3 flex justify-end">
+            <Button size="sm" onClick={clearFocus}>Got it</Button>
+          </div>
+        </AnchoredBubble>
+      )}
     </div>
   );
 }

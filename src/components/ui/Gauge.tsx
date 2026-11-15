@@ -19,8 +19,11 @@ function Lines({ title, lines, g }: { title: string; lines: ResourceGauge["usedB
   );
 }
 
-/** Horizontal used-versus-capacity bar with a hover or focus tooltip that explains the numbers. */
-export function Gauge({ gauge: g, compact, alignRight }: { gauge: ResourceGauge; compact?: boolean; alignRight?: boolean }) {
+/**
+ * Horizontal used-versus-capacity bar with a hover or focus tooltip that explains the numbers.
+ * `flash` blinks it cyan once, so a change the player did not make by hand is still visible.
+ */
+export function Gauge({ gauge: g, compact, alignRight, flash }: { gauge: ResourceGauge; compact?: boolean; alignRight?: boolean; flash?: boolean }) {
   const ratio = g.capacity > 0 ? g.used / g.capacity : g.used > 0 ? 1 : 0;
   const pct = Math.min(1, ratio) * 100;
   const color = COLOR[g.status];
@@ -33,7 +36,7 @@ export function Gauge({ gauge: g, compact, alignRight }: { gauge: ResourceGauge;
       aria-valuemin={0}
       aria-valuemax={g.capacity}
       aria-valuenow={g.used}
-      className="group relative min-w-0 rounded-md"
+      className={`group relative min-w-0 rounded-md ${flash ? "gauge-flash" : ""}`}
     >
       <div className="flex items-center justify-between gap-2 text-[11px] uppercase tracking-wider text-muted">
         <span className="flex items-center gap-1.5">
