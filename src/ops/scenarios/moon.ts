@@ -4,9 +4,12 @@ import {
   DONKI,
   DSN_NOW,
   LCROSS_WATER,
+  LEAF,
   LRO,
   LRO_MISSION,
+  PAD_SINTERING,
   POLAR_ILLUMINATION,
+  REGOLITH_OXYGEN,
   VEGGIE,
 } from "../sources";
 import type { OpsEnv, OpsGoal, Tile } from "../types";
@@ -51,7 +54,7 @@ const structures: StructureDef[] = [
   def({
     kind: "greenhouse",
     label: "Plant growth chamber",
-    blurb: "Grows plants: 3 good turns, then science every turn.",
+    blurb: "Grows food plants: 3 good turns, then science every turn.",
     allowedTerrain: ["plain", "slope", "rim"],
     buildCost: { ap: 2, waterKg: 30 }, // game value
     powerW: 150, // game value
@@ -60,20 +63,21 @@ const structures: StructureDef[] = [
     sciencePerTurn: 10, // game value
     traits: [],
     priority: 5,
-    sources: [VEGGIE],
+    sources: [VEGGIE, LEAF],
   }),
   def({ kind: "berm", label: "Regolith berm", blurb: "Shields neighbours from storms and halves dust wear.", allowedTerrain: GROUND, buildCost: { ap: 1 }, traits: ["shield"], priority: 100 }),
   def({ kind: "mast", label: "Antenna mast", blurb: "Lifts an antenna: more Earth view on its tile.", allowedTerrain: GROUND, buildCost: { ap: 1 }, earthViewBonus: 0.25, traits: ["overlay"], priority: 100 }),
   def({ kind: "wadi", label: "Thermal wadi", blurb: "Stores heat and warms the tiles next to it.", allowedTerrain: ["plain", "slope"], buildCost: { ap: 2 }, lockedUntilResearch: true, traits: ["heater"], priority: 100 }),
-  def({ kind: "isru", label: "Propellant test plant", blurb: "Turns 5 kg of water into science each turn.", allowedTerrain: ["plain", "slope"], buildCost: { ap: 2 }, powerW: 100, consumeKgPerTurn: 5, sciencePerTurn: 8, lockedUntilResearch: true, traits: [], priority: 8 }), // game values
+  def({ kind: "isru", label: "Oxygen demo plant", blurb: "Bakes oxygen out of regolith with concentrated heat.", allowedTerrain: ["plain", "slope"], buildCost: { ap: 2 }, powerW: 100, sciencePerTurn: 8, lockedUntilResearch: true, traits: [], priority: 8, sources: [REGOLITH_OXYGEN] }), // game values
+  def({ kind: "pad", label: "Landing pad", blurb: "Sintered regolith: the next lander kicks up no dust.", allowedTerrain: ["plain", "slope", "ridge"], buildCost: { ap: 2 }, traits: [], priority: 100, sources: [PAD_SINTERING] }), // game value
 ];
 
 const sideDefs: Record<string, (maxTurns: number) => OpsGoal> = {
-  "mb-night": () => ({ id: "side-night", kind: "side", objectiveId: "mb-night", title: "No structure below 30 health through the dark", progress: 0, target: 1, unit: "night", done: false, points: 15 }),
-  "mb-ice": () => ({ id: "side-ice", kind: "side", objectiveId: "mb-ice", title: "Collect 60 kg of water ice", progress: 0, target: 60, unit: "kg", done: false, points: 15 }),
+  "mb-night": () => ({ id: "side-night", kind: "side", objectiveId: "mb-night", title: "Night shift: keep every structure above 30 health through the dark", progress: 0, target: 1, unit: "night", done: false, points: 15 }),
+  "mb-ice": () => ({ id: "side-ice", kind: "side", objectiveId: "mb-ice", title: "Water ice: collect 60 kg", progress: 0, target: 60, unit: "kg", done: false, points: 15 }),
   "mb-quantum-link": (n) => ({ id: "side-quantum", kind: "side", objectiveId: "mb-quantum-link", title: "Keep the post-quantum link on all mission", progress: 0, target: n, unit: "turns", done: false, points: 15 }),
-  "mb-surface-net": () => ({ id: "side-net", kind: "side", objectiveId: "mb-surface-net", title: "Mesh links 3+ structures", progress: 0, target: 3, unit: "structures", done: false, points: 15 }),
-  "mb-scout": () => ({ id: "side-scout", kind: "side", objectiveId: "mb-scout", title: "Scout 5 tiles", progress: 0, target: 5, unit: "tiles", done: false, points: 15 }),
+  "mb-surface-net": () => ({ id: "side-net", kind: "side", objectiveId: "mb-surface-net", title: "Comms and navigation: run a relay or a mesh for 4 turns", progress: 0, target: 4, unit: "turns", done: false, points: 15 }),
+  "mb-scout": () => ({ id: "side-scout", kind: "side", objectiveId: "mb-scout", title: "First tracks: scout 5 tiles with the rover", progress: 0, target: 5, unit: "tiles", done: false, points: 15 }),
 };
 
 const darkTurns = (schedule: OpsEnv[]) => schedule.filter((e) => e.sunFactor <= 0.1).map((e) => e.turn);
@@ -316,17 +320,22 @@ export const moon: OpsScenario = {
     const main: OpsGoal[] = [
       g({ id: "main-power", kind: "main", step: 1, title: "Power up: deploy a power source", target: 1, unit: "source", points: 10 }),
       g({ id: "main-phone", kind: "main", step: 2, title: "Phone home: first data reaches Earth", target: 1, unit: "link", points: 15 }),
-      g({ id: "main-dark", kind: "main", step: 3, title: "Survive the dark", target: 1, unit: "night", points: 25 }),
+      g({ id: "main-dark", kind: "main", step: 3, title: "Night shift: survive the dark", target: 1, unit: "night", points: 25 }),
       g({ id: "main-data", kind: "main", step: 4, title: `Return ${target} Gb of science`, target, unit: "Gb", points: 30 }),
     ];
     const side = design.secondaryObjectiveIds.map((id) => sideDefs[id]?.(maxTurns)).filter((x): x is OpsGoal => !!x);
-    const extra = g({ id: "grow-plant", kind: "side", title: "Grow the first plant on the Moon", target: 3, unit: "turns", points: 20 });
+    // goals built on site, open to every design
+    const onSite = [
+      g({ id: "grow-plant", kind: "side", title: "Grow food: 3 good turns in a plant chamber", target: 3, unit: "turns", points: 20 }),
+      g({ id: "landing-pad", kind: "side", title: "Landing pad: sinter one for the next lander", target: 1, unit: "pad", points: 15 }),
+      g({ id: "oxygen", kind: "side", title: "Oxygen from regolith: run the demo plant 2 turns", target: 2, unit: "turns", points: 20 }),
+    ];
     const disc: OpsGoal[] = [
       g({ id: "disc-cold-trap", kind: "discovery", hidden: true, title: "Cold trap: ice richer than expected", target: 1, unit: "find", points: 10 }),
       g({ id: "disc-lava-tube", kind: "discovery", hidden: true, title: "Lava tube skylight", target: 1, unit: "find", points: 10 }),
       g({ id: "disc-regolith", kind: "discovery", hidden: true, title: "Ancient regolith layer", target: 1, unit: "find", points: 10 }),
     ];
-    return [...main, ...side, extra, ...disc];
+    return [...main, ...side, ...onSite, ...disc];
   },
 
   placeSecrets(rng, tiles, goals) {
@@ -354,10 +363,12 @@ export const moon: OpsScenario = {
         return flag(s, "iceCollected");
       case "side-quantum":
         return flag(s, "pqRun");
-      case "side-net": {
-        if (!s.structures.some((st) => isActive(st) && st.kind === "mesh")) return 0;
-        return s.structures.filter((st) => isActive(st) && st.tileId !== s.tiles.find((t) => t.q === 0 && t.r === 0)?.id && ["lab", "rover", "drill", "antenna-dte", "relay-terminal"].includes(st.kind)).length;
-      }
+      case "side-net":
+        return flag(s, "netTurns");
+      case "landing-pad":
+        return s.structures.some((st) => st.kind === "pad") ? 1 : 0;
+      case "oxygen":
+        return flag(s, "oxygenTurns");
       case "side-scout":
         return s.tiles.filter((t) => t.scouted && !(t.q === 0 && t.r === 0)).length;
       case "grow-plant":
@@ -372,7 +383,7 @@ export const moon: OpsScenario = {
     { id: "driving", title: "Autonomous driving", blurb: "+1 action point each turn.", cost: 30, effect: { ap: 1 } },
     { id: "optical", title: "Optical comms terminal", blurb: "Downlink is twice as fast.", cost: 60, effect: { downlinkMul: 2 } },
     { id: "wadi", title: "Thermal wadi", blurb: "Unlocks a heat store you can build.", cost: 35, effect: { unlockBuild: "wadi" } },
-    { id: "electrolysis", title: "Water electrolysis", blurb: "Unlocks a plant that turns water into science.", cost: 40, effect: { unlockBuild: "isru" } },
+    { id: "electrolysis", title: "Regolith oxygen", blurb: "Unlocks a plant that bakes oxygen out of regolith.", cost: 40, effect: { unlockBuild: "isru" } },
     { id: "edge-ai", title: "Edge AI triage", blurb: "Instruments return 30% more data.", cost: 45, effect: { dataMul: 1.3 } },
   ],
   events,
@@ -395,6 +406,8 @@ export const moon: OpsScenario = {
     }
     const pq = s.structures.some((st) => isActive(st) && st.kind === "pq-link");
     s.flags.pqRun = pq ? flag(s, "pqRun") + 1 : 0;
+    if (!info.blackout && s.structures.some((st) => isActive(st) && (st.kind === "relay-terminal" || st.kind === "mesh"))) bump(s, "netTurns");
+    if (!info.blackout && !info.shelter && s.structures.some((st) => isActive(st) && st.kind === "isru")) bump(s, "oxygenTurns");
     if (s.env.sunFactor <= 0.1 && s.structures.some((st) => st.health < 30 && defOf(moon, st.kind) && !hasTrait(moon, st, "overlay"))) {
       s.flags.nightBad = 1;
     }
@@ -405,4 +418,4 @@ function structuresTerrainLabel(t: string): string {
   return moon.terrains.find((x) => x.id === t)?.label ?? t;
 }
 
-export const moonSources = [DONKI, DSN_NOW, LRO, LCROSS_WATER, POLAR_ILLUMINATION, VEGGIE, CUBESAT_101];
+export const moonSources = [DONKI, DSN_NOW, LRO, LCROSS_WATER, POLAR_ILLUMINATION, VEGGIE, LEAF, PAD_SINTERING, REGOLITH_OXYGEN, CUBESAT_101];
