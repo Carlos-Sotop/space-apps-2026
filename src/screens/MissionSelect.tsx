@@ -1,4 +1,4 @@
-import { Suspense, lazy, useMemo, useState, type ReactNode } from "react";
+import { Suspense, lazy, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Badge, GlassCard, Icon, InfoButton, LiveBadge, hasIcon, type IconName } from "@/components/ui";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { TopBar } from "@/components/hud/TopBar";
@@ -11,6 +11,16 @@ import { hasWebgl } from "@/three/missions/webgl";
  * sit in the cards, and the canvas they are painted into. Until it arrives the SVG shows.
  */
 const MissionSceneView = lazy(() => import("@/three/missions/MissionScenes").then((m) => ({ default: m.MissionSceneView })));
+/** Card order on screen: the Moon, the hardest and the headline, sits in the middle. */
+const ORDER = ["orbital-lab", "moon-base-zero", "earth-guardian"];
+const rank = (id: string) => (ORDER.indexOf(id) + ORDER.length + 1) % (ORDER.length + 1);
+
+/** Rendered by the error boundary when the 3D canvas fails: tells the cards to show their SVG art. */
+function SceneFailed({ onFail }: { onFail: () => void }) {
+  useEffect(onFail, [onFail]);
+  return null;
+}
+
 const MissionSceneCanvas = lazy(() => import("@/three/missions/MissionScenes").then((m) => ({ default: m.MissionSceneCanvas })));
 import { useCatalog, useGame } from "@/store/game";
 import { useLiveRoute } from "@/live/useLive";
@@ -155,12 +165,17 @@ export default function MissionSelect() {
   const webgl = useMemo(hasWebgl, []);
   /** the card the pointer or the keyboard is on: it dollies its camera in and lifts */
   const [active, setActive] = useState<string | null>(null);
+  /** the 3D canvas crashed: fall back to the SVG art on every card */
+  const [sceneFailed, setSceneFailed] = useState(false);
+  const missions = useMemo(() => [...catalog.missions].sort((a, b) => rank(a.id) - rank(b.id)), [catalog.missions]);
+  const art = !webgl || sceneFailed;
+  const markFailed = useMemo(() => () => setSceneFailed(true), []);
 
   return (
     <div className="pb-10">
       <TopBar title="Choose a mission" onBack={() => go("intro")} />
       <div data-coach="missions.cards" className="mx-auto grid max-w-7xl gap-4 px-4 sm:px-6 lg:grid-cols-3 lg:gap-5">
-        {catalog.missions.map((m, i) => {
+        {missions.map((m, i) => {
           const line = liveLine(m.id, iss.altitudeKm, live?.moonDistanceKm, live?.earthEvents.length);
           const orbit = m.destinations[0]?.orbitClass;
           const on = active === m.id;
@@ -179,10 +194,11 @@ export default function MissionSelect() {
               onBlur={() => setActive((c) => (c === m.id ? null : c))}
             >
               <div className="flex h-full flex-col">
-              {/* the scene paints over this SVG; the SVG is what remains without WebGL */}
-              <div className="relative h-44 shrink-0 overflow-hidden border-b border-line sm:h-52 lg:h-auto lg:flex-1 lg:min-h-[14rem]">
-                <MissionArt id={m.id} />
-                {webgl && (
+              {/* with WebGL the 3D scene is the only art, over a dark backdrop, so the old drawing never flashes in first;
+                  the SVG art is what you get without WebGL or when the scene fails */}
+              <div className="relative h-44 shrink-0 overflow-hidden border-b border-line bg-[#05060f] sm:h-52 lg:h-auto lg:flex-1 lg:min-h-[14rem]">
+                {art && <MissionArt id={m.id} />}
+                {!art && (
                   <Suspense fallback={null}>
                     <MissionSceneView id={m.id} active={on} index={i + 1} />
                   </Suspense>
@@ -231,7 +247,7 @@ export default function MissionSelect() {
         })}
       </div>
       {webgl && (
-        <ErrorBoundary fallback={null}>
+        <ErrorBoundary fallback={<SceneFailed onFail={markFailed} />}>
           <Suspense fallback={null}>
             <MissionSceneCanvas />
           </Suspense>
