@@ -7,6 +7,7 @@ import {
   HOURS_PER_TURN,
   type OpsAction,
   type OpsCtx,
+  type OpsEffect,
   type OpsEventCard,
   type OpsGoal,
   type OpsInit,
@@ -15,6 +16,7 @@ import {
   type StructureKind,
   type Tile,
 } from "./types";
+import { warningsFor } from "./warnings";
 import {
   addLog,
   bump,
@@ -264,11 +266,13 @@ export function whyNot(s: OpsState, a: OpsAction, _ctx: OpsCtx): string | null {
       const need = sc.scout.needsTrait;
       if (need) {
         if (need === "rover" && flag(s, "stuck") === s.turn) return "The rover is stuck this turn.";
+        // a working rover can scout any tile; other scouts (an imager over its region) need to be in range
+        const range = need === "rover" ? Infinity : sc.scout.range;
         const near = s.structures.some((st) => {
           const t = tileById(s, st.tileId);
-          return isActive(st) && hasTrait(sc, st, need) && !!t && hexDist(t, tile) <= sc.scout.range;
+          return isActive(st) && hasTrait(sc, st, need) && !!t && hexDist(t, tile) <= range;
         });
-        if (!near) return cut(`Needs a working ${need} within ${sc.scout.range} tiles.`);
+        if (!near) return cut(need === "rover" ? "Deploy a rover first." : `Needs a working ${need} within ${sc.scout.range} tiles.`);
       }
       return needAp(1);
     }
@@ -280,6 +284,29 @@ export function whyNot(s: OpsState, a: OpsAction, _ctx: OpsCtx): string | null {
     }
   }
   return null;
+}
+
+/** Action points each action costs: the UI shows this on every action card. Toggling and advancing are free. */
+export function apCost(s: OpsState, a: OpsAction): number {
+  const sc = getScenario(s.missionId);
+  switch (a.type) {
+    case "deploy":
+    case "move":
+    case "research":
+    case "scout":
+    case "repair":
+      return 1;
+    case "build":
+      return defOf(sc, a.kind)?.buildCost?.ap ?? 1;
+    case "choose": {
+      const card = s.pendingEvent;
+      if (!card) return 0;
+      if (card.id.startsWith("storm-")) return a.optionId === "shelter" && sc.stormMode === "crew" ? 1 : 0;
+      return eventDef(sc, card)?.options.find((o) => o.id === a.optionId)?.needsAp ?? 0;
+    }
+    default:
+      return 0;
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -384,7 +411,22 @@ function reveal(s: OpsState, sc: OpsScenario, goalId: string, tile: Tile): void 
   if (!g || g.done) return;
   g.hidden = false;
   award(s, g);
+  const before = s.science;
   sc.onDiscover?.(goalId, tile, s);
+  credit(s, s.science - before);
+  (s.turnEffects ??= []).push({ kind: "discovery", tileId: tile.id, goalId }, { kind: "goal-done", goalId });
+}
+
+/** Science the player earns also lands in the science points they see and spend. */
+function credit(s: OpsState, gained: number): void {
+  if (gained !== 0) s.sciencePoints = Math.max(0, s.sciencePoints + gained);
+}
+
+/** Health a structure lost, kept per cause for the hub so a loss can say why. */
+function hurt(s: OpsState, sc: OpsScenario, st: Structure, amount: number, cause: string): void {
+  const before = st.health;
+  st.health = Math.max(0, st.health - amount);
+  if (st.kind === sc.hubKind && before > st.health) bump(s, `hubHurt:${cause}`, before - st.health);
 }
 
 function eventRng(s: OpsState): () => number {
@@ -403,7 +445,16 @@ function choose(s: OpsState, sc: OpsScenario, ctx: OpsCtx, optionId: string): vo
   }
   const def = eventDef(sc, card)?.options.find((o) => o.id === optionId);
   if (def?.needsAp) spend(s, def.needsAp);
+  const health = new Map(s.structures.map((st) => [st.id, st.health]));
+  const science = s.science;
   def?.apply({ s, ctx, rng: eventRng(s) });
+  credit(s, s.science - science);
+  const hit = s.structures.filter((st) => st.health < (health.get(st.id) ?? st.health));
+  if (hit.length) {
+    const dmg = Math.max(...hit.map((st) => (health.get(st.id) ?? 0) - st.health));
+    for (const st of hit) if (st.kind === sc.hubKind) bump(s, `hubHurt:${card.title.toLowerCase()}`, (health.get(st.id) ?? 0) - st.health);
+    (s.turnEffects ??= []).push({ kind: "impact", tileId: hit[0]!.tileId, hitIds: hit.map((st) => st.id), damage: Math.round(dmg) });
+  }
   addLog(s, "info", `${card.title}: ${opt?.label ?? optionId}`);
 }
 
@@ -471,7 +522,27 @@ function updateGoals(s: OpsState, sc: OpsScenario, ctx: OpsCtx): void {
 /* One turn                                                            */
 /* ------------------------------------------------------------------ */
 
-function advance(s: OpsState, sc: OpsScenario, ctx: OpsCtx): void {
+const CAUSE_WORDS: Record<string, string> = { cold: "the cold", supplies: "running out of supplies", storm: "the storm", wear: "wear" };
+
+/** Why the outpost was lost, as a short chain of causes the player can act on next time. */
+function lossReason(s: OpsState, sc: OpsScenario, hub: Structure | undefined, frozen: boolean): string {
+  const name = sc.hubLabel.toLowerCase();
+  if (frozen) {
+    const sun = s.env.sunFactor;
+    const why = sun <= 0.1 ? `Night fell and solar power dropped to ${Math.round(sun * 100)}%` : sun < 1 ? "The Sun was low" : "Power use stayed above what you generate";
+    const heater = s.structures.some((st) => isActive(st) && hasTrait(sc, st, "heater"));
+    return `${why}, the batteries ran empty, and the ${name} froze for two turns${heater ? "" : " with no heater"}.`;
+  }
+  const causes = Object.entries(s.flags)
+    .filter(([k, v]) => k.startsWith("hubHurt:") && v > 0)
+    .map(([k, v]) => ({ cause: k.slice("hubHurt:".length), v }))
+    .sort((a, b) => b.v - a.v)
+    .map(({ cause, v }) => `${CAUSE_WORDS[cause] ?? cause} took ${Math.round(v)}`);
+  const label = hub ? (defOf(sc, hub.kind)?.label ?? sc.hubLabel).toLowerCase() : name;
+  return causes.length ? `The ${label} broke down: ${causes.join(", ")} health, and it was not repaired in time.` : `The ${label} broke down.`;
+}
+
+function advance(s: OpsState, sc: OpsScenario, ctx: OpsCtx, preview = false): void {
   const { catalog } = ctx;
   const env = s.env;
   const fx = effectsOf(s, sc);
@@ -484,6 +555,13 @@ function advance(s: OpsState, sc: OpsScenario, ctx: OpsCtx): void {
   const label = (st: Structure) => defOf(sc, st.kind)?.label ?? st.kind;
   const trait = (st: Structure, t: string) => hasTrait(sc, st, t);
 
+  // the report: what changes this turn, in the order it happens
+  const played = s.turn;
+  const before = { energyWh: s.energyWh, waterKg: s.waterKg, dataStoredGb: s.dataStoredGb, dataReturnedGb: s.dataReturnedGb, sciencePoints: s.sciencePoints };
+  const doneBefore = new Set(s.goals.filter((g) => g.done).map((g) => g.id));
+  const effects: OpsEffect[] = [{ kind: "daylight", sunFactor: env.sunFactor, earthUp: env.earthUp }, ...(s.turnEffects ?? [])];
+  s.turnEffects = [];
+
   recomputeStorage(s, sc, ctx);
 
   // 2. power
@@ -494,6 +572,7 @@ function advance(s: OpsState, sc: OpsScenario, ctx: OpsCtx): void {
   const drawW = (st: Structure) => (isActive(st) ? statsOf(st, sc, catalog).powerW * (fx.powerMulKind[st.kind] ?? 1) : 0);
   const generatedW = s.structures.reduce((a, st) => a + gen(st), 0);
   let usedW = s.structures.reduce((a, st) => a + drawW(st), 0);
+  const switchedOff: string[] = [];
   while (s.energyWh + (generatedW - usedW) * H < 0) {
     const cand = s.structures
       .filter((st) => drawW(st) > 0 && !trait(st, "hub"))
@@ -501,6 +580,7 @@ function advance(s: OpsState, sc: OpsScenario, ctx: OpsCtx): void {
     if (!cand) break;
     usedW -= drawW(cand);
     cand.on = false;
+    switchedOff.push(cand.id);
     addLog(s, "warning", `Power short: ${label(cand)} switched off.`);
   }
   const netWh = (generatedW - usedW) * H;
@@ -509,12 +589,14 @@ function advance(s: OpsState, sc: OpsScenario, ctx: OpsCtx): void {
     blackout = true;
     s.energyWh = 0;
     s.frozenTurns += 1;
-    for (const st of s.structures) if (st.health > 0 && !heated(s, sc, st)) st.health = Math.max(0, st.health - FREEZE_DAMAGE);
+    for (const st of s.structures) if (st.health > 0 && !heated(s, sc, st)) hurt(s, sc, st, FREEZE_DAMAGE, "cold");
     addLog(s, "failure", "No power: systems without a heater are freezing.");
   } else {
     s.energyWh = Math.min(s.storageWh, s.energyWh + netWh);
     s.frozenTurns = 0;
   }
+  if (switchedOff.length || blackout)
+    effects.push({ kind: "power-out", structureIds: blackout ? s.structures.filter((st) => isActive(st) && !trait(st, "overlay")).map((st) => st.id) : switchedOff });
   if (generatedW > 0) s.flags.generating = 1;
   bump(s, "generatedWh", generatedW * H);
   bump(s, "usedWh", usedW * H);
@@ -532,7 +614,7 @@ function advance(s: OpsState, sc: OpsScenario, ctx: OpsCtx): void {
         s.waterKg -= need;
         supplied.add(st.id);
       } else if (trait(st, "hub")) {
-        st.health = Math.max(0, st.health - 20);
+        hurt(s, sc, st, 20, "supplies");
         addLog(s, "failure", `Out of ${sc.consumable.label.toLowerCase()}: the ${label(st).toLowerCase()} is losing health.`);
       }
     }
@@ -543,7 +625,7 @@ function advance(s: OpsState, sc: OpsScenario, ctx: OpsCtx): void {
     return !blackout && !shelter && isActive(st) && (!d?.consumeKgPerTurn || supplied.has(st.id)) && !(stuck && trait(st, "rover"));
   };
 
-  // growth and science per turn
+  // growth and science per turn: each producer adds to the science points the player sees
   for (const st of s.structures) {
     const d = defOf(sc, st.kind);
     if (!d) continue;
@@ -551,7 +633,11 @@ function advance(s: OpsState, sc: OpsScenario, ctx: OpsCtx): void {
       st.streak = working(st) ? (st.streak ?? 0) + 1 : 0;
     }
     const grown = !d.growth || (st.streak ?? 0) >= d.growth.turns;
-    if (d.sciencePerTurn && working(st) && grown) s.science += d.sciencePerTurn;
+    if (d.sciencePerTurn && working(st) && grown) {
+      s.science += d.sciencePerTurn;
+      credit(s, d.sciencePerTurn);
+      effects.push({ kind: "science", points: d.sciencePerTurn, fromIds: [st.id] });
+    }
   }
 
   // 4. data
@@ -581,6 +667,7 @@ function advance(s: OpsState, sc: OpsScenario, ctx: OpsCtx): void {
   }
   let capacity = 0;
   let linked = false;
+  const links: { id: string; gb: number }[] = [];
   const noDirect = flag(s, "noDte") === s.turn;
   const halved = !!env.storm && choice === 2 && sc.stormMode === "downlink" ? 0.5 : 1;
   if (!blackout) {
@@ -590,40 +677,62 @@ function advance(s: OpsState, sc: OpsScenario, ctx: OpsCtx): void {
       const direct = trait(st, "direct") && !noDirect && env.earthSignal + tileOf(st).earthView >= 0.5;
       if (!relay && !direct) continue;
       linked = true;
-      capacity += statsOf(st, sc, catalog).downlinkGbPerDay * DAYS_PER_TURN * env.dsnFactor * fx.downlinkMul * (st.health / 100) * halved;
+      const gb = statsOf(st, sc, catalog).downlinkGbPerDay * DAYS_PER_TURN * env.dsnFactor * fx.downlinkMul * (st.health / 100) * halved;
+      capacity += gb;
+      links.push({ id: st.id, gb });
     }
   }
   const sent = Math.min(s.dataStoredGb, capacity);
   s.dataStoredGb -= sent;
   s.dataReturnedGb += sent;
+  if (sent > 0) for (const l of links) if (l.gb > 0) effects.push({ kind: "downlink", gb: (sent * l.gb) / capacity, fromId: l.id });
   const pts = (s.flags.gbCarry ?? 0) + sent / sc.gbPerSciencePoint;
-  s.sciencePoints += Math.floor(pts);
-  s.flags.gbCarry = pts - Math.floor(pts);
+  const whole = Math.floor(pts);
+  s.sciencePoints += whole;
+  s.flags.gbCarry = pts - whole;
+  const sources = Object.keys(produced).filter((id) => (produced[id] ?? 0) > 0);
+  if (whole > 0) effects.push({ kind: "science", points: whole, fromIds: sources.length ? sources : links.map((l) => l.id) });
   if (sent > 0) addLog(s, "info", `${Math.round(sent)} Gb reached Earth.`);
 
+  const scienceBefore = s.science;
   sc.onTurn?.(s, ctx, { produced, shelter, blackout });
 
-  // 5. storm
+  // 5. storm: the report names who was hit and who a shield protected
   if (env.storm) {
+    let hitIds: string[] = [];
+    let shieldedIds: string[] = [];
     if (choice === 2 && sc.stormMode !== "downlink") {
-      const hit = s.structures.filter((st) => st.health > 0 && !shielded(s, sc, st) && (sc.stormMode !== "crew" || trait(st, "instrument")));
-      for (const st of hit) st.health = Math.max(0, st.health - sc.stormDamage * env.storm.severity);
+      const exposed = s.structures.filter((st) => st.health > 0 && (sc.stormMode !== "crew" || trait(st, "instrument")));
+      const hit = exposed.filter((st) => !shielded(s, sc, st));
+      shieldedIds = exposed.filter((st) => shielded(s, sc, st)).map((st) => st.id);
+      for (const st of hit) hurt(s, sc, st, sc.stormDamage * env.storm.severity, "storm");
+      hitIds = hit.map((st) => st.id);
       sc.onStormWork?.(s, env.storm);
       addLog(s, "warning", `The storm hurt ${hit.length} structure${hit.length === 1 ? "" : "s"}.`);
     } else if (choice === 1) {
       addLog(s, "info", "You sheltered: no damage from the storm.");
     }
+    effects.push({ kind: "storm", severity: env.storm.severity, shieldedIds, hitIds, ...(env.storm.liveSource ? { liveSource: env.storm.liveSource } : {}) });
+  }
+  const gained = s.science - scienceBefore;
+  if (gained !== 0) {
+    credit(s, gained);
+    if (gained > 0) effects.push({ kind: "science", points: gained, fromIds: sources });
   }
 
   // wear
   for (const st of s.structures) {
     if (st.health <= 0) continue;
-    const wear = HEALTH_WEAR * fx.healthLossMul * (shielded(s, sc, st) ? 0.5 : 1);
-    st.health = Math.max(0, st.health - wear);
+    hurt(s, sc, st, HEALTH_WEAR * fx.healthLossMul * (shielded(s, sc, st) ? 0.5 : 1), "wear");
   }
 
   // 7. goals
   updateGoals(s, sc, ctx);
+  for (const g of s.goals) {
+    if (!g.done || doneBefore.has(g.id)) continue;
+    effects.push({ kind: "goal-done", goalId: g.id });
+    if (Math.floor(g.points / 2) > 0) effects.push({ kind: "science", points: Math.floor(g.points / 2), fromIds: [] });
+  }
 
   // 8. history, end
   s.history.push({
@@ -639,24 +748,49 @@ function advance(s: OpsState, sc: OpsScenario, ctx: OpsCtx): void {
   const hub = hubStructure(s, sc);
   if (hub && hub.health <= 0) {
     s.status = "lost";
-    s.lostReason = `The ${label(hub).toLowerCase()} failed.`;
+    s.lostReason = lossReason(s, sc, hub, false);
   } else if (s.frozenTurns >= 2) {
     s.status = "lost";
-    s.lostReason = "No power for two turns: everything froze.";
+    s.lostReason = lossReason(s, sc, hub, true);
   }
-  if (s.status === "lost") {
-    addLog(s, "failure", s.lostReason as string);
-    return;
-  }
-  if (s.turn >= s.maxTurns) {
+  if (s.status === "lost") addLog(s, "failure", s.lostReason as string);
+  else if (s.turn >= s.maxTurns) {
     s.status = "ended";
     addLog(s, "success", "The operations phase is over.");
-    return;
+  } else {
+    s.turn += 1;
+    setEnv(s);
+    s.apPerTurn = apPerTurn(s, sc);
+    s.ap = s.apPerTurn;
+    bump(s, "apTotal", s.apPerTurn);
+    if (!preview) queueCard(s, sc, ctx, true);
   }
-  s.turn += 1;
-  setEnv(s);
-  s.apPerTurn = apPerTurn(s, sc);
-  s.ap = s.apPerTurn;
-  bump(s, "apTotal", s.apPerTurn);
-  queueCard(s, sc, ctx, true);
+
+  s.lastReport = {
+    turn: played,
+    fromDay: (played - 1) * DAYS_PER_TURN,
+    toDay: played * DAYS_PER_TURN,
+    delta: {
+      energyWh: s.energyWh - before.energyWh,
+      waterKg: s.waterKg - before.waterKg,
+      dataStoredGb: s.dataStoredGb - before.dataStoredGb,
+      dataReturnedGb: s.dataReturnedGb - before.dataReturnedGb,
+      sciencePoints: s.sciencePoints - before.sciencePoints,
+    },
+    effects,
+    warnings: preview ? [] : warningsFor(s, sc, ctx, (x) => previewState(x, ctx)),
+  };
+}
+
+/**
+ * The state after the current turn is played with no random events: a waiting card is set aside and a
+ * storm nobody has answered yet is sheltered. Pure: the input is not changed.
+ */
+export function previewState(state: OpsState, ctx: OpsCtx): OpsState {
+  const s = structuredClone(state);
+  if (s.status !== "running") return s;
+  s.pendingEvent = null;
+  if (s.env.storm && !flag(s, "stormChoice")) s.flags.stormChoice = 1;
+  advance(s, getScenario(s.missionId), ctx, true);
+  return s;
 }

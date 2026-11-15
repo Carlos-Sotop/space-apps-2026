@@ -278,14 +278,16 @@ export const moon: OpsScenario = {
     const link = dest?.earthLinkFraction ?? 0.5;
     const first = 4 + Math.floor(rng() * 5);
     const lunationTurns = 29.5 / 3;
+    // the dark lasts the site's unlit share of each 29.5-day lunation, as in the flight model: about one
+    // turn on the connecting ridge (lit 88% of the time), two at de Gerlache, four at Malapert
+    const darkLen = Math.max(1, Math.min(4, Math.round((1 - (dest?.sunlightFraction ?? 0.8)) * lunationTurns)));
     const dark = new Set<number>();
     const partial = new Set<number>();
     for (let k = 0; k < 3; k++) {
       const start = first + Math.round(k * lunationTurns);
-      dark.add(start);
-      dark.add(start + 1);
+      for (let i = 0; i < darkLen; i++) dark.add(start + i);
       partial.add(start - 1);
-      partial.add(start + 2);
+      partial.add(start + darkLen);
     }
     const psi = rng() * 2 * Math.PI;
     const storms = placeStorms(rng, live, maxTurns);
