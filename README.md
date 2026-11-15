@@ -59,12 +59,13 @@ React, React DOM (MIT) · Vite (MIT) · TypeScript (Apache-2.0) · Tailwind CSS 
 ## Audio credits
 
 - Music: "Adrift Among Infinite Stars" by Scott Buckley, www.scottbuckley.com.au, licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Trimmed and re-encoded.
+- Music in the demo videos: "Artemis" by Scott Buckley, scottbuckley.com.au, licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/).
 - Interface and sci-fi sound effects: Kenney "Interface Sounds", "Sci-fi Sounds" and "Digital Audio" packs (kenney.nl), CC0.
 - Launch sound: NASA Space Launch System engine test audio (nasa.gov), public domain. NASA does not endorse this project.
 
 ## Use of AI
 
-The team used AI assistants (Anthropic's Claude) to research sourced data, write and review code, and draft documentation. Every AI-assisted change was reviewed by a team member; commits made with Claude carry a `Co-Authored-By` line. Any AI-generated image or video in the project carries a visible "AI-generated" watermark. The SpaceDAO logo was generated with ChatGPT (OpenAI) from the team's concept; the logo files carry an "AI-generated" watermark.
+The team used AI assistants (Anthropic's Claude) to research sourced data, write and review code, and draft documentation. Every AI-assisted change was reviewed by a team member; commits made with Claude carry a `Co-Authored-By` line. Any AI-generated image or video in the project carries a visible "AI-generated" watermark. The SpaceDAO logo was generated with ChatGPT (OpenAI) from the team's concept; the logo files carry an "AI-generated" watermark. The narration in the demo videos was generated with ElevenLabs.
 
 ## License
 
