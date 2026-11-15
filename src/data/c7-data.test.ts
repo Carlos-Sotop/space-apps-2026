@@ -33,3 +33,14 @@ describe("C7 data", () => {
       for (const r of recommendedCoalitions(m, "nasa")) expect(r.partnerIds.some((id) => id === "bizu-space" || id === "visiona"), `${m.id} ${r.id}`).toBe(false);
   });
 });
+
+describe("C7 verified rockets", () => {
+  it("marks a rocket verified only with a spec card and a source beyond Wikipedia", () => {
+    const checked = catalog.launchVehicles.filter((v) => v.verified).map((v) => v.id).sort();
+    expect(checked).toEqual(["ariane-62", "ariane-64", "falcon-heavy", "falcon-heavy-expendable", "vega-c"]);
+    for (const v of catalog.launchVehicles.filter((x) => x.verified)) {
+      expect(v.specs, v.id).toBeDefined();
+      expect(v.sources.some((s) => !s.url.includes("wikipedia.org")), v.id).toBe(true);
+    }
+  });
+});

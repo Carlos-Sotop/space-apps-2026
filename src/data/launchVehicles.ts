@@ -59,7 +59,7 @@ export const launchVehicles: LaunchVehicle[] = [
     blurb: "Lands its three cores for reuse: cheaper, but lifts less.",
     specs: { heightM: 70, stages: 2, flights: 14, successes: 14, recordAsOf: "2026-11-15" }, // Wikipedia infobox read 2026-11-15; two side boosters around the core
     sources: [S_LSP, wiki("Falcon Heavy (payload, price, flights)", "Falcon_Heavy")],
-    verified: false,
+    verified: true, // every number matched 2026-11-15: payload re-run on NASA LSP, price and record on the cited page
   },
   {
     id: "falcon-heavy-expendable",
@@ -79,7 +79,7 @@ export const launchVehicles: LaunchVehicle[] = [
       { title: "NASA JPL: NASA awards launch services contract for the Europa Clipper mission (about $178 million)", url: "https://www.jpl.nasa.gov/news/nasa-awards-launch-services-contract-for-the-europa-clipper-mission/" },
       wiki("Falcon Heavy (height, stages, launch record)", "Falcon_Heavy"),
     ],
-    verified: false,
+    verified: true, // every number matched 2026-11-15: payload re-run on NASA LSP, price on NASA JPL, record on the cited page
   },
   {
     id: "starship",
@@ -159,7 +159,7 @@ export const launchVehicles: LaunchVehicle[] = [
     blurb: "Europe's launcher with two boosters, operated by Arianespace.",
     specs: { heightM: 63, stages: 2, flights: 9, successes: 8, recordAsOf: "2026-11-15" }, // Wikipedia infobox read 2026-11-15; Ariane 6 family record
     sources: [S_A6, S_A6_NUMBERS, wiki("Ariane 6 (price, flights)", "Ariane_6")],
-    verified: false,
+    verified: true, // every number matched 2026-11-15: payloads in the Ariane 6 manual and ArianeGroup page, price and record on the cited page
   },
   {
     id: "ariane-64",
@@ -179,7 +179,7 @@ export const launchVehicles: LaunchVehicle[] = [
     blurb: "Four-booster Ariane 6 for heavy loads, operated by Arianespace.",
     specs: { heightM: 63, stages: 2, flights: 9, successes: 8, recordAsOf: "2026-11-15" }, // Wikipedia infobox read 2026-11-15; Ariane 6 family record
     sources: [S_A6, S_A6_NUMBERS, wiki("Ariane 6 (price, flights)", "Ariane_6")],
-    verified: false,
+    verified: true, // every number matched 2026-11-15: payloads in the Ariane 6 manual and ArianeGroup page, price and record on the cited page
   },
   {
     id: "vega-c",
@@ -196,7 +196,7 @@ export const launchVehicles: LaunchVehicle[] = [
     blurb: "Small European launcher for Earth observation, by Arianespace.",
     specs: { heightM: 34.8, stages: 4, flights: 8, successes: 7, recordAsOf: "2026-11-15" }, // Wikipedia infobox read 2026-11-15
     sources: [S_VEGAC, S_VEGAC0, wiki("Vega C (price, flights)", "Vega_C")],
-    verified: false,
+    verified: true, // every number matched 2026-11-15: payloads in both Vega C manuals, price and record on the cited page
   },
   {
     id: "h3",
