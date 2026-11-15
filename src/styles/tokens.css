@@ -2,10 +2,11 @@
   --bg: #04050d;
   --bg-deep: #0a0b1e;
 
-  --glass: rgba(255, 255, 255, 0.04);
-  --glass-strong: rgba(255, 255, 255, 0.07);
-  --glass-border: rgba(255, 255, 255, 0.09);
-  --glass-blur: blur(16px) saturate(140%);
+  --glass: rgba(12, 14, 34, 0.72);
+  --glass-strong: rgba(12, 14, 34, 0.85);
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --glass-blur: blur(20px) saturate(160%);
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 
   --fg: #eef0ff;
   --fg-muted: #9aa0c3;
@@ -16,6 +17,8 @@
   --blue: #3b82f6;
   --blue-bright: #60a5fa;
   --cyan: #22d3ee;
+  --cyan-bright: #67e8f9;
+  --select-ring: rgba(34, 211, 238, 0.85);
   --brand-gradient: linear-gradient(90deg, #a78bfa, #60a5fa);
 
   --ok: #34d399;
@@ -23,6 +26,7 @@
   --over: #fb7185;
 
   --glow: 0 0 24px rgba(139, 92, 246, 0.35);
+  --select-glow: 0 0 0 1px var(--select-ring), 0 0 26px rgba(34, 211, 238, 0.35);
   --radius-card: 16px;
   --radius-ctl: 10px;
 
@@ -50,6 +54,7 @@
   --color-blue: var(--blue);
   --color-blue-bright: var(--blue-bright);
   --color-cyan: var(--cyan);
+  --color-cyan-bright: var(--cyan-bright);
   --color-ok: var(--ok);
   --color-tight: var(--tight);
   --color-over: var(--over);
@@ -59,4 +64,5 @@
   --radius-card: var(--radius-card);
   --radius-ctl: var(--radius-ctl);
   --shadow-glow: var(--glow);
+  --shadow-select: var(--select-glow);
 }

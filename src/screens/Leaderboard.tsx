@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { TopBar } from "@/components/hud/TopBar";
-import { Badge, Button, Icon, MonogramBadge } from "@/components/ui";
+import { Badge, Button, Flag, Icon, MonogramBadge } from "@/components/ui";
 import { catalog } from "@/data";
 import type { MissionId } from "@/engine/types";
-import { countryFlag, countryName, fetchLeaderboard } from "@/lib/leaderboard";
+import { countryName, fetchLeaderboard } from "@/lib/leaderboard";
 import { getActor } from "@/lib/catalog";
 import type { ScoreRow } from "@/leaderboard/types";
 import { useGame } from "@/store/game";
@@ -19,7 +19,7 @@ function Row({ row, rank }: { row: ScoreRow; rank: number }) {
     <li className="glass overflow-hidden">
       <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="flex w-full items-center gap-3 p-3 text-left sm:gap-4 sm:p-4">
         <span className={`num w-7 shrink-0 text-center text-lg ${rank <= 3 ? "text-tight" : "text-muted"}`}>{rank}</span>
-        <span className="text-xl" title={countryName(row.country)} aria-label={countryName(row.country)}>{countryFlag(row.country)}</span>
+        <span title={countryName(row.country)}><Flag code={row.country} size={28} /></span>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <span className="truncate font-medium">{row.playerName}</span>
@@ -78,7 +78,7 @@ export default function Leaderboard() {
 
   return (
     <div className="pb-12">
-      <TopBar title="Global ranking" onBack={() => go("intro")} backLabel="Back to start" />
+      <TopBar title="Global leaderboard" onBack={() => go("intro")} backLabel="Back to start" />
       <div className="mx-auto max-w-4xl space-y-4 px-4 sm:px-6">
         <p className="m-0 text-sm text-muted">Every score is checked: the server replays the mission with the same design, seed and decisions before it counts.</p>
         <div className="flex flex-wrap gap-2" role="tablist" aria-label="Mission">
@@ -95,7 +95,7 @@ export default function Leaderboard() {
         ) : (
           <div className="glass grid place-items-center gap-3 p-10 text-center">
             <Icon name="trophy" size={36} className="text-violet-bright" />
-            <p className="m-0 text-muted">{offline ? "The ranking is offline right now. Your game still works." : "No missions here yet. Be the first."}</p>
+            <p className="m-0 text-muted">{offline ? "The leaderboard is offline right now. Your game still works." : "No missions here yet. Be the first."}</p>
             <Button variant="primary" onClick={() => go("missions")}>Fly a mission</Button>
           </div>
         )}

@@ -1,27 +1,26 @@
 import type { Actor } from "@/engine/types";
+import { Flag } from "./Flag";
 
 interface Props {
-  actor?: Pick<Actor, "shortName" | "color" | "flag">;
+  actor?: Pick<Actor, "shortName" | "color" | "country">;
   /** used when the actor is missing from the catalog */
   fallbackName?: string;
   size?: number;
+  /** kept for API compatibility; the flag is always the badge itself */
   showFlag?: boolean;
+  /** render the actor's short name next to the flag */
+  showName?: boolean;
 }
 
-/** Circle with the actor's initials in its color plus a flag emoji. Replaces logos, which the rules forbid. */
-export function MonogramBadge({ actor, fallbackName = "?", size = 44, showFlag = true }: Props) {
+/** Rounded SVG flag with the actor color as a thin ring. Replaces logos and letter monograms, which the rules forbid. */
+export function MonogramBadge({ actor, fallbackName = "?", size = 44, showName = false }: Props) {
   const color = actor?.color ?? "#8b93c9";
-  const text = (actor?.shortName ?? fallbackName).replace(/[^A-Za-z0-9]/g, "").slice(0, 2).toUpperCase();
+  const badge = <Flag code={actor?.country} size={size} ring={color} className="m-[1.5px]" />;
+  if (!showName) return badge;
   return (
-    <span className="relative inline-flex shrink-0 items-center justify-center rounded-full font-display" style={{
-      width: size, height: size, fontSize: size * 0.32, letterSpacing: "0.04em",
-      color, background: `color-mix(in srgb, ${color} 16%, transparent)`, border: `1.5px solid color-mix(in srgb, ${color} 70%, transparent)`,
-      boxShadow: `0 0 ${size / 3}px color-mix(in srgb, ${color} 25%, transparent)`,
-    }}>
-      {text}
-      {showFlag && actor?.flag && (
-        <span className="absolute -bottom-1 -right-1 rounded-full bg-bg/90 leading-none" style={{ fontSize: size * 0.34, padding: 1 }} aria-hidden="true">{actor.flag}</span>
-      )}
+    <span className="inline-flex min-w-0 items-center gap-2">
+      {badge}
+      <span className="truncate font-display text-xs">{actor?.shortName ?? fallbackName}</span>
     </span>
   );
 }

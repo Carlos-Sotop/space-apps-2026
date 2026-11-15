@@ -48,9 +48,9 @@ function EnvStrip({ s, turnLabel }: { s: OpsState; turnLabel: string }) {
         <div key={e.turn} className={`min-w-[64px] flex-1 rounded-xl border p-2 text-center text-[11px] ${i === 0 ? "border-violet-bright/60 bg-violet/10" : "border-line bg-white/[0.02]"}`}>
           <div className="text-faint">{i === 0 ? "Now" : `${turnLabel} ${e.turn}`}</div>
           <div className="mt-1 flex justify-center gap-1.5">
-            <span title={`Sun ${pct(e.sunFactor)}`} style={{ color: e.sunFactor > 0.6 ? "#fbbf24" : e.sunFactor > 0.25 ? "#a16207" : "#475569" }}>☀</span>
-            <span title={e.earthUp ? "Earth in view" : "Earth below the horizon"} style={{ color: e.earthUp ? "#60a5fa" : "#334155" }}>◐</span>
-            {e.storm && <span title={e.storm.note} className="text-over">⚡</span>}
+            <span title={`Sun ${pct(e.sunFactor)}`} style={{ color: e.sunFactor > 0.6 ? "#fbbf24" : e.sunFactor > 0.25 ? "#a16207" : "#475569" }}><Icon name="sun" size={14} /></span>
+            <span title={e.earthUp ? "Earth in view" : "Earth below the horizon"} style={{ color: e.earthUp ? "#60a5fa" : "#334155" }}><Icon name="earth" size={14} /></span>
+            {e.storm && <span title={e.storm.note} className="text-over"><Icon name="storm" size={14} /></span>}
           </div>
           <div className="num mt-0.5 text-faint" title="Share of the downlink network free for us">{link} {pct(e.dsnFactor)}</div>
         </div>
@@ -174,7 +174,7 @@ export default function OpsScreen() {
                 <button type="button" className="ml-1 text-muted hover:text-fg" onClick={() => setPending(null)} aria-label="Cancel"><Icon name="x" size={14} /></button>
               </div>
             ) : <span />}
-            {ops.env.storm && <div className="glass px-3 py-2 text-sm text-over">⚡ {ops.env.storm.note}</div>}
+            {ops.env.storm && <div className="glass px-3 py-2 text-sm text-over"><Icon name="storm" size={16} className="mr-1.5 inline align-text-bottom" />{ops.env.storm.note}</div>}
           </div>
           {selTile && !pending && (
             <div className="glass absolute inset-x-3 bottom-3 p-3 text-sm sm:right-auto sm:max-w-sm">
@@ -184,7 +184,7 @@ export default function OpsScreen() {
               </div>
               <div className="text-xs text-muted">{sc.terrains.find((t) => t.id === selTile.terrain)?.blurb}</div>
               <div className="num mt-1 text-[11px] text-faint">Sun {pct(selTile.sun)} · Earth view {selTile.earthView >= 0 ? "+" : ""}{pct(selTile.earthView)}{selTile.iceKgPerTurn > 0 ? ` · ice ${selTile.iceKgPerTurn} kg/turn` : ""}</div>
-              {selTile.liveEvent && <a className="mt-1 block text-xs text-tight hover:underline" href={selTile.liveEvent.source.url} target="_blank" rel="noreferrer">● Live: {selTile.liveEvent.title}</a>}
+              {selTile.liveEvent && <a className="mt-1 block text-xs text-tight hover:underline" href={selTile.liveEvent.source.url} target="_blank" rel="noreferrer"><Icon name="dot" size={12} className="mr-1 inline align-text-bottom" />Live: {selTile.liveEvent.title}</a>}
               {selStructs.map((st) => {
                 const d = defOf(st.kind);
                 return (
@@ -263,7 +263,7 @@ export default function OpsScreen() {
                   return (
                     <li key={r.id}>
                       <button type="button" disabled={r.unlocked || ended || !!blocked} onClick={() => act({ type: "research", id: r.id })} className={`w-full rounded-xl border p-2.5 text-left transition ${r.unlocked ? "border-ok/50 bg-ok/10" : "border-line bg-white/[0.03] hover:border-violet-bright/60"} disabled:cursor-default`}>
-                        <div className="flex justify-between text-sm"><span>{r.unlocked ? "✓ " : ""}{r.title}</span><span className="num text-xs text-faint">{r.cost} pts</span></div>
+                        <div className="flex justify-between text-sm"><span className="inline-flex items-center gap-1">{r.unlocked && <Icon name="check" size={14} className="text-ok" />}{r.title}</span><span className="num text-xs text-faint">{r.cost} pts</span></div>
                         <div className="text-xs text-muted">{r.blurb}</div>
                       </button>
                     </li>
@@ -308,7 +308,7 @@ export default function OpsScreen() {
               <div className="text-[11px] uppercase tracking-wider text-tight">{sc.turnLabel} {ops.turn} · Decision</div>
               <h2 className="font-display mt-1 text-lg">{ops.pendingEvent.title}</h2>
               <p className="text-sm text-fg/90">{ops.pendingEvent.text}</p>
-              {ops.pendingEvent.liveSource && <a href={ops.pendingEvent.liveSource.url} target="_blank" rel="noreferrer" className="text-xs text-cyan hover:underline">● Live NASA data: {ops.pendingEvent.liveSource.title}</a>}
+              {ops.pendingEvent.liveSource && <a href={ops.pendingEvent.liveSource.url} target="_blank" rel="noreferrer" className="text-xs text-cyan hover:underline"><Icon name="dot" size={12} className="mr-1 inline align-text-bottom" />Live NASA data: {ops.pendingEvent.liveSource.title}</a>}
               <div className="mt-4 grid gap-2">
                 {ops.pendingEvent.options.map((o) => (
                   <button key={o.id} type="button" onClick={() => act({ type: "choose", eventId: ops.pendingEvent!.id, optionId: o.id })} className="rounded-xl border border-line bg-white/[0.04] p-3 text-left transition hover:border-violet-bright/70">

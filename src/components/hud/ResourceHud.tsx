@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { computeResources, validateDesign } from "@/engine";
 import type { Issue, MissionDesign, ResourceKey } from "@/engine/types";
 import { Gauge } from "@/components/ui/Gauge";
@@ -22,28 +22,43 @@ export function useIssues(design: MissionDesign): Issue[] {
   return useMemo(() => validateDesign(design, catalog), [design, catalog]);
 }
 
-/** Blockers (red) and warnings (amber) as small chips. The fix shows on hover or focus. */
+/** Compact count chip that expands into a panel with every issue in full, plus how to fix it. */
 export function IssueChips({ issues }: { issues: Issue[] }) {
+  const [open, setOpen] = useState(false);
   if (!issues.length) {
     return (
       <div className="flex items-center gap-1.5 text-xs text-ok"><Icon name="check" size={14} /> No issues, ready for review</div>
     );
   }
   const sorted = [...issues].sort((a, b) => (a.severity === b.severity ? 0 : a.severity === "blocker" ? -1 : 1));
+  const blockers = sorted.filter((i) => i.severity === "blocker").length;
+  const warnings = sorted.length - blockers;
+  const chip = (n: number, one: string, many: string, cls: string, icon: "x" | "warning") => n > 0 && (
+    <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs ${cls}`}><Icon name={icon} size={13} /> {n} {n === 1 ? one : many}</span>
+  );
   return (
-    <ul className="flex flex-wrap gap-1.5">
-      {sorted.map((i) => {
-        const blocker = i.severity === "blocker";
-        return (
-          <li key={i.id} tabIndex={0} className={`group relative max-w-full cursor-help rounded-full border px-2.5 py-0.5 text-xs ${blocker ? "border-over/50 bg-over/10 text-over" : "border-tight/40 bg-tight/10 text-tight"}`}>
-            <span className="inline-block max-w-[70vw] truncate align-bottom sm:max-w-sm">{blocker ? "Blocker" : "Warning"}: {i.text}</span>
-            <span role="tooltip" className="pointer-events-none absolute left-0 top-full z-40 mt-1.5 hidden w-64 max-w-[80vw] rounded-xl border border-line bg-[#0d0f26]/95 p-3 text-xs text-fg shadow-2xl group-hover:block group-focus-visible:block">
-              <span className="mb-1 block text-[10px] uppercase tracking-widest text-faint">How to fix</span>
-              {i.fix}
-            </span>
-          </li>
-        );
-      })}
-    </ul>
+    <div className="w-full" data-coach="control.issues">
+      <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} className="flex flex-wrap items-center gap-1.5 rounded-full text-left">
+        {chip(blockers, "blocker", "blockers", "border-over/50 bg-over/10 text-over", "x")}
+        {chip(warnings, "warning", "warnings", "border-tight/40 bg-tight/10 text-tight", "warning")}
+        <Icon name={open ? "minus" : "plus"} size={14} className="text-muted" />
+      </button>
+      {open && (
+        <ul className="glass mt-2 space-y-2.5 p-3">
+          {sorted.map((i) => {
+            const blocker = i.severity === "blocker";
+            return (
+              <li key={i.id} className="flex items-start gap-2.5 text-sm">
+                <Icon name={blocker ? "x" : "warning"} size={16} className={`mt-0.5 shrink-0 ${blocker ? "text-over" : "text-tight"}`} />
+                <div className="min-w-0">
+                  <div className="text-fg">{i.text}</div>
+                  <div className="mt-0.5 text-xs text-muted">Fix: {i.fix}</div>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
   );
 }

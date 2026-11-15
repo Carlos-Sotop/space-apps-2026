@@ -18,14 +18,18 @@ body {
 
 * { box-sizing: border-box; }
 
+@layer components {
 .glass {
   background: var(--glass);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-card);
+  box-shadow: var(--glass-highlight);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
 }
 .glass-strong { background: var(--glass-strong); }
+}
+
 
 .font-display { font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.08em; }
 .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }

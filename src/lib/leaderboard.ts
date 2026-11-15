@@ -22,12 +22,6 @@ export async function submitScore(sub: ScoreSubmission): Promise<{ row: ScoreRow
   return { row: body.row, rank: body.rank ?? 0 };
 }
 
-/** ISO alpha-2 → flag emoji; "INT" → globe. */
-export function countryFlag(code: string | null): string {
-  if (!code || code === "INT") return "🌐";
-  return String.fromCodePoint(...[...code.toUpperCase()].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65));
-}
-
 const regionNames = (() => {
   try { return new Intl.DisplayNames(["en"], { type: "region" }); } catch { return null; }
 })();
