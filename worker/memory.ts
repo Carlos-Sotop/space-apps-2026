@@ -1,6 +1,7 @@
-// Per-isolate memory for the live answers. The Workers Cache API does nothing on *.workers.dev (Cloudflare docs:
-// "any *.workers.dev deployments will have no impact"), and production runs on spacedao.dayon-x.workers.dev, so
-// without this every page load called NASA. Keyed by path only, so query strings cannot grow it.
+// Per-isolate memory for the live answers, in front of the Workers Cache API. A Cloudflare docs page says the Cache API
+// has no effect on *.workers.dev, where production runs, but production served a cached space-weather answer across
+// a fresh deploy (2026-11-15), so both layers stay: memory answers without a cache round trip either way.
+// Keyed by path only, so query strings cannot grow it.
 const entries = new Map<string, { until: number; body: string }>();
 
 export function recall(path: string, now: number): { body: string; ttlLeftS: number } | null {
