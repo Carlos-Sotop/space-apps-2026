@@ -1,3 +1,4 @@
+import { MAX_SECONDARY } from "./types";
 import type {
   Actor,
   Capability,
@@ -6,6 +7,7 @@ import type {
   DesignPatch,
   DesignStep,
   Domain,
+  Forecast,
   Issue,
   MissionDesign,
   Module,
@@ -17,6 +19,7 @@ import type {
   Values,
 } from "./types";
 import { designMoves, fmt, getActor, getMission, strongCapabilities, type DesignMove } from "./design";
+import { forecast } from "./forecast";
 import { computeResources } from "./resources";
 import { validateDesign } from "./validate";
 
@@ -302,6 +305,8 @@ function reliabilityDrop(t: Tried, design: MissionDesign, catalog: Catalog): num
 interface Fix {
   text: string;
   rank: number;
+  /** the changed design behind the text */
+  tried: Tried;
 }
 
 /**
@@ -334,7 +339,7 @@ function rankedFixes(issue: Issue, ctx: ReviewContext, who: Actor): Fix[] {
   const clearing = (list: Tried[]) =>
     list
       .filter((t) => !t.issues.some((i) => i.id === issue.id) && !newBlocker(t) && better(t))
-      .map((t) => ({ text: label(t), rank: rankOf(t), id: t.move.id }))
+      .map((t) => ({ text: label(t), rank: rankOf(t), id: t.move.id, tried: t }))
       .sort((a, b) => a.rank - b.rank || a.id.localeCompare(b.id));
   const single = clearing(singles);
   if (single.length) return single;
@@ -350,7 +355,7 @@ function rankedFixes(issue: Issue, ctx: ReviewContext, who: Actor): Fix[] {
     .map((t) => ({ t, g: gap(issue, t.issues, t.rep) ?? now }))
     .filter(({ t, g }) => trims(t) && g <= now * 0.75 && t.issues.every((i) => known.has(i.id)))
     .sort((a, b) => a.g - b.g || a.t.move.id.localeCompare(b.t.move.id))
-    .map(({ t, g }) => ({ text: label(t, true), rank: g }));
+    .map(({ t, g }) => ({ text: label(t, true), rank: g, tried: t }));
 }
 
 /** When no change helps, say why in a few words. */
@@ -508,5 +513,517 @@ export function councilReview(design: MissionDesign, catalog: Catalog): Review[]
       message = `${voice.approve} ${sentence(resourceFact(key, rep))}.${idea ? ` ${sentence(idea)}.` : ""}`;
     }
     return { actorId: actor.id, verdict, message, issueIds: cited.map((i) => i.id) };
+  });
+}
+
+/* ------------------------------------------------------------------ */
+/* Go / No-Go readiness review (Sunday sprint C2)                      */
+/* ------------------------------------------------------------------ */
+// Modeled on NASA's pre-launch readiness reviews and the commit-to-launch poll: every seat runs its
+// checks on the engine's real numbers and answers GO, GO IF (a condition) or NO-GO. One NO-GO, or an
+// open condition, holds the signatures. Same design, same catalog, same risk: same votes.
+
+export type ReadinessCheck = ReadinessVote["check"];
+export type ReadinessVerdict = ReadinessVote["verdict"];
+
+/** A vote with the number it rests on, so a change can be explained: "mass margin rose from 4% to 18%". */
+export interface ReadinessVoteDetail extends ReadinessVote {
+  metric: { label: string; value: number; unit: string };
+  /** the member's own hardware that makes it accept a soft condition (barter) */
+  acceptedFor?: string;
+}
+
+export const VERDICT_LABEL: Record<ReadinessVerdict, string> = { go: "GO", "go-with-condition": "GO IF", "no-go": "NO-GO" };
+
+export const READINESS_SOURCES = {
+  margins: {
+    title: "NASA GSFC-STD-1000G, Rules for the Design, Development, Verification, and Operation of Flight Systems, Table 1.06-1",
+    url: "https://standards.nasa.gov/sites/default/files/standards/GSFC/G/0/GSFC-STD-1000Revg_signature.pdf",
+  },
+  risk: { title: "NASA/SP-2011-3421, Probabilistic Risk Assessment Procedures Guide", url: "https://ntrs.nasa.gov/citations/20120001369" },
+  poll: {
+    title: "NASA NPD 8610.24C, Launch Services Program Pre-Launch Readiness Reviews",
+    url: "https://nodis3.gsfc.nasa.gov/displayDir.cfm?t=NPD&c=8610&s=24C",
+  },
+  barter: {
+    title: "ESA: International Space Station legal framework (partners barter their utilisation rights)",
+    url: "https://www.esa.int/Science_Exploration/Human_and_Robotic_Exploration/International_Space_Station/International_Space_Station_legal_framework",
+  },
+} satisfies Record<string, Source>;
+
+/** Margin asked of mass, power, link and budget: 10%, NASA Goddard's mass and power rule at critical design review. */
+export const READY_MARGIN = 0.1;
+/** Share of simulated flights that must succeed for a clean GO, and under which the review says NO-GO. */
+export const READY_SUCCESS = 0.7;
+export const NO_GO_SUCCESS = 0.5;
+/** Batteries covering less than this share of the dark period are a NO-GO: the craft would freeze. */
+export const NO_GO_NIGHT_COVER = 0.5;
+/** Flights the risk assessment simulates when the caller has none. */
+export const RISK_RUNS = 200;
+
+/** What one check found. */
+interface Outcome {
+  check: ReadinessCheck;
+  verdict: ReadinessVerdict;
+  reason: string;
+  numbers: string;
+  metric: ReadinessVoteDetail["metric"];
+  source?: Source;
+  /** the issue a fix has to clear */
+  issue?: Issue;
+  /** physics, not preference: no barter changes it */
+  hard: boolean;
+}
+
+interface ReadyContext {
+  design: MissionDesign;
+  catalog: Catalog;
+  issues: Issue[];
+  rep: ResourceReport;
+  risk: Forecast;
+  review: () => ReviewContext;
+}
+
+const RANK: Record<ReadinessVerdict, number> = { "no-go": 0, "go-with-condition": 1, go: 2 };
+const whole = (x: number) => `${Math.round(x * 100)}%`;
+const margin = (used: number, capacity: number) => (capacity > 0 ? (capacity - used) / capacity : used > 0 ? -1 : 1);
+const firstSentence = (s: string) => sentence(s.split(/\. /)[0]);
+
+/** The check an issue belongs to. */
+function checkOf(issue: Issue): ReadinessCheck {
+  if (issue.resource === "data") return "comms";
+  if (issue.resource === "mass" || issue.domain === "launch") return "mass";
+  if (issue.resource === "budget" || issue.domain === "budget") return "budget";
+  if (issue.resource === "comms" || issue.domain === "comms") return "comms";
+  if (issue.domain === "science") return "objectives";
+  return "power";
+}
+
+const mineFor = (check: ReadinessCheck, issues: Issue[]) => issues.filter((i) => checkOf(i) === check);
+
+function massCheck(c: ReadyContext): Outcome {
+  const g = c.rep.mass;
+  const m = margin(g.used, g.capacity);
+  const base = {
+    check: "mass" as const,
+    numbers: `${fmt(g.used)} of ${fmt(g.capacity)} kg, ${whole(m)} margin`,
+    metric: { label: "mass margin", value: Math.round(m * 100), unit: "%" },
+    source: READINESS_SOURCES.margins,
+  };
+  const mine = mineFor("mass", c.issues);
+  const blocker = mine.find((i) => i.severity === "blocker");
+  if (blocker) {
+    const heavy = blocker.id === "mass-over" || blocker.id === "launch-cannot-reach";
+    return { ...base, verdict: "no-go", hard: true, issue: blocker, reason: heavy ? "Too heavy for the rocket" : firstSentence(blocker.text), numbers: sentence(issueFact(blocker, c.rep, c.design, c.catalog)) };
+  }
+  if (m < READY_MARGIN) return { ...base, verdict: "go-with-condition", hard: false, issue: mine.find((i) => i.id === "mass-tight"), reason: "Under 10% mass margin: masses grow late" };
+  return { ...base, verdict: "go", hard: false, reason: "Fits the rocket with margin" };
+}
+
+function powerCheck(c: ReadyContext): Outcome {
+  const g = c.rep.power;
+  const m = margin(g.used, g.capacity);
+  const base = {
+    check: "power" as const,
+    numbers: `${fmt(g.used)} of ${fmt(g.capacity)} W, ${whole(m)} margin`,
+    metric: { label: "power margin", value: Math.round(m * 100), unit: "%" },
+    source: READINESS_SOURCES.margins,
+  };
+  const mine = mineFor("power", c.issues);
+  const blocker = mine.find((i) => i.severity === "blocker");
+  if (blocker) return { ...base, verdict: "no-go", hard: true, issue: blocker, reason: blocker.id === "power-over" ? "Draws more than the station allows" : firstSentence(blocker.text) };
+  const life = mine.find((i) => i.id === "lifetime-under");
+  if (life) {
+    const l = c.rep.lifetime;
+    return {
+      ...base, verdict: "no-go", hard: true, issue: life, reason: "Goes quiet before the mission ends",
+      numbers: `lasts ${fmt(l.capacity)} of ${fmt(l.used)} days`, metric: { label: "design life", value: Math.round(l.capacity), unit: " days" },
+    };
+  }
+  const battery = mine.find((i) => i.id === "battery-small");
+  if (battery) {
+    const x = battery.text.match(/hold ([\d,.]+) Wh.*needs about ([\d,.]+) Wh/);
+    const have = x ? num(x[1]) : 0;
+    const need = x ? num(x[2]) : 1;
+    const cover = need > 0 ? have / need : 1;
+    const out = { ...base, issue: battery, numbers: `batteries ${fmt(have)} of ${fmt(need)} Wh for the dark`, metric: { label: "night battery cover", value: Math.round(cover * 100), unit: "%" } };
+    return cover < NO_GO_NIGHT_COVER
+      ? { ...out, verdict: "no-go", hard: true, reason: "Batteries die in the dark" }
+      : { ...out, verdict: "go-with-condition", hard: false, reason: "Batteries run short in the dark" };
+  }
+  if (m < 0) return { ...base, verdict: "no-go", hard: true, issue: mine.find((i) => i.id === "power-over"), reason: "Draws more power than it makes" };
+  if (m < READY_MARGIN) return { ...base, verdict: "go-with-condition", hard: false, issue: mine.find((i) => i.id === "power-tight"), reason: "Under 10% power margin" };
+  const lifeTight = mine.find((i) => i.id === "lifetime-tight");
+  if (lifeTight) {
+    const l = c.rep.lifetime;
+    return {
+      ...base, verdict: "go-with-condition", hard: false, issue: lifeTight, reason: "Design life barely covers the mission",
+      numbers: `lasts ${fmt(l.capacity)} of ${fmt(l.used)} days`, metric: { label: "design life", value: Math.round(l.capacity), unit: " days" },
+    };
+  }
+  return { ...base, verdict: "go", hard: false, reason: "Power holds with margin" };
+}
+
+function commsCheck(c: ReadyContext): Outcome {
+  const g = c.rep.comms;
+  const d = c.rep.data;
+  const base = {
+    check: "comms" as const,
+    numbers: `link ${whole(g.capacity)} of the day, ${whole(g.used)} needed`,
+    metric: { label: "link time", value: Math.round(g.capacity * 100), unit: "%" },
+  };
+  const mine = mineFor("comms", c.issues);
+  const blocker = mine.find((i) => i.severity === "blocker");
+  if (blocker) return { ...base, verdict: "no-go", hard: true, issue: blocker, reason: firstSentence(blocker.text) };
+  const under = mine.find((i) => i.id === "comms-under");
+  if (under) {
+    const ratio = g.used > 0 ? g.capacity / g.used : 1;
+    return ratio < 0.5
+      ? { ...base, verdict: "no-go", hard: true, issue: under, reason: "Out of contact most of the time" }
+      : { ...base, verdict: "go-with-condition", hard: false, issue: under, reason: "Less link time than the team needs" };
+  }
+  const dataOver = mine.find((i) => i.id === "data-over");
+  const dataBase = {
+    numbers: `makes ${fmt(d.used)} Gb/day, sends ${fmt(d.capacity)} Gb/day`,
+    metric: { label: "downlink margin", value: Math.round(margin(d.used, d.capacity) * 100), unit: "%" },
+  };
+  if (dataOver) return { ...base, ...dataBase, verdict: "go-with-condition", hard: false, issue: dataOver, reason: "Data piles up on board" };
+  const tight = mine.find((i) => i.id === "comms-tight" || i.id === "data-tight");
+  if (tight) return { ...base, ...(tight.id === "data-tight" ? dataBase : {}), verdict: "go-with-condition", hard: false, issue: tight, reason: "Under 10% link margin" };
+  return { ...base, verdict: "go", hard: false, reason: "The link covers what the team needs" };
+}
+
+function budgetCheck(c: ReadyContext): Outcome {
+  const g = c.rep.budget;
+  const m = margin(g.used, g.capacity);
+  const base = {
+    check: "budget" as const,
+    numbers: `${money(g.used)} of ${money(g.capacity)}, ${whole(m)} in reserve`,
+    metric: { label: "budget reserve", value: Math.round(m * 100), unit: "%" },
+  };
+  const mine = mineFor("budget", c.issues);
+  const blocker = mine.find((i) => i.severity === "blocker");
+  if (blocker) return { ...base, verdict: "no-go", hard: true, issue: blocker, reason: "Costs more than the treasury holds" };
+  if (m < READY_MARGIN) return { ...base, verdict: "go-with-condition", hard: false, issue: mine.find((i) => i.id === "budget-tight"), reason: "Under 10% reserve for surprises" };
+  return { ...base, verdict: "go", hard: false, reason: "Within the treasury, with reserve" };
+}
+
+function reliabilityCheck(c: ReadyContext): Outcome {
+  const p = c.risk.successProbability;
+  const base = {
+    check: "reliability" as const,
+    numbers: `${Math.round(p * c.risk.runs)} of ${c.risk.runs} simulated flights succeed`,
+    metric: { label: "success", value: Math.round(p * 100), unit: "%" },
+    source: READINESS_SOURCES.risk,
+  };
+  if (c.issues.some((i) => i.severity === "blocker")) return { ...base, verdict: "no-go", hard: true, reason: "Can't fly until the red issues are fixed" };
+  if (p < NO_GO_SUCCESS) return { ...base, verdict: "no-go", hard: true, reason: "Fails more often than it succeeds" };
+  if (p < READY_SUCCESS) return { ...base, verdict: "go-with-condition", hard: false, reason: "Too many simulated flights fail" };
+  return { ...base, verdict: "go", hard: false, reason: "The odds look good" };
+}
+
+function objectivesCheck(c: ReadyContext): Outcome {
+  const mission = getMission(c.catalog, c.design.missionId);
+  const chosen = c.design.secondaryObjectiveIds.length;
+  const mine = mineFor("objectives", c.issues);
+  const unmet = mine.filter((i) => i.id.startsWith("secondary-unmet-"));
+  const met = Math.max(0, chosen - unmet.length);
+  const base = {
+    check: "objectives" as const,
+    numbers: chosen ? `main goal and ${met} of ${chosen} extra goals covered` : "main goal covered, 0 extra goals picked",
+    metric: { label: "goals covered", value: 1 + met, unit: "" },
+  };
+  const blocker = mine.find((i) => i.severity === "blocker");
+  if (blocker) {
+    const reason = blocker.id === "primary-unmet" ? "The main goal can't be met" : blocker.id === "too-many-secondaries" ? "Too many extra goals" : firstSentence(blocker.text);
+    return { ...base, verdict: "no-go", hard: true, issue: blocker, reason, numbers: blocker.id === "primary-unmet" ? `main goal: ${mission.primaryObjective.title}` : base.numbers };
+  }
+  if (unmet.length) {
+    const obj = mission.secondaryObjectives.find((o) => `secondary-unmet-${o.id}` === unmet[0].id);
+    return { ...base, verdict: "go-with-condition", hard: false, issue: unmet[0], reason: obj ? `Can't meet "${obj.title}" yet` : "An extra goal can't be met" };
+  }
+  return { ...base, verdict: "go", hard: false, reason: chosen ? "Covers the main goal and every extra" : "Covers the main goal" };
+}
+
+const CHECKS: Record<ReadinessCheck, ((c: ReadyContext) => Outcome) | undefined> = {
+  mass: massCheck,
+  power: powerCheck,
+  comms: commsCheck,
+  budget: budgetCheck,
+  reliability: reliabilityCheck,
+  objectives: objectivesCheck,
+  values: undefined,
+};
+
+/* Seats: the player's organization owns the science case; partners split the engineering checks. */
+
+const strength = (a: Actor, ...caps: Capability[]) => Math.max(0, ...caps.map((k) => a.capabilities[k] ?? 0));
+const PARTNER_CHECKS = ["mass", "power", "comms", "budget", "reliability"] as const;
+const AFFINITY: Record<(typeof PARTNER_CHECKS)[number], (a: Actor) => number> = {
+  mass: (a) => 2 * strength(a, "launch") + a.priorities.safety,
+  power: (a) => 2 * strength(a, "spacecraft", "landing", "habitat") + a.priorities.safety,
+  comms: (a) => 2 * strength(a, "comms", "ground-segment"),
+  budget: (a) => 2 * strength(a, "funding") + 3 * a.priorities.cost,
+  reliability: (a) => 3 * a.priorities.safety + strength(a, "landing", "launch"),
+};
+
+/**
+ * Which checks each seat runs, in seat order (lead first). The lead checks the objectives; partners
+ * draft the five engineering checks by strength, snake order, so every check has an owner.
+ */
+export function readinessSeats(coalition: Coalition, catalog: Catalog): { actorId: string; checks: ReadinessCheck[] }[] {
+  const partners = coalition.partnerIds.map((id) => getActor(catalog, id));
+  const owned = new Map<string, ReadinessCheck[]>(partners.map((a) => [a.id, []]));
+  const left: ReadinessCheck[] = [...PARTNER_CHECKS];
+  const round = [...partners, ...[...partners].reverse()];
+  for (const a of round) {
+    if (!left.length) break;
+    const pick = [...left].sort((x, y) => AFFINITY[y as keyof typeof AFFINITY](a) - AFFINITY[x as keyof typeof AFFINITY](a) || left.indexOf(x) - left.indexOf(y))[0];
+    owned.get(a.id)!.push(pick);
+    left.splice(left.indexOf(pick), 1);
+  }
+  return [{ actorId: coalition.leadId, checks: ["objectives"] }, ...partners.map((a) => ({ actorId: a.id, checks: owned.get(a.id)! }))];
+}
+
+/* Fixes and concessions: real changes, tried against the engine */
+
+function patchOf(design: MissionDesign, next: MissionDesign): DesignPatch {
+  const patch: DesignPatch = {};
+  if (next.launchVehicleId !== design.launchVehicleId) patch.launchVehicleId = next.launchVehicleId;
+  if (next.destinationId !== design.destinationId) patch.destinationId = next.destinationId;
+  if (next.moduleIds.join("|") !== design.moduleIds.join("|")) patch.moduleIds = next.moduleIds;
+  if (next.secondaryObjectiveIds.join("|") !== design.secondaryObjectiveIds.join("|")) patch.secondaryObjectiveIds = next.secondaryObjectiveIds;
+  if (next.blueprintIds.join("|") !== design.blueprintIds.join("|")) patch.blueprintIds = next.blueprintIds;
+  if (next.rideshareIds.join("|") !== design.rideshareIds.join("|")) patch.rideshareIds = next.rideshareIds;
+  return patch;
+}
+
+const stepOf = (patch: DesignPatch): DesignStep =>
+  patch.launchVehicleId || patch.destinationId ? "launch" : patch.secondaryObjectiveIds && !patch.moduleIds ? "objectives" : "build";
+
+const fixFrom = (design: MissionDesign, label: string, next: MissionDesign): NonNullable<ReadinessVote["fix"]> => {
+  const patch = patchOf(design, next);
+  return { label, patch, goTo: stepOf(patch) };
+};
+
+/** Launch-and-arrival odds from the rocket and the carrier: what a swap changes in the risk assessment. */
+function odds(d: MissionDesign, catalog: Catalog): number {
+  const vehicle = catalog.launchVehicles.find((v) => v.id === d.launchVehicleId)?.reliability ?? 0;
+  return vehicle * (d.moduleIds.map((id) => moduleOf(catalog, id)).find(isCarrier)?.reliability ?? 0.98);
+}
+
+const POWER_ISSUES = new Set(["battery-small", "lifetime-under", "lifetime-tight", "power-over", "power-tight"]);
+const CARRIER_ISSUES = new Set([...POWER_ISSUES, "mass-tight", "mass-over", "launch-cannot-reach"]);
+
+interface Candidate {
+  design: MissionDesign;
+  label: string;
+}
+
+function deepLabel(design: MissionDesign, next: MissionDesign, catalog: Catalog): string {
+  const parts: string[] = [];
+  const carrier = (d: MissionDesign) => d.moduleIds.map((id) => moduleOf(catalog, id)).find(isCarrier);
+  const was = carrier(design);
+  const now = carrier(next);
+  if (now && was && now.id !== was.id) parts.push(`swap to ${now.name}`);
+  for (const id of next.moduleIds) if (!design.moduleIds.includes(id) && id !== now?.id) parts.push(`add ${moduleOf(catalog, id)?.name ?? id}`);
+  if (next.launchVehicleId !== design.launchVehicleId) parts.push(`fly on ${catalog.launchVehicles.find((v) => v.id === next.launchVehicleId)?.name ?? next.launchVehicleId}`);
+  const cost = computeResources(next, catalog).budget.used - computeResources(design, catalog).budget.used;
+  return `${sentence(parts.join(", "))} (${signedMoney(cost)})`;
+}
+
+/**
+ * Bigger changes for what no one- or two-step change clears: any carrier the mission offers, on any
+ * rocket, plus a battery or sunlight-independent source when the issue is power. Only designs with no
+ * blocker that clear the issue.
+ */
+function deepCandidates(issue: Issue, ctx: ReviewContext): Candidate[] {
+  const { design, catalog } = ctx;
+  if (!CARRIER_ISSUES.has(issue.id)) return [];
+  const offered = getMission(catalog, design.missionId).moduleIds.map((id) => moduleOf(catalog, id)).filter((m): m is Module => !!m);
+  const flownCarrier = design.moduleIds.map((id) => moduleOf(catalog, id)).find(isCarrier);
+  const rest = design.moduleIds.filter((id) => id !== flownCarrier?.id);
+  const extras: (Module | undefined)[] = [undefined];
+  if (POWER_ISSUES.has(issue.id)) extras.push(...offered.filter((m) => !isCarrier(m) && ((m.storageWh ?? 0) > 0 || m.sunlightIndependent) && !rest.includes(m.id)));
+  const carriers = flownCarrier ? offered.filter(isCarrier) : [undefined];
+  const out: Candidate[] = [];
+  for (const carrier of carriers)
+    for (const e of extras)
+      for (const v of catalog.launchVehicles) {
+        const d: MissionDesign = { ...design, moduleIds: [...(carrier ? [carrier.id] : []), ...rest, ...(e ? [e.id] : [])], launchVehicleId: v.id };
+        if (d.launchVehicleId === design.launchVehicleId && d.moduleIds.join("|") === design.moduleIds.join("|")) continue;
+        const issues = validateDesign(d, catalog);
+        if (issues.some((i) => i.severity === "blocker" || i.id === issue.id)) continue;
+        out.push({ design: d, label: deepLabel(design, d, catalog) });
+      }
+  return out;
+}
+
+/** Verdicts of the checks that need no simulation, for screening candidate fixes. */
+function quickChecks(d: MissionDesign, catalog: Catalog): Outcome[] {
+  const c: ReadyContext = {
+    design: d, catalog, issues: validateDesign(d, catalog), rep: computeResources(d, catalog),
+    risk: { successProbability: 1, expectedScore: 0, p10: 0, p90: 0, runs: 0 },
+    review: () => { throw new Error("not used"); },
+  };
+  return (["mass", "power", "comms", "budget", "objectives"] as const).map((k) => CHECKS[k]!(c));
+}
+
+/**
+ * The candidate that improves the vote's own check and leaves the fewest NO-GO, then GO IF, verdicts,
+ * then keeps the best launch-and-arrival odds, then costs least.
+ */
+function pickFix(o: Outcome, candidates: Candidate[], ctx: ReviewContext): Candidate | undefined {
+  const { catalog, rep } = ctx;
+  const scored = candidates.map((cand, n) => {
+    const outs = quickChecks(cand.design, catalog);
+    const mine = outs.find((x) => x.check === o.check);
+    const better = !mine || RANK[mine.verdict] > RANK[o.verdict] || (RANK[mine.verdict] === RANK[o.verdict] && mine.metric.label === o.metric.label && mine.metric.value > o.metric.value);
+    return {
+      cand, n, better,
+      noGo: outs.filter((x) => x.verdict === "no-go").length,
+      cond: outs.filter((x) => x.verdict === "go-with-condition").length,
+      odds: Math.round(odds(cand.design, catalog) * 100),
+      cost: computeResources(cand.design, catalog).budget.used - rep.budget.used,
+    };
+  });
+  return scored
+    .filter((x) => x.better)
+    .sort((a, b) => a.noGo - b.noGo || a.cond - b.cond || b.odds - a.odds || a.cost - b.cost || a.n - b.n)[0]?.cand;
+}
+
+/** The swap of rocket or carrier that raises the launch-and-arrival odds most without a new issue. */
+function reliabilityFix(ctx: ReviewContext): NonNullable<ReadinessVote["fix"]> | undefined {
+  const { design, catalog, issues, rep } = ctx;
+  const known = new Set(issues.map((i) => i.id));
+  const now = odds(design, catalog);
+  const best = ctx.tried
+    .filter((t) => (t.move.kind === "vehicle" || (t.move.kind === "swap" && isCarrier(moduleOf(catalog, t.move.outId)))) && t.issues.every((i) => known.has(i.id)))
+    .map((t) => ({ t, gain: odds(t.move.design, catalog) - now, cost: t.rep.budget.used - rep.budget.used }))
+    .filter((x) => x.gain > 0.005)
+    .sort((a, b) => b.gain - a.gain || a.cost - b.cost || a.t.move.id.localeCompare(b.t.move.id))[0];
+  return best ? fixFrom(design, `${best.t.move.label} (${signedMoney(best.cost)})`, best.t.move.design) : undefined;
+}
+
+function fixFor(o: Outcome, ctx: ReviewContext, who: Actor): ReadinessVote["fix"] {
+  if (o.verdict === "go") return undefined;
+  const { design, catalog } = ctx;
+  if (o.check === "reliability") return ctx.issues.some((i) => i.severity === "blocker") ? undefined : reliabilityFix(ctx);
+  const issue = o.issue;
+  if (!issue) return undefined;
+  if (issue.id === "too-many-secondaries")
+    return { label: `Keep ${MAX_SECONDARY} extra goals`, patch: { secondaryObjectiveIds: design.secondaryObjectiveIds.slice(0, MAX_SECONDARY) }, goTo: "objectives" };
+  const candidates: Candidate[] = rankedFixes(issue, ctx, who).map((f) => ({ design: f.tried.move.design, label: f.text }));
+  candidates.push(...deepCandidates(issue, ctx));
+  if (issue.id.startsWith("secondary-unmet-")) {
+    const obj = getMission(catalog, design.missionId).secondaryObjectives.find((x) => `secondary-unmet-${x.id}` === issue.id);
+    if (obj) candidates.push({ design: { ...design, secondaryObjectiveIds: design.secondaryObjectiveIds.filter((id) => id !== obj.id) }, label: `Drop "${obj.title}"` });
+  }
+  const best = pickFix(o, candidates, ctx);
+  return best ? fixFrom(design, best.label, best.design) : undefined;
+}
+
+/** What a change does to the six gauges, biggest first, at most three: "+12 kg, +30 W made, +$4M". */
+function gaugeDelta(before: ResourceReport, after: ResourceReport): string {
+  const parts: { text: string; size: number }[] = [];
+  const add = (d: number, text: string, scale: number) => { if (Math.abs(d) >= 0.05) parts.push({ text, size: Math.abs(d) / scale }); };
+  const dm = after.mass.used - before.mass.used;
+  add(dm, signed(dm, " kg"), Math.max(1, before.mass.capacity));
+  const dw = after.power.used - before.power.used;
+  add(dw, signed(dw, " W used"), Math.max(1, before.power.capacity));
+  const dg = after.power.capacity - before.power.capacity;
+  add(dg, signed(dg, " W made"), Math.max(1, before.power.capacity));
+  const db = after.budget.used - before.budget.used;
+  add(db, signedMoney(db), Math.max(1, before.budget.capacity));
+  const dl = after.lifetime.capacity - before.lifetime.capacity;
+  add(dl, signed(dl, " days of life"), Math.max(1, before.lifetime.capacity));
+  const dd = after.data.capacity - before.data.capacity;
+  add(dd, signed(dd, " Gb/day downlink"), Math.max(1, before.data.capacity));
+  return parts.sort((a, b) => b.size - a.size).slice(0, 3).map((p) => p.text).join(", ") || "nothing on the gauges";
+}
+
+/**
+ * ISS-style barter for a soft condition: adopt the member's open design (credit flows to it), or give
+ * its hardware a payload slot. Either shows on the gauges; the member then accepts the condition.
+ * Only trades that add no blocker; the one that leaves the fewest NO-GO and GO IF verdicts first.
+ */
+function concessionFor(o: Outcome, ctx: ReviewContext, who: Actor): ReadinessVote["concession"] {
+  if (o.verdict !== "go-with-condition" || o.hard) return undefined;
+  const { design, catalog, rep } = ctx;
+  const mission = getMission(catalog, design.missionId);
+  const offered = new Set(mission.moduleIds);
+  const cats = new Set(design.moduleIds.map((id) => moduleOf(catalog, id)?.category));
+  const trades: { label: string; d: MissionDesign }[] = [
+    ...catalog.blueprints
+      .filter((b) => b.authorId === who.id && !design.blueprintIds.includes(b.id) && cats.has(b.category))
+      .map((b) => ({ label: `Adopt ${who.shortName}'s ${b.name}`, d: { ...design, blueprintIds: [...design.blueprintIds, b.id] } })),
+    ...catalog.modules
+      .filter((m) => m.providerId === who.id && offered.has(m.id) && !isCarrier(m) && !design.moduleIds.includes(m.id))
+      .map((m) => ({ label: `Fly ${who.shortName}'s ${m.name}`, d: { ...design, moduleIds: [...design.moduleIds, m.id] } })),
+  ];
+  const known = new Set(ctx.issues.map((i) => i.id));
+  const best = trades
+    .map((t, n) => {
+      const issues = validateDesign(t.d, catalog);
+      const outs = quickChecks(t.d, catalog);
+      return { t, n, issues, noGo: outs.filter((x) => x.verdict === "no-go").length, cond: outs.filter((x) => x.verdict === "go-with-condition").length, r: computeResources(t.d, catalog) };
+    })
+    .filter((x) => !x.issues.some((i) => i.severity === "blocker" && !known.has(i.id)) && x.noGo === 0)
+    .sort((a, b) => a.cond - b.cond || a.r.mass.used - b.r.mass.used || a.n - b.n)[0];
+  if (!best) return undefined;
+  return { label: best.t.label, cost: gaugeDelta(rep, best.r), patch: patchOf(design, best.t.d) };
+}
+
+/**
+ * The Go / No-Go poll: one vote per seat, lead first. Each seat reports its worst check; a soft
+ * condition is accepted when the member's own hardware flies (ISS-style barter), or when nothing on
+ * offer would fix it. Pass the risk assessment the player sees; without one it is simulated here.
+ */
+export function readinessReview(design: MissionDesign, catalog: Catalog, risk?: Forecast): ReadinessVoteDetail[] {
+  const issues = validateDesign(design, catalog);
+  const rep = computeResources(design, catalog);
+  let ctx: ReviewContext | undefined;
+  const review = (): ReviewContext => (ctx ??= { design, catalog, issues, rep, storage: storageOf(design, catalog), tried: tryMoves(design, catalog) });
+  const c: ReadyContext = { design, catalog, issues, rep, risk: risk ?? forecast(design, catalog, RISK_RUNS), review };
+  // what each member gets from this design: its open design adopted, or its hardware flying
+  const stake = new Map<string, string>();
+  for (const id of design.moduleIds) {
+    const m = moduleOf(catalog, id);
+    if (m?.providerId && !stake.has(m.providerId)) stake.set(m.providerId, `our ${m.name} flies`);
+  }
+  for (const id of design.blueprintIds) {
+    const b = catalog.blueprints.find((x) => x.id === id);
+    if (b && !stake.has(b.authorId)) stake.set(b.authorId, `our ${b.name} design is used`);
+  }
+
+  return readinessSeats(design.coalition, catalog).map(({ actorId, checks }, seat) => {
+    const who = getActor(catalog, actorId);
+    const outcomes = checks.map((k) => CHECKS[k]!(c));
+    const o = outcomes.reduce((a, b) => (RANK[b.verdict] < RANK[a.verdict] ? b : a));
+    const vote: ReadinessVoteDetail = { actorId, verdict: o.verdict, check: o.check, reason: o.reason, numbers: o.numbers, metric: o.metric, ...(o.source ? { source: o.source } : {}) };
+    if (o.verdict === "go") return vote;
+    const own = seat > 0 && !o.hard ? stake.get(actorId) : undefined;
+    if (own) return { ...vote, verdict: "go", reason: `Accepted: ${own}`, acceptedFor: own, source: READINESS_SOURCES.barter };
+    const fix = fixFor(o, review(), who);
+    const concession = seat > 0 ? concessionFor(o, review(), who) : undefined;
+    if (o.verdict === "go-with-condition" && !fix && !concession) return { ...vote, verdict: "go", reason: `${o.reason}, accepted: nothing on offer fixes it` };
+    return { ...vote, ...(fix ? { fix } : {}), ...(concession ? { concession } : {}) };
+  });
+}
+
+/** True when every seat says a clean GO: the signatures unlock. */
+export const readinessAllGo = (votes: ReadinessVote[]) => votes.length > 0 && votes.every((v) => v.verdict === "go");
+
+/** One line per seat whose verdict changed: "JAXA: NO-GO to GO, mass margin rose from 4% to 18%". */
+export function readinessChanges(before: ReadinessVoteDetail[], after: ReadinessVoteDetail[], catalog: Catalog): string[] {
+  return after.flatMap((a) => {
+    const b = before.find((x) => x.actorId === a.actorId);
+    if (!b || b.verdict === a.verdict) return [];
+    const head = `${getActor(catalog, a.actorId).shortName}: ${VERDICT_LABEL[b.verdict]} to ${VERDICT_LABEL[a.verdict]}`;
+    const m0 = b.metric;
+    const m1 = a.metric;
+    if (m0.label === m1.label && m0.value !== m1.value)
+      return [`${head}, ${m1.label} ${m1.value > m0.value ? "rose" : "fell"} from ${m0.value}${m0.unit} to ${m1.value}${m1.unit}`];
+    return [`${head}, ${lowerFirst(a.reason)}`];
   });
 }
