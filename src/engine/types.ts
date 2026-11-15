@@ -310,6 +310,8 @@ export interface RideshareOffer extends Sourced {
   paysMUsd: number;
   scienceValue: number;
   blurb: string;
+  /** true when the request is made up, built on the real satellite its sources describe */
+  example?: boolean;
 }
 
 export interface Mission extends Sourced {
@@ -367,6 +369,16 @@ export interface Blueprint {
   txHash?: string;
   /** missions that adopted it (grows as people play) */
   adoptions: number;
+  /** module ids it attaches to; absent means any module of its category */
+  hostIds?: string[];
+  /** what adopting it costs the spacecraft: integration hardware, power and work */
+  integration?: { massKg?: number; powerW?: number; costMUsd?: number };
+  /** the real technology behind it */
+  sources?: Source[];
+  /** true when the entry illustrates a real technology instead of a design its author published */
+  example?: boolean;
+  /** one line on its real-world use, backed by its sources, e.g. "Powered 40+ NASA missions" */
+  provenance?: string;
 }
 
 /* ------------------------------------------------------------------ */

@@ -1,6 +1,6 @@
 export { makeRng } from "./rng";
 export { defaultDesign } from "./design";
-export { effectiveModifiers, applyStat } from "./modifiers";
+export { effectiveModifiers, applyStat, blueprintFit, reciprocityDue, type BlueprintFit } from "./modifiers";
 export { computeResources } from "./resources";
 export { validateDesign } from "./validate";
 export { councilValues, councilReview, type ReadinessVote } from "./council";

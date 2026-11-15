@@ -29,6 +29,16 @@ describe("catalog", () => {
     }
   });
 
+  it("gives every open design and rideshare request a source, and hosts that exist", () => {
+    for (const b of catalog.blueprints) {
+      expect(b.sources?.length ?? 0, b.id).toBeGreaterThan(0);
+      for (const id of b.hostIds ?? []) expect(moduleIds.has(id), `${b.id} host ${id}`).toBe(true);
+      const hosts = b.hostIds ?? catalog.modules.filter((m) => m.category === b.category).map((m) => m.id);
+      expect(catalog.missions.some((m) => m.moduleIds.some((id) => hosts.includes(id))), `${b.id} fits no mission`).toBe(true);
+    }
+    for (const o of catalog.rideshareOffers) expect(o.sources.length, o.id).toBeGreaterThan(0);
+  });
+
   it("lets every mission be completed: a module exists for each required category", () => {
     for (const m of catalog.missions) {
       const cats = new Set(m.moduleIds.map((id) => catalog.modules.find((x) => x.id === id)?.category));
