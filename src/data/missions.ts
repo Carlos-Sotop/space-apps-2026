@@ -19,6 +19,24 @@ const S_BGLAND: Source = { title: "NASA CLPS Firefly Blue Ghost Mission One pres
 const S_DTN: Source = { title: "NASA NTRS: Delay/Disruption Tolerant Networking for the ISS", url: "https://ntrs.nasa.gov/api/citations/20160014037/downloads/20160014037.pdf" };
 const S_FIPS203: Source = { title: "NIST FIPS 203: ML-KEM", url: "https://csrc.nist.gov/pubs/fips/203/final" };
 const S_FIPS204: Source = { title: "NIST FIPS 204: ML-DSA", url: "https://csrc.nist.gov/pubs/fips/204/final" };
+// objective sources (C5): one primary source behind each objective
+const O_ISS_RESEARCH: Source = { title: "NASA: research on the International Space Station", url: "https://www.nasa.gov/international-space-station/space-station-research-and-technology/" };
+const O_PROTEIN: Source = { title: "NASA: creating new and better drugs with protein crystal growth experiments", url: "https://www.nasa.gov/missions/station/iss-research/creating-new-and-better-drugs-with-protein-crystal-growth-experiments/" };
+const O_VEGGIE: Source = { title: "NASA: growing plants in space (Veggie)", url: "https://www.nasa.gov/missions/station/iss-research/veggie/" };
+const O_TISSUE: Source = { title: "NIH NCATS: Tissue Chips in Space", url: "https://ncats.nih.gov/research/research-activities/tissue-chip/projects/space" };
+const O_FIBER: Source = { title: "NASA: optical fiber manufacturing arrives at the space station", url: "https://www.nasa.gov/centers-and-facilities/armstrong/nasa-supported-optical-fiber-manufacturing-arrives-at-space-station/" };
+const O_FIRE: Source = { title: "NASA: studying combustion and fire safety on the station", url: "https://www.nasa.gov/missions/station/iss-research/studying-combustion-and-fire-safety/" };
+const O_HRP: Source = { title: "NASA Human Research Program", url: "https://www.nasa.gov/hrp/" };
+const O_DISASTERS: Source = { title: "NASA Applied Sciences: Disasters program", url: "https://appliedsciences.nasa.gov/what-we-do/disasters" };
+const O_FIRMS: Source = { title: "NASA FIRMS: active fire data within 3 hours of a satellite pass", url: "https://firms.modaps.eosdis.nasa.gov/" };
+const O_HARVEST: Source = { title: "NASA Harvest: food security and agriculture program", url: "https://nasaharvest.org/" };
+const O_DIRECT: Source = { title: "NASA Direct Readout Laboratory: data straight to local ground stations", url: "https://directreadout.sci.gsfc.nasa.gov/" };
+const O_AIS: Source = { title: "ESA: space station tracks months-long voyages of ships at sea", url: "https://www.esa.int/Enabling_Support/Space_Engineering_Technology/Space_station_tracks_months-long_voyages_of_ships_at_sea" };
+const O_ARTEMIS_SITES: Source = { title: "NASA identifies candidate regions for landing next Americans on the Moon", url: "https://www.nasa.gov/news-release/nasa-identifies-candidate-regions-for-landing-next-americans-on-moon/" };
+const O_LCROSS: Source = { title: "NASA LCROSS: water ice found in a permanently shadowed crater", url: "https://science.nasa.gov/mission/lcross/" };
+const O_NIGHT: Source = { title: "NASA LRO: lunar night lows near -173 C (Diviner)", url: "https://www.nasa.gov/solar-system/nasas-lro-finds-lunar-pits-harbor-comfortable-temperatures/" };
+const O_VIPER: Source = { title: "NASA VIPER: a rover to map ice at the lunar south pole", url: "https://science.nasa.gov/mission/viper/" };
+const O_LUNANET: Source = { title: "NASA LunaNet: communications and navigation for Artemis", url: "https://www.nasa.gov/humans-in-space/lunanet-empowering-artemis-with-communications-and-navigation-interoperability/" };
 
 // Event factor semantics assumed: mitigatedBy.factor multiplies the event chance (0.5 halves it).
 // liveFeed "donki-gst" is not in the type, so geomagnetic storm events use "donki-cme" (CMEs cause GSTs).
@@ -34,37 +52,65 @@ export const missions: Mission[] = [
     primaryObjective: {
       id: "ol-primary",
       title: "Run 30 days of microgravity science",
-      summary: "Deliver experiments to the ISS and return their data.",
+      summary: "Deliver experiments to the station and return their data.",
+      why: "Only an orbiting lab can run experiments for weeks without gravity.",
+      source: O_ISS_RESEARCH,
       requires: { categories: ["bus", "experiment"] },
       scienceValue: 100, // game value
     },
     secondaryObjectives: [
       {
-        id: "ol-fire-safety",
-        title: "Flame in Freefall",
-        summary: "Study how fire spreads in microgravity.",
-        requires: { moduleIds: ["ol-combustion"] },
+        id: "ol-protein",
+        title: "Protein crystals for medicine",
+        summary: "Grow protein crystals that show how a drug binds its target.",
+        why: "Crystals grown without gravity are larger and more ordered, which helps design new drugs.",
+        source: O_PROTEIN,
+        requires: { moduleIds: ["ol-protein-crystal"] },
         scienceValue: 80, // game value
       },
       {
-        id: "ol-health",
-        title: "Watch astronaut health",
-        summary: "Track vital signs or radiation dose of the crew.",
-        requires: { moduleIds: ["ol-biomonitor", "ol-dosimetry"] }, // any of
-        scienceValue: 70, // game value
-      },
-      {
         id: "ol-plants",
-        title: "Grow food for long missions",
-        summary: "Raise plants in orbit as a step to Moon and Mars food.",
+        title: "Grow food in orbit",
+        summary: "Raise plants in a station chamber, as NASA's Veggie does.",
+        why: "Crews going to the Moon and Mars will need fresh food they grow themselves.",
+        source: O_VEGGIE,
         requires: { moduleIds: ["ol-plant-chamber"] },
         scienceValue: 70, // game value
       },
       {
+        id: "ol-tissue",
+        title: "Human tissue in orbit",
+        summary: "Grow human tissue models that age and sicken faster in space.",
+        why: "Tissue changes in weeks in orbit, so studies of aging and disease run faster.",
+        source: O_TISSUE,
+        requires: { moduleIds: ["ol-bioprinter"] },
+        scienceValue: 80, // game value
+      },
+      {
         id: "ol-manufacturing",
-        title: "Make things only space can make",
-        summary: "Draw better optical fiber in microgravity.",
+        title: "Materials only space can make",
+        summary: "Draw optical fiber with fewer flaws than on the ground.",
+        why: "Without gravity the glass does not crystallize, so the fiber carries light farther.",
+        source: O_FIBER,
         requires: { moduleIds: ["ol-fiber"] },
+        scienceValue: 60, // game value
+      },
+      {
+        id: "ol-fire-safety",
+        title: "Flame in freefall",
+        summary: "Study how fire spreads and goes out in microgravity.",
+        why: "A fire is one of the worst emergencies on a spacecraft, and flames behave differently there.",
+        source: O_FIRE,
+        requires: { moduleIds: ["ol-combustion"] },
+        scienceValue: 70, // game value
+      },
+      {
+        id: "ol-health",
+        title: "Watch astronaut health",
+        summary: "Track the crew's vital signs or radiation dose.",
+        why: "Long missions are only possible if we know what space does to the body.",
+        source: O_HRP,
+        requires: { moduleIds: ["ol-biomonitor", "ol-dosimetry"] }, // any of
         scienceValue: 60, // game value
       },
     ],
@@ -188,7 +234,9 @@ export const missions: Mission[] = [
     primaryObjective: {
       id: "eg-primary",
       title: "Watch the planet for a year",
-      summary: "Fly an instrument and send its images to the ground.",
+      summary: "Fly an imager and send its images to the ground.",
+      why: "Fires, floods and failed harvests hit fast; a satellite sees them through smoke and cloud.",
+      source: O_DISASTERS,
       requires: {
         categories: ["bus", "power", "comms"],
         moduleIds: ["eg-thermal-ir", "eg-lsar", "eg-ssar", "eg-xsar", "eg-msi"], // at least one imager: fires and floods need imaging, not ship tracking
@@ -198,29 +246,46 @@ export const missions: Mission[] = [
     secondaryObjectives: [
       {
         id: "eg-wildfire",
-        title: "Spot wildfire hotspots",
-        summary: "Detect fires by heat and help harmonize MODIS and VIIRS data.",
+        title: "Wildfire watch",
+        summary: "Spot new fires by their heat, day and night.",
+        why: "A fire found within hours gives firefighters and villages time to act.",
+        source: O_FIRMS,
         requires: { moduleIds: ["eg-thermal-ir"] },
         scienceValue: 90, // game value
       },
       {
         id: "eg-flood",
-        title: "Map floods and surface change",
-        summary: "Use radar to see water and ground motion through cloud.",
+        title: "Flood maps through cloud",
+        summary: "Map flood water with radar, which sees through cloud and at night.",
+        why: "Floods come with storm clouds, so cameras go blind just when people need maps.",
+        source: S_NISAR2,
         requires: { moduleIds: ["eg-lsar", "eg-ssar", "eg-xsar"] }, // any of
         scienceValue: 90, // game value
       },
       {
         id: "eg-crops",
-        title: "Protect crops and farms",
-        summary: "Track crop health and soil moisture for the Field Shift theme.",
+        title: "Crop health for small farms",
+        summary: "Spot drought and crop stress early on smallholder farms.",
+        why: "An early warning gives a small farm time to irrigate or replant before the harvest fails.",
+        source: O_HARVEST,
         requires: { moduleIds: ["eg-msi", "eg-lsar", "eg-ssar"] }, // any of
         scienceValue: 80, // game value
       },
       {
+        id: "eg-local",
+        title: "Data to local ground stations",
+        summary: "Send images straight to stations in the countries they cover.",
+        why: "Data that lands in-country reaches local responders without waiting on a distant archive.",
+        source: O_DIRECT,
+        requires: { moduleIds: ["eg-ground-network"] },
+        scienceValue: 60, // game value
+      },
+      {
         id: "eg-ships",
         title: "Track ships at sea",
-        summary: "Follow vessels with AIS and radar images.",
+        summary: "Follow vessels with their radio beacons (AIS) and radar images.",
+        why: "Ships far from shore drop off coastal radar; from orbit they stay in view.",
+        source: O_AIS,
         requires: { moduleIds: ["eg-ais", "eg-xsar"] }, // any of
         scienceValue: 50, // game value
       },
@@ -399,47 +464,59 @@ export const missions: Mission[] = [
       "An international coalition wants a first outpost near the lunar south pole, where sunlit ridges sit beside craters that may hold ice. It must survive the dark, find water and stay in touch with Earth. A secure link and a local network show how a base can run when Earth drops out of view.",
     primaryObjective: {
       id: "mb-primary",
-      title: "Land and run a powered outpost",
-      summary: "Store energy, keep a link to Earth and send site data for 45 days.",
+      title: "Precision touchdown, then run the outpost",
+      summary: "Land beside sunlit ground and icy craters, then work for 45 days.",
+      why: "Sunlit ridges next to icy craters give a base both power and water.",
+      source: O_ARTEMIS_SITES,
       // an instrument: the outpost must return data, so power, link and lifetime all count
       requires: { categories: ["lander", "battery", "comms", "instrument"] },
       scienceValue: 120, // game value
     },
     secondaryObjectives: [
       {
-        id: "mb-night",
-        title: "Survive the lunar night",
-        summary: "Keep electronics warm and powered through darkness.",
-        requires: { moduleIds: ["mb-rhu", "mb-rfc"] }, // any of
-        scienceValue: 90, // game value
-      },
-      {
         id: "mb-ice",
-        title: "Prospect water ice",
-        summary: "Drill and measure ice that could become water and fuel.",
+        title: "Water ice",
+        summary: "Drill for ice on the edge of a permanently shadowed crater.",
+        why: "Ice becomes drinking water, oxygen and rocket fuel made on the Moon.",
+        source: O_LCROSS,
         requires: { moduleIds: ["mb-ice-drill"] },
         scienceValue: 110, // game value
       },
       {
-        id: "mb-quantum-link",
-        title: "Quantum-safe Earth–Moon link",
-        summary: "Protect keys and signatures against future quantum computers.",
-        requires: { moduleIds: ["mb-pq-link"] },
-        scienceValue: 70, // game value
-      },
-      {
-        id: "mb-surface-net",
-        title: "Open surface network",
-        summary: "Local network for trades and data when Earth is out of view.",
-        requires: { moduleIds: ["mb-mesh"] },
-        scienceValue: 70, // game value
+        id: "mb-night",
+        title: "Night shift",
+        summary: "Keep the base working through the lunar night.",
+        why: "In the dark the ground falls near -173 C and solar power stops, so heat and energy must be stored.",
+        source: O_NIGHT,
+        requires: { moduleIds: ["mb-rhu", "mb-rfc"] }, // any of
+        scienceValue: 90, // game value
       },
       {
         id: "mb-scout",
-        title: "Scout the next landing zone",
-        summary: "Map rocks and slopes for the next modules (Landing Site Navigator).",
-        requires: { moduleIds: ["mb-rover", "mb-regolith-science"] }, // any of
+        title: "First tracks",
+        summary: "Deploy a rover and drive it to scout the ground around the base.",
+        why: "A rover reaches ice, rocks and safe ground the lander cannot see.",
+        source: O_VIPER,
+        requires: { moduleIds: ["mb-rover"] },
         scienceValue: 80, // game value
+      },
+      {
+        id: "mb-surface-net",
+        title: "Lunar comms and navigation",
+        summary: "Run a relay or a surface network for places with no view of Earth.",
+        why: "Craters and hills hide Earth, so a base needs its own links, as in NASA's LunaNet.",
+        source: O_LUNANET,
+        requires: { moduleIds: ["mb-relay", "mb-mesh"] }, // any of
+        scienceValue: 70, // game value
+      },
+      {
+        id: "mb-quantum-link",
+        title: "Quantum-safe Earth-Moon link",
+        summary: "Sign and encrypt the link with NIST's post-quantum standards.",
+        why: "Traffic recorded today could be decrypted by future quantum computers.",
+        source: S_FIPS204,
+        requires: { moduleIds: ["mb-pq-link"] },
+        scienceValue: 60, // game value
       },
     ],
     destinations: [

@@ -280,6 +280,7 @@ export const earth: OpsScenario = {
       "eg-flood": goal({ id: "side-flood", kind: "side", objectiveId: "eg-flood", title: "Cover 2 coastal regions", target: 2, unit: "regions", points: 15 }),
       "eg-crops": goal({ id: "side-crops", kind: "side", objectiveId: "eg-crops", title: "Cover 3 farmland regions", target: 3, unit: "regions", points: 15 }),
       "eg-ships": goal({ id: "side-ships", kind: "side", objectiveId: "eg-ships", title: "Cover 2 ocean regions", target: 2, unit: "regions", points: 15 }),
+      "eg-local": goal({ id: "side-local", kind: "side", objectiveId: "eg-local", title: "Land images at local stations in 6 months", target: 6, unit: "months", points: 15 }),
     };
     return [
       goal({ id: "main-commission", kind: "main", step: 1, title: "Commission the satellite: deploy all instruments", target: Math.max(1, count), unit: "instruments", points: 10 }),
@@ -326,6 +327,8 @@ export const earth: OpsScenario = {
         return regionsOf(s, "farmland");
       case "side-ships":
         return regionsOf(s, "ocean");
+      case "side-local":
+        return s.history.filter((h) => h.linked).length;
       default:
         return 0;
     }
