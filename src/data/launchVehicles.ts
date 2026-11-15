@@ -39,6 +39,7 @@ export const launchVehicles: LaunchVehicle[] = [
     reusable: true,
     status: "operational",
     blurb: "Reusable workhorse with the longest flight record today.",
+    specs: { heightM: 69.8, stages: 2, flights: 702, successes: 699, recordAsOf: "2026-11-15" }, // Wikipedia infobox read 2026-11-15; Full Thrust height; record covers every Falcon 9 version
     sources: [S_LSP, wiki("Falcon 9 (Block 5 payload, price, launch record)", "Falcon_9")],
     verified: false,
   },
@@ -56,6 +57,7 @@ export const launchVehicles: LaunchVehicle[] = [
     reusable: true,
     status: "operational",
     blurb: "Lands its three cores for reuse: cheaper, but lifts less.",
+    specs: { heightM: 70, stages: 2, flights: 14, successes: 14, recordAsOf: "2026-11-15" }, // Wikipedia infobox read 2026-11-15; two side boosters around the core
     sources: [S_LSP, wiki("Falcon Heavy (payload, price, flights)", "Falcon_Heavy")],
     verified: false,
   },
@@ -71,9 +73,11 @@ export const launchVehicles: LaunchVehicle[] = [
     reusable: false,
     status: "operational",
     blurb: "All three cores spent for full power. Europa Clipper flew this way.",
+    specs: { heightM: 70, stages: 2, flights: 14, successes: 14, recordAsOf: "2026-11-15" }, // Wikipedia infobox read 2026-11-15; same vehicle record as above
     sources: [
       S_LSP,
       { title: "NASA JPL: NASA awards launch services contract for the Europa Clipper mission (about $178 million)", url: "https://www.jpl.nasa.gov/news/nasa-awards-launch-services-contract-for-the-europa-clipper-mission/" },
+      wiki("Falcon Heavy (height, stages, launch record)", "Falcon_Heavy"),
     ],
     verified: false,
   },
@@ -91,6 +95,7 @@ export const launchVehicles: LaunchVehicle[] = [
     reusable: true,
     status: "in-development",
     blurb: "Must refill in orbit before it can reach the Moon.",
+    specs: { heightM: 124.4, stages: 2, flights: 15, successes: 10, recordAsOf: "2026-11-15" }, // Wikipedia infobox read 2026-11-15; Block 3 height; record covers Blocks 1 to 3
     sources: [
       wiki("SpaceX Starship (payload by block, status)", "SpaceX_Starship"),
       { title: "NASA: NASA, SpaceX illustrate key moments of Artemis lunar lander mission (propellant loading in Earth orbit)", url: "https://www.nasa.gov/directorates/esdmd/artemis-campaign-development-division/human-landing-system-program/nasa-spacex-illustrate-key-moments-of-artemis-lunar-lander-mission/" },
@@ -112,6 +117,7 @@ export const launchVehicles: LaunchVehicle[] = [
     reusable: true,
     status: "operational",
     blurb: "Heavy lifter with a reusable first stage; ESCAPADE rode it.",
+    specs: { heightM: 98, stages: 2, flights: 3, successes: 2, recordAsOf: "2026-11-15" }, // Wikipedia infobox read 2026-11-15
     sources: [S_LSP, wiki("New Glenn (payload, flights, price)", "New_Glenn")],
     verified: false,
   },
@@ -131,7 +137,8 @@ export const launchVehicles: LaunchVehicle[] = [
     reusable: false,
     status: "operational",
     blurb: "ULA's Centaur V upper stage launcher for national security and science.",
-    sources: [{ title: "ULA Vulcan Centaur performance table (VC6)", url: "https://www.ulalaunch.com/rockets/vulcan-centaur" }],
+    specs: { heightM: 61.6, stages: 2, flights: 4, successes: 4, recordAsOf: "2026-11-15" }, // Wikipedia infobox read 2026-11-15; standard fairing
+    sources: [{ title: "ULA Vulcan Centaur performance table (VC6)", url: "https://www.ulalaunch.com/rockets/vulcan-centaur" }, wiki("Vulcan Centaur (height, stages, launch record)", "Vulcan_Centaur")],
     verified: false,
   },
   {
@@ -150,6 +157,7 @@ export const launchVehicles: LaunchVehicle[] = [
     reusable: false,
     status: "operational",
     blurb: "Europe's launcher with two boosters, operated by Arianespace.",
+    specs: { heightM: 63, stages: 2, flights: 9, successes: 8, recordAsOf: "2026-11-15" }, // Wikipedia infobox read 2026-11-15; Ariane 6 family record
     sources: [S_A6, S_A6_NUMBERS, wiki("Ariane 6 (price, flights)", "Ariane_6")],
     verified: false,
   },
@@ -169,6 +177,7 @@ export const launchVehicles: LaunchVehicle[] = [
     reusable: false,
     status: "operational",
     blurb: "Four-booster Ariane 6 for heavy loads, operated by Arianespace.",
+    specs: { heightM: 63, stages: 2, flights: 9, successes: 8, recordAsOf: "2026-11-15" }, // Wikipedia infobox read 2026-11-15; Ariane 6 family record
     sources: [S_A6, S_A6_NUMBERS, wiki("Ariane 6 (price, flights)", "Ariane_6")],
     verified: false,
   },
@@ -185,6 +194,7 @@ export const launchVehicles: LaunchVehicle[] = [
     reusable: false,
     status: "operational",
     blurb: "Small European launcher for Earth observation, by Arianespace.",
+    specs: { heightM: 34.8, stages: 4, flights: 8, successes: 7, recordAsOf: "2026-11-15" }, // Wikipedia infobox read 2026-11-15
     sources: [S_VEGAC, S_VEGAC0, wiki("Vega C (price, flights)", "Vega_C")],
     verified: false,
   },
@@ -203,6 +213,7 @@ export const launchVehicles: LaunchVehicle[] = [
     reusable: false,
     status: "operational",
     blurb: "Japan's flexible launcher, cheaper than its predecessor H-IIA.",
+    specs: { heightM: 63, stages: 2, flights: 10, successes: 8, recordAsOf: "2026-11-15" }, // Wikipedia infobox read 2026-11-15; with the L or W fairing (57 m with the S fairing)
     sources: [S_HTVX1, S_H3, wiki("H3 (rocket) (payload, price, flights)", "H3_(rocket)")],
     verified: false,
   },
@@ -216,10 +227,11 @@ export const launchVehicles: LaunchVehicle[] = [
       GTO: 1425, // ISRO: 1,425 kg to sub-GTO
     },
     costMUsd: 22, // INR 130-200 crore, US$18-27M, midpoint
-    reliability: 0.921, // 58 successes of 63 launches as of 2026-01-12
+    reliability: 0.922, // 59 successes of 64 launches as of 2026-11-15
     reusable: false,
     status: "operational",
     blurb: "India's low-cost rideshare champion for small satellites.",
+    specs: { heightM: 44, stages: 4, flights: 64, successes: 59, recordAsOf: "2026-11-15" }, // Wikipedia infobox read 2026-11-15
     sources: [S_PSLV, wiki("PSLV (LEO payload, price, flights)", "PSLV")],
     verified: false,
   },
@@ -237,6 +249,7 @@ export const launchVehicles: LaunchVehicle[] = [
     reusable: false,
     status: "operational",
     blurb: "India's heavy launcher; it sent Chandrayaan-3 to the Moon.",
+    specs: { heightM: 43.4, stages: 3, flights: 9, successes: 9, recordAsOf: "2026-11-15" }, // Wikipedia infobox read 2026-11-15
     sources: [wiki("LVM3 (payload, price, flights)", "LVM3")],
     verified: false,
   },
@@ -253,6 +266,7 @@ export const launchVehicles: LaunchVehicle[] = [
     reusable: false,
     status: "operational",
     blurb: "Dedicated small launcher with booster recovery trials.",
+    specs: { heightM: 18, stages: 2, flights: 100, successes: 96, recordAsOf: "2026-11-15" }, // Wikipedia infobox read 2026-11-15; count includes HASTE suborbital flights
     sources: [S_ELECTRON, S_RKLB_10K, wiki("Electron (rocket) (flights)", "Electron_(rocket)")],
     verified: false,
   },
@@ -269,6 +283,7 @@ export const launchVehicles: LaunchVehicle[] = [
     reusable: true,
     status: "in-development",
     blurb: "Medium reusable rocket, first launch slipped to 2027.",
+    specs: { heightM: 42.8, stages: 2, flights: 0, successes: 0, recordAsOf: "2026-11-15" }, // Wikipedia infobox read 2026-11-15; not flown yet
     sources: [wiki("Neutron (rocket) (payload, price, status)", "Neutron_(rocket)")],
     verified: false,
   },
@@ -286,6 +301,7 @@ export const launchVehicles: LaunchVehicle[] = [
     reusable: false,
     status: "operational",
     blurb: "South Korea's own three-stage launcher, flying since 2021.",
+    specs: { heightM: 47.2, stages: 3, flights: 5, successes: 4, recordAsOf: "2026-11-15" }, // Wikipedia infobox read 2026-11-15
     sources: [S_KARI, wiki("Nuri (rocket) (LEO payload, price, flights)", "Nuri_(rocket)")],
     verified: false,
   },
@@ -302,6 +318,7 @@ export const launchVehicles: LaunchVehicle[] = [
     reusable: false,
     status: "operational",
     blurb: "Small launcher with a rough record; Firefly is fixing it.",
+    specs: { heightM: 29, stages: 2, flights: 7, successes: 3, recordAsOf: "2026-11-15" }, // Wikipedia infobox read 2026-11-15; 2 failures and 2 partial failures
     sources: [S_ALPHA, S_ALPHA_PRICE, wiki("Firefly Alpha (flights)", "Firefly_Alpha")],
     verified: false,
   },

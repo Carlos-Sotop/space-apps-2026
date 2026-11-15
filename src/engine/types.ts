@@ -160,6 +160,19 @@ export interface LaunchVehicle extends Sourced {
   status: "operational" | "in-development";
   /** one line shown on the card */
   blurb: string;
+  /** numbers for the spec card; payload comes from capacityKg and the owner from providerId */
+  specs?: LaunchVehicleSpecs;
+}
+
+export interface LaunchVehicleSpecs {
+  /** height to the tip of the fairing, m */
+  heightM: number;
+  stages: number;
+  /** orbital launches flown and fully successful, counted on recordAsOf */
+  flights: number;
+  successes: number;
+  /** ISO date the flight record was read */
+  recordAsOf: string;
 }
 
 /* ------------------------------------------------------------------ */
