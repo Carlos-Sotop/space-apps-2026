@@ -17,7 +17,7 @@ export function Warnings({ warnings, onFix }: { warnings: OpsWarning[]; onFix: (
               {w.turnsLeft !== undefined && <div className="num text-[11px]">{w.turnsLeft} turn{w.turnsLeft === 1 ? "" : "s"} left</div>}
               {w.fix && <div className="mt-1 text-xs font-medium text-fg"><span className="text-cyan">Fix: </span>{w.fix}</div>}
             </div>
-            {w.fix && <Button size="sm" variant="primary" onClick={() => onFix(w)}>Fix</Button>}
+            {w.fix && <Button size="sm" variant="primary" className="shrink-0 !text-[#0b0b1e]" onClick={() => onFix(w)}>Fix</Button>}
           </div>
         </li>
       ))}
