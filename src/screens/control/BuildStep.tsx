@@ -172,14 +172,14 @@ export function BuildStep() {
           </div>
 
           <div data-coach="build.modules" className="grid gap-3 sm:grid-cols-2">
-            {shown.map((m) => {
+            {shown.map((m, n) => {
               const on = design.moduleIds.includes(m.id);
               const pointed = spot?.moduleId === m.id;
               return (
                 <GlassCard
                   key={m.id}
                   selected={on}
-                  data-coach={pointed ? "build.focus" : undefined}
+                  data-coach={pointed ? "build.focus" : n === 0 ? "build.module" : undefined}
                   onSelect={() => { if (!on) flashGauges(["power", "mass", "budget"]); toggle("moduleIds", m.id); }}
                   label={`${on ? "Remove" : "Add"} ${m.name}`}
                   className={`p-3.5 ${pointed ? "ring-2 ring-cyan" : ""}`}

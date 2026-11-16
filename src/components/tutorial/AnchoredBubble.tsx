@@ -56,7 +56,7 @@ interface Props {
  */
 export function AnchoredBubble({ anchor, pose, tipKey, spotlight, maxWidth = 380, children }: Props) {
   const { box, vp } = useAnchorBox(anchor, true);
-  useScrollToAnchor(anchor, tipKey, true);
+  useScrollToAnchor(anchor, tipKey, true, box, vp);
   const ref = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: maxWidth, h: 150 });
 
@@ -76,11 +76,13 @@ export function AnchoredBubble({ anchor, pose, tipKey, spotlight, maxWidth = 380
 
   const { side, style, arrow } = place(box, vp, size);
   const narrow = vp.w < 640;
+  // a target that fills the screen is not worth lighting: dimming the thin frame around it only adds noise
+  const huge = !!box && (box.height > vp.h * 0.7 || (box.width > vp.w * 0.92 && box.height > vp.h * 0.5));
   const pointLeft = !!box && side !== "docked" && box.left + box.width / 2 < (style.left ?? 0) + style.width / 2 - 40;
 
   return (
     <>
-      {spotlight && box && <Spotlight box={box} vp={vp} />}
+      {spotlight && box && !huge && <Spotlight box={box} vp={vp} />}
       <motion.div
         key={tipKey}
         role="status" aria-live="polite"
