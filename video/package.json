@@ -14,19 +14,25 @@
     "render180": "node scripts/assets.mjs && node scripts/make-vtt.mjs 180 && remotion render src/index.ts SpaceDAO180 out/spacedao-3min.mp4 --codec=h264 --crf=16 --audio-bitrate=320k --concurrency=4 --timeout=120000"
   },
   "dependencies": {
-    "@react-three/fiber": "8.18.0",
+    "@react-three/drei": "10.7.9",
+    "@react-three/fiber": "9.8.2",
+    "@react-three/postprocessing": "3.2.2",
     "@remotion/cli": "4.0.542",
     "@remotion/google-fonts": "4.0.542",
     "@remotion/noise": "4.0.542",
     "@remotion/three": "4.0.542",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
+    "motion": "14.14.0",
+    "postprocessing": "6.39.6",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
     "remotion": "4.0.542",
-    "three": "0.170.0"
+    "three": "0.187.0",
+    "zustand": "5.1.0"
   },
   "devDependencies": {
-    "@types/react": "^18.2.0",
-    "@types/three": "0.170.0",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@types/three": "0.187.0",
     "playwright": "^1.50.0",
     "typescript": "^5.3.0"
   }
