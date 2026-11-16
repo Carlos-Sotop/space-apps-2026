@@ -251,15 +251,40 @@ export function validateDesign(design: MissionDesign, catalog: Catalog): Issue[]
     const needWh = Math.max(0, rep.power.used - independentW) * dark;
     const storage = modules.reduce((s, m) => s + (m.storageWh ?? 0), 0);
     // under ~15 minutes of darkness (e.g. a dawn-dusk orbit) the bus capacitors and margins cover it
-    if (dark >= 0.25 && storage < needWh)
+    if (dark >= 0.25 && storage < needWh) {
+      const load = rep.power.used - independentW;
+      const darkLabel = dark < 2 ? `${fmt(dark * 60)} min` : `${fmt(dark)} h`;
+      // every storage module this mission offers, biggest first; together they are the most the night can draw on
+      const stores = mission.moduleIds
+        .map((id) => catalog.modules.find((m) => m.id === id))
+        .filter((m): m is NonNullable<typeof m> => !!m && (m.storageWh ?? 0) > 0)
+        .sort((a, b) => (b.storageWh ?? 0) - (a.storageWh ?? 0));
+      const maxStorage = stores.reduce((s, m) => s + (m.storageWh ?? 0), 0);
+      const missing = stores.filter((m) => !design.moduleIds.includes(m.id));
+      const sunniest = [...mission.destinations].sort((a, b) => b.sunlightFraction - a.sunlightFraction)[0];
+      let fix: string;
+      if (maxStorage < needWh) {
+        const maxLoad = maxStorage / dark;
+        fix =
+          `No battery on offer can carry this night: all of them together store ${fmt(maxStorage)} Wh, enough for ${fmt(maxLoad)} W over ${darkLabel}, and the design draws ${fmt(load)} W.` +
+          (sunniest && sunniest.id !== destination.id
+            ? ` Land at ${sunniest.name} (${fmt(sunniest.sunlightFraction * 100)}% sunlight) in Launch, or cut the load below ${fmt(maxLoad)} W.`
+            : ` Cut the load below ${fmt(maxLoad)} W${hungriest ? ` (the ${hungriest.name} draws ${fmt(modulePowerW(hungriest, mods, mid))} W)` : ""}.`);
+      } else if (missing.length) {
+        const best = missing.find((m) => storage + (m.storageWh ?? 0) >= needWh) ?? missing[0];
+        fix = `Solar arrays make nothing in shadow; only stored energy helps. The load is ${fmt(load)} W for ${darkLabel} of shadow. Add the ${best.name} in Build (+${fmt(best.storageWh ?? 0)} Wh, ${fmt(best.massKg)} kg). If it does not fit, pick a bigger lander or launch vehicle, and take rideshare deals to pay for it.`;
+      } else {
+        fix = `Every battery on offer is aboard. Cut the load${hungriest ? ` (the ${hungriest.name} draws ${fmt(modulePowerW(hungriest, mods, mid))} W)` : ""} or pick a destination with more sunlight.`;
+      }
       add({
         id: "battery-small",
-      resource: "power",
+        resource: "power",
         domain: "spacecraft",
         severity: "warning",
         text: `The batteries hold ${fmt(storage)} Wh but the ${dark < 2 ? `${fmt(dark * 60)}-minute` : `${fmt(dark)}-hour`} dark period needs about ${fmt(needWh)} Wh.`,
-        fix: `Solar arrays make nothing in shadow, so more panels will not help; only stored energy does. The load is ${fmt(rep.power.used - independentW)} W for ${dark < 2 ? `${fmt(dark * 60)} min` : `${fmt(dark)} h`} of shadow. Add a bigger battery, add sunlight-independent power such as an RTG, cut the load${hungriest ? ` (the ${hungriest.name} draws ${fmt(modulePowerW(hungriest, mods, mid))} W)` : ""}, or pick a destination with more sunlight.`,
+        fix,
       });
+    }
   }
 
   return issues;
