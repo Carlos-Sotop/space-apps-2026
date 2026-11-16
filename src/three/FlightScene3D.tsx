@@ -12,7 +12,8 @@ import type { FlightSceneProps } from "@/screens/FlightSceneSvg";
 import type { Timeline } from "@/screens/flightTimeline";
 import { Earth, Moon } from "@/scene/bodies";
 import { StationModel } from "./missions/parts";
-import { EARTH_R, FlightPath, MOON_C, MOON_R, NOSE, STAGE1, STAGE2, newPose, newState } from "./flightPath";
+import { EARTH_R, FLIGHT_SECONDS, FlightPath, MOON_C, MOON_R, newPose, newState } from "./flightPath";
+import { BELL1_Y, BELL2_Y, Stage1Model, UpperStageModel, makeParticleMaterial, makePlumeGeometry, makePlumeMaterial, usePlumeFade, useSoftDot } from "./rocket";
 
 export interface FlightCoreProps {
   timeline: Timeline;
@@ -29,19 +30,11 @@ export interface FlightCoreProps {
   clock?: { readonly current: number };
   /** called once, on the first frame drawn */
   onReady?: () => void;
+  /** prefers-reduced-motion: no shake, no smoke, only the positions */
+  calm?: boolean;
 }
 
 const PATH_N = 240;
-
-/** Unit-height open cone, apex down, base at the top: the plume, scaled each frame. */
-function usePlumeGeometry() {
-  return useMemo(() => {
-    const g = new THREE.ConeGeometry(1, 1, 20, 1, true);
-    g.rotateX(Math.PI);
-    g.translate(0, -0.5, 0);
-    return g;
-  }, []);
-}
 
 /** Text label drawn to a canvas texture (drei <Html> re-mounts a React root every frame here). */
 function useLabel(text: string) {
@@ -60,14 +53,21 @@ function useLabel(text: string) {
  * The flight scene without its Canvas: the game puts it in an R3F Canvas, the video in Remotion's
  * ThreeCanvas. Everything moves by mutation inside one useFrame, from preallocated objects.
  */
-export function FlightSceneCore({ timeline, lunar, station, lostAt, progress, clock, onReady }: FlightCoreProps) {
+export function FlightSceneCore({ timeline, lunar, station, lostAt, progress, clock, onReady, calm }: FlightCoreProps) {
   const path = useMemo(() => new FlightPath(timeline, { lunar, station, lostAt }), [timeline, lunar, station, lostAt]);
   const L = path.layout;
   const plan = useMemo(() => path.plannedPath(PATH_N), [path]);
   const ring = useMemo(() => path.ring(), [path]);
   const st = useMemo(newState, []);
   const pose = useMemo(newPose, []);
-  const plumeGeo = usePlumeGeometry();
+  const dot = useSoftDot();
+  const plumeGeo = useMemo(makePlumeGeometry, []);
+  const coreGeo = useMemo(() => { const g = new THREE.CylinderGeometry(0.5, 0.12, 1, 24, 8, true); g.translate(0, -0.5, 0); return g; }, []);
+  const plumeFade = usePlumeFade();
+  const outerMat = useMemo(() => makePlumeMaterial("#ff7a3d", plumeFade, 0.55), [plumeFade]);
+  const coreMat = useMemo(() => makePlumeMaterial("#fff1c2", plumeFade, 0.95), [plumeFade]);
+  const sparkMat = useMemo(() => makeParticleMaterial(dot, "#ffb066", true), [dot]);
+  const smokeMat = useMemo(() => makeParticleMaterial(dot, "#d9dde8", false), [dot]);
   const earthLabel = useLabel("Earth");
   const moonLabel = useLabel("Moon");
   const moonQ = useMemo(() => new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, -1, 0), L.landDir), [L]);
@@ -78,10 +78,13 @@ export function FlightSceneCore({ timeline, lunar, station, lostAt, progress, cl
   const plume = useRef<THREE.Group>(null);
   const outer = useRef<THREE.Mesh>(null);
   const core = useRef<THREE.Mesh>(null);
-  const throat = useRef<THREE.Mesh>(null);
+  const throat = useRef<THREE.Sprite>(null);
+  const throatMat = useRef<THREE.SpriteMaterial>(null);
+  const smoke = useRef<THREE.Points>(null);
+  const rim = useRef<THREE.DirectionalLight>(null);
+  const rimTarget = useRef<THREE.Object3D>(null);
   const flameLight = useRef<THREE.PointLight>(null);
   const spent = useRef<THREE.Group>(null);
-  const spentMat = useRef<THREE.MeshStandardMaterial>(null);
   const stationRef = useRef<THREE.Group>(null);
   const lostRef = useRef<THREE.Group>(null);
   const trail = useRef<Line2>(null);
@@ -92,12 +95,30 @@ export function FlightSceneCore({ timeline, lunar, station, lostAt, progress, cl
   const dustMat = useRef<THREE.PointsMaterial>(null);
   const bloom = useRef<UnrealBloomPass | null>(null);
 
+  const scratchFade = useMemo(() => ({ value: 1 }), []);
   // per-frame scratch
   const scratch = useMemo(() => ({
     m: new THREE.Matrix4(), x: new THREE.Vector3(), z: new THREE.Vector3(), v: new THREE.Vector3(),
     offPos: new THREE.Vector3(), offLook: new THREE.Vector3(), lastPos: new THREE.Vector3(), lastLook: new THREE.Vector3(),
     lastP: -1, ready: false,
+    fadeMesh: (o: THREE.Object3D) => {
+      const m = (o as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined;
+      if (m && "opacity" in m) { m.transparent = true; m.opacity = scratchFade.value; }
+    },
+  }), [scratchFade]);
+
+  // smoke from the pad: the exhaust hits the ground and rolls out sideways, then thins out
+  const SMOKE_N = 170;
+  const smokeSeeds = useMemo(() => Array.from({ length: SMOKE_N }, (_, i) => {
+    const f = (i * 0.6180339887) % 1, g = (i * 0.7548776662) % 1, h = (i * 0.5698402910) % 1;
+    const late = i > 110;
+    return { a: f * Math.PI * 2, speed: 0.05 + 0.08 * g, rise: 0.004 + 0.012 * h, delay: late ? 0.8 + 1.6 * g : 0.04 + 0.75 * h, grow: 0.7 + 0.6 * f };
   }), []);
+  const smokeData = useMemo(() => ({ pos: new Float32Array(SMOKE_N * 3), size: new Float32Array(SMOKE_N), alpha: new Float32Array(SMOKE_N) }), []);
+  // hot gas in the plume: grains born at the nozzle that stream back, spread and cool
+  const SPARK_N = 56;
+  const sparkData = useMemo(() => ({ pos: new Float32Array(SPARK_N * 3), size: new Float32Array(SPARK_N), alpha: new Float32Array(SPARK_N) }), []);
+  const sparks = useRef<THREE.Points>(null);
 
   // dust thrown up by the landing engine: low straight arcs, no air on the Moon
   const DUST_N = 300;
@@ -118,6 +139,7 @@ export function FlightSceneCore({ timeline, lunar, station, lostAt, progress, cl
     camera.fov = 45; camera.near = 0.004; camera.far = 220;
     camera.updateProjectionMatrix();
   }, [camera]);
+  useEffect(() => { if (rim.current && rimTarget.current) rim.current.target = rimTarget.current; }, []);
 
   useFrame((state, rawDt) => {
     const dt = Math.min(0.1, Math.max(0, rawDt));
@@ -145,6 +167,19 @@ export function FlightSceneCore({ timeline, lunar, station, lostAt, progress, cl
     S.lastPos.copy(pose.pos);
     S.lastLook.copy(pose.look);
 
+    // ignition rumble: 2 to 3 pixels of shake that dies away as the rocket climbs
+    const tIgn = (Math.min(p, path.marks.end) - path.marks.ignite) * FLIGHT_SECONDS;
+    if (!calm && tIgn > 0 && s.climb < 0.35) {
+      const env = Math.min(1, tIgn / 0.3) * (1 - Math.min(1, s.climb / 0.35)) * s.burn;
+      const px = (2 * pose.pos.distanceTo(pose.look) * Math.tan((22.5 * Math.PI) / 180)) / Math.max(1, state.size.height);
+      const amp = 2.5 * px * env;
+      S.v.subVectors(pose.look, pose.pos).cross(pose.up).normalize();
+      const nx = Math.sin(t * 47.3) * 0.6 + Math.sin(t * 83.1 + 1.7) * 0.4;
+      const ny = Math.sin(t * 53.9 + 0.5) * 0.6 + Math.sin(t * 91.7 + 2.3) * 0.4;
+      pose.pos.addScaledVector(S.v, nx * amp).addScaledVector(pose.up, ny * amp);
+      pose.look.addScaledVector(S.v, nx * amp).addScaledVector(pose.up, ny * amp);
+    }
+
     const cam = state.camera;
     cam.position.copy(pose.pos);
     cam.up.copy(pose.up);
@@ -169,18 +204,80 @@ export function FlightSceneCore({ timeline, lunar, station, lostAt, progress, cl
     const burn = s.burn;
     if (plume.current) {
       plume.current.visible = burn > 0.01 && !s.lost;
-      plume.current.position.y = s.stage1 ? -STAGE1 : 0;
-      const flick = 1 + 0.1 * Math.sin(t * 34) + 0.05 * Math.sin(t * 57 + 1.3);
-      const len = (1.1 + 1.6 * s.climb) * burn * flick;
-      const wid = 0.2 + 0.08 * s.climb;
-      outer.current?.scale.set(wid * flick, len, wid * flick);
-      core.current?.scale.set(wid * 0.45 * flick, len * 0.7, wid * 0.45 * flick);
-      if (throat.current) throat.current.scale.setScalar(0.11 * (0.6 + 0.4 * burn));
+      plume.current.position.y = s.stage1 ? BELL1_Y : BELL2_Y;
+      const nozzle = s.stage1 ? 0.058 : 0.044;
+      const flick = 1 + 0.06 * Math.sin(t * 31) + 0.04 * Math.sin(t * 57 + 1.3);
+      // short against the pad, longer and wider as the air thins
+      const ground = 0.6 + 0.4 * Math.min(1, s.climb * 6);
+      const len = (1.0 + 2.6 * s.climb) * ground * Math.min(1, burn * 1.4) * flick;
+      const wide = 2 * nozzle * (1 + 0.9 * s.climb);
+      outer.current?.scale.set(wide, len, wide);
+      core.current?.scale.set(2 * nozzle * 0.85, len * 0.42, 2 * nozzle * 0.85);
+      outerMat.opacity = 0.55 * Math.min(1, burn * 1.5);
+      coreMat.opacity = 0.95 * Math.min(1, burn * 1.5);
+      // the flash at ignition, then the glow at the throat
+      const flash = Math.exp(-(((tIgn - 0.12) / 0.12) ** 2)) * 1.3;
+      if (throat.current) throat.current.scale.setScalar((0.5 + flash) * Math.max(0.2, burn));
+      const sk = sparks.current;
+      if (sk) {
+        sk.visible = !calm;
+        if (sk.visible) {
+          const D = sparkData;
+          for (let i = 0; i < SPARK_N; i++) {
+            const ph = (t * 2.6 + i / SPARK_N + ((i * 0.618) % 1) * 0.3) % 1;
+            const a = i * 2.399963, spread = nozzle * (0.4 + 1.6 * ph) * (1 + 0.8 * s.climb);
+            D.pos[i * 3] = Math.cos(a) * spread * ((i * 0.37) % 1);
+            D.pos[i * 3 + 1] = -ph * len * 1.1;
+            D.pos[i * 3 + 2] = Math.sin(a) * spread * ((i * 0.37) % 1);
+            D.size[i] = size * (0.05 + 0.12 * ph);
+            D.alpha[i] = (1 - ph) * (1 - ph) * 0.8 * Math.min(1, burn * 1.5);
+          }
+          const g = sk.geometry;
+          (g.attributes.position as THREE.BufferAttribute).needsUpdate = true;
+          (g.attributes.size as THREE.BufferAttribute).needsUpdate = true;
+          (g.attributes.alpha as THREE.BufferAttribute).needsUpdate = true;
+          sparkMat.uniforms.scale.value = (state.size.height * state.viewport.dpr) / (2 * Math.tan((22.5 * Math.PI) / 180));
+        }
+      }
+      if (throatMat.current) throatMat.current.opacity = Math.min(1, 0.7 * burn + flash);
     }
     if (flameLight.current) {
       flameLight.current.intensity = 0.5 * burn;
       flameLight.current.distance = size * 6;
-      flameLight.current.position.y = s.stage1 ? -STAGE1 - 0.2 : -0.2;
+      flameLight.current.position.y = (s.stage1 ? BELL1_Y : BELL2_Y) - 0.15;
+    }
+
+    // rim light: cyan, from behind the rocket as the camera sees it, so it stands out from the dark
+    if (rim.current && rimTarget.current) {
+      rimTarget.current.position.copy(s.pos);
+      rim.current.position.copy(s.pos).sub(pose.pos).normalize().addScaledVector(pose.up, 0.5).add(s.pos);
+    }
+
+    // smoke rolling out from the pad
+    const sm = smoke.current;
+    if (sm) {
+      sm.visible = !calm && tIgn > 0 && tIgn < 6.5 && !s.lost;
+      if (sm.visible) {
+        const D = smokeData;
+        S.x.copy(L.earth).addScaledVector(L.P, EARTH_R);
+        for (let i = 0; i < SMOKE_N; i++) {
+          const sd = smokeSeeds[i];
+          const tau = tIgn - sd.delay;
+          if (tau <= 0) { D.alpha[i] = 0; continue; }
+          const dist = sd.speed * 1.6 * (1 - Math.exp(-tau / 1.3));
+          const ca = Math.cos(sd.a), sa = Math.sin(sd.a);
+          S.v.copy(S.x).addScaledVector(L.T, ca * dist).addScaledVector(L.N, sa * dist).addScaledVector(L.P, 0.003 + sd.rise * Math.pow(tau, 0.8));
+          D.pos[i * 3] = S.v.x; D.pos[i * 3 + 1] = S.v.y; D.pos[i * 3 + 2] = S.v.z;
+          D.size[i] = (0.012 + 0.03 * Math.min(1, tau / 3)) * sd.grow;
+          const inA = Math.min(1, tau / 0.25), outA = 1 - Math.min(1, Math.max(0, (tau - 1.8) / 1.8));
+          D.alpha[i] = 0.5 * inA * outA;
+        }
+        const g = sm.geometry;
+        (g.attributes.position as THREE.BufferAttribute).needsUpdate = true;
+        (g.attributes.size as THREE.BufferAttribute).needsUpdate = true;
+        (g.attributes.alpha as THREE.BufferAttribute).needsUpdate = true;
+        smokeMat.uniforms.scale.value = (state.size.height * state.viewport.dpr) / (2 * Math.tan((22.5 * Math.PI) / 180));
+      }
     }
 
     // the first stage, once it lets go: it drifts back, falls and tumbles, then fades
@@ -190,14 +287,15 @@ export function FlightSceneCore({ timeline, lunar, station, lostAt, progress, cl
       sp.visible = !s.lost && age >= 0 && age < 2.4;
       if (sp.visible) {
         const travel = s.sepSpeed * age * 0.55;
-        sp.position.copy(s.sepPos).addScaledVector(s.sepVel, travel - STAGE1 * size * 0.5).addScaledVector(s.sepOut, -0.004 * age * age);
+        sp.position.copy(s.sepPos).addScaledVector(s.sepVel, travel).addScaledVector(s.sepOut, -0.004 * age * age);
         S.x.copy(L.N).negate();
         S.m.makeBasis(S.x, s.sepVel, S.z.crossVectors(S.x, s.sepVel));
         sp.quaternion.setFromRotationMatrix(S.m);
         sp.rotateX(age * 0.9);
         sp.rotateZ(age * 0.5);
         sp.scale.setScalar(size);
-        if (spentMat.current) spentMat.current.opacity = Math.max(0, 1 - age / 2.4);
+        scratchFade.value = Math.max(0, 1 - age / 2.4);
+        sp.traverse(S.fadeMesh);
       }
     }
 
@@ -230,8 +328,10 @@ export function FlightSceneCore({ timeline, lunar, station, lostAt, progress, cl
         lostRef.current.scale.setScalar((size / 0.06) * (1 + 0.15 * Math.sin(t * 6)));
       }
     }
-    if (earthSprite.current) earthSprite.current.opacity = pose.wide;
-    if (moonSprite.current) moonSprite.current.opacity = pose.wide;
+    // body names only once the view is wide
+    const label = Math.min(1, Math.max(0, (pose.wide - 0.45) / 0.5));
+    if (earthSprite.current) earthSprite.current.opacity = label;
+    if (moonSprite.current) moonSprite.current.opacity = label;
 
     // landing dust
     const d = dust.current;
@@ -308,42 +408,39 @@ export function FlightSceneCore({ timeline, lunar, station, lostAt, progress, cl
 
       {/* the first stage after it lets go */}
       <group ref={spent} visible={false}>
-        <mesh position={[0, -STAGE1 / 2, 0]}>
-          <cylinderGeometry args={[0.075, 0.08, STAGE1, 14]} />
-          <meshStandardMaterial ref={spentMat} color="#cbd5e1" transparent opacity={1} />
-        </mesh>
+        <Stage1Model />
       </group>
 
       {/* the rocket: origin at the top of the first stage, nose up its local y */}
       <group ref={rocket}>
-        <group ref={stage1}>
-          <mesh position={[0, -STAGE1 / 2, 0]}>
-            <cylinderGeometry args={[0.075, 0.08, STAGE1, 14]} />
-            <meshStandardMaterial color="#e2e8f0" emissive="#334155" />
-          </mesh>
-        </group>
-        <mesh position={[0, STAGE2 / 2, 0]}>
-          <cylinderGeometry args={[0.07, 0.075, STAGE2, 14]} />
-          <meshStandardMaterial color="#f1f5f9" emissive="#334155" />
-        </mesh>
-        <mesh position={[0, STAGE2 + NOSE / 2, 0]}>
-          <coneGeometry args={[0.07, NOSE, 14]} />
-          <meshStandardMaterial color="#a78bfa" emissive="#6d28d9" />
-        </mesh>
+        <Stage1Model ref={stage1} />
+        <UpperStageModel />
         <group ref={plume}>
-          <mesh ref={outer} geometry={plumeGeo}>
-            <meshBasicMaterial color="#fb7185" transparent opacity={0.32} side={THREE.DoubleSide} depthWrite={false} blending={THREE.AdditiveBlending} />
-          </mesh>
-          <mesh ref={core} geometry={plumeGeo}>
-            <meshBasicMaterial color="#fde68a" transparent opacity={0.6} side={THREE.DoubleSide} depthWrite={false} blending={THREE.AdditiveBlending} />
-          </mesh>
-          <mesh ref={throat}>
-            <sphereGeometry args={[1, 12, 12]} />
-            <meshBasicMaterial color="#fff7e0" transparent opacity={0.9} depthWrite={false} blending={THREE.AdditiveBlending} />
-          </mesh>
+          <mesh ref={outer} geometry={plumeGeo} material={outerMat} frustumCulled={false} />
+          <mesh ref={core} geometry={coreGeo} material={coreMat} frustumCulled={false} />
+          <points ref={sparks} frustumCulled={false} material={sparkMat}>
+            <bufferGeometry>
+              <bufferAttribute attach="attributes-position" args={[sparkData.pos, 3]} />
+              <bufferAttribute attach="attributes-size" args={[sparkData.size, 1]} />
+              <bufferAttribute attach="attributes-alpha" args={[sparkData.alpha, 1]} />
+            </bufferGeometry>
+          </points>
+          <sprite ref={throat}>
+            <spriteMaterial ref={throatMat} map={dot} color="#fff1d0" transparent depthWrite={false} blending={THREE.AdditiveBlending} />
+          </sprite>
         </group>
         <pointLight ref={flameLight} color="#fbbf24" intensity={0} distance={1} />
       </group>
+      <directionalLight ref={rim} color="#22d3ee" intensity={2.4} />
+      <object3D ref={rimTarget} />
+
+      <points ref={smoke} visible={false} frustumCulled={false} material={smokeMat}>
+        <bufferGeometry>
+          <bufferAttribute attach="attributes-position" args={[smokeData.pos, 3]} />
+          <bufferAttribute attach="attributes-size" args={[smokeData.size, 1]} />
+          <bufferAttribute attach="attributes-alpha" args={[smokeData.alpha, 1]} />
+        </bufferGeometry>
+      </points>
 
       <group ref={lostRef} visible={false}>
         <mesh><sphereGeometry args={[0.12, 16, 16]} /><meshBasicMaterial color="#fb7185" transparent opacity={0.55} blending={THREE.AdditiveBlending} depthWrite={false} /></mesh>
