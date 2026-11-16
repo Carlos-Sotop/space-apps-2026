@@ -102,7 +102,7 @@ export function validateDesign(design: MissionDesign, catalog: Catalog): Issue[]
       fix: carrier
         ? `Choose a bigger launch vehicle or a lighter ${carrier.category}.`
         : heaviest
-          ? `Drop the ${heaviest.name} (-${fmt(moduleMassKg(heaviest, mods, mid))} kg) or choose a bigger launch vehicle.`
+          ? `Drop or swap the ${heaviest.name} (-${fmt(moduleMassKg(heaviest, mods, mid))} kg), choose a bigger launch vehicle in Launch, or take a partner's open tech that makes modules lighter.`
           : "Choose a bigger launch vehicle.",
     });
   }
@@ -173,7 +173,7 @@ export function validateDesign(design: MissionDesign, catalog: Catalog): Issue[]
       fix: hungriest
         ? station
           ? `Drop the ${hungriest.name} (-${fmt(modulePowerW(hungriest, mods, mid))} W) or swap it for a smaller experiment.`
-          : `Add a solar array or drop the ${hungriest.name} (-${fmt(modulePowerW(hungriest, mods, mid))} W).`
+          : `Generation is short, and batteries cannot fix that (they only store power). Add a solar array in Build, drop the ${hungriest.name} (-${fmt(modulePowerW(hungriest, mods, mid))} W), or take an open tech that cuts power use.`
         : "Add a solar array.",
     });
   if (destination && rep.data.status === "over")
@@ -258,7 +258,7 @@ export function validateDesign(design: MissionDesign, catalog: Catalog): Issue[]
         domain: "spacecraft",
         severity: "warning",
         text: `The batteries hold ${fmt(storage)} Wh but the ${dark < 2 ? `${fmt(dark * 60)}-minute` : `${fmt(dark)}-hour`} dark period needs about ${fmt(needWh)} Wh.`,
-        fix: "Add a bigger battery, add sunlight-independent power such as an RTG, or cut the load.",
+        fix: `Solar arrays make nothing in shadow, so more panels will not help; only stored energy does. The load is ${fmt(rep.power.used - independentW)} W for ${dark < 2 ? `${fmt(dark * 60)} min` : `${fmt(dark)} h`} of shadow. Add a bigger battery, add sunlight-independent power such as an RTG, cut the load${hungriest ? ` (the ${hungriest.name} draws ${fmt(modulePowerW(hungriest, mods, mid))} W)` : ""}, or pick a destination with more sunlight.`,
       });
   }
 
