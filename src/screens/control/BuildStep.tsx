@@ -69,13 +69,13 @@ function Chip({ icon, children, tone = "" }: { icon: IconName; children: ReactNo
  * The night-power warning, right under the gauges: the player sees the shortfall while building,
  * instead of meeting it as a refusal at the review.
  */
-function NightPowerWarning({ design, shortWh, onShowMe }: { design: MissionDesign; shortWh: number; onShowMe: () => void }) {
+function NightPowerWarning({ design, shortWh, fix, onShowMe }: { design: MissionDesign; shortWh: number; fix?: string; onShowMe: () => void }) {
   void design;
   return (
     <div className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-tight/45 bg-tight/10 px-4 py-3" role="status" aria-live="polite">
       <Icon name="warning" size={16} className="shrink-0 text-tight" />
       <p className="m-0 min-w-0 flex-1 text-sm text-fg">
-        <span className="num">Night power short by {fmtWh(shortWh)}.</span> Add a bigger battery or cut the night load.
+        <span className="num">Night power short by {fmtWh(shortWh)}.</span> <span className="text-muted">How to fix: {fix ?? "Add a bigger battery or cut the night load."}</span>
       </p>
       <Button size="sm" onClick={onShowMe}><Icon name="arrow" size={14} /> Show me</Button>
     </div>
@@ -147,7 +147,7 @@ export function BuildStep() {
       </div>
       <div className="grid gap-6 xl:grid-cols-[1fr_300px]">
         <div className="min-w-0">
-          {shortWh > 0 && <NightPowerWarning design={design} shortWh={shortWh} onShowMe={showBattery} />}
+          {shortWh > 0 && <NightPowerWarning design={design} shortWh={shortWh} fix={issues.find((i) => i.id === "battery-small")?.fix} onShowMe={showBattery} />}
           <div role="tablist" aria-label="What the module is for" className="mb-4 flex flex-wrap gap-1.5">
             {(["all", ...fns] as const).map((f) => {
               const on = tab === f;
