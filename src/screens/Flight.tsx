@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { sfx } from "@/components/audio";
 import { TopBar } from "@/components/hud/TopBar";
@@ -35,10 +35,15 @@ export default function Flight() {
   const mission = design ? getMission(design.missionId) : undefined;
   const moon = useLiveRoute("moon");
   const dsn = useLiveRoute("dsn");
+  /** progress as React state, for the HUD and telemetry: refreshed about 10 times a second */
   const [p, setP] = useState(0);
   const [speed, setSpeed] = useState(1);
+  /** the same progress every frame: the 3D view reads it directly, so the page never re-renders at 60 Hz */
   const pRef = useRef(0);
   const speedRef = useRef(1);
+  /** set by the flight view on its first frame, so the flight starts on the pad, not behind a loading screen */
+  const readyRef = useRef(false);
+  const onReady = useCallback(() => { readyRef.current = true; }, []);
   /** risk events the flight has already reached, so each one is heard once */
   const heard = useRef(0);
 
@@ -49,15 +54,16 @@ export default function Flight() {
   const calm = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   useEffect(() => {
-    let raf = 0, last = performance.now();
+    const t0 = performance.now();
+    let raf = 0, last = t0, shown = -Infinity, started = false;
     pRef.current = 0; setP(0);
     heard.current = 0;
-    // the first phase of every mission is the launch, so the flight opens on the pad
-    sfx("launch");
     const tick = (now: number) => {
       const dt = Math.min(0.1, (now - last) / 1000); last = now;
-      pRef.current = Math.min(end, pRef.current + (dt * speedRef.current) / (calm ? DURATION_S / 4 : DURATION_S));
-      setP(pRef.current);
+      // the first phase of every mission is the launch, so the flight opens on the pad, with its sound
+      if (!started && (readyRef.current || now - t0 > 3000)) { started = true; sfx("launch"); }
+      if (started) pRef.current = Math.min(end, pRef.current + (dt * speedRef.current) / (calm ? DURATION_S / 4 : DURATION_S));
+      if (pRef.current >= end || now - shown >= 100) { shown = now; setP(pRef.current); }
       if (pRef.current < end) raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
@@ -141,7 +147,7 @@ export default function Flight() {
         <div className="grid gap-4 lg:grid-cols-[1fr_340px]">
           <div className="min-w-0 space-y-4">
             <div className="glass relative aspect-[4/3] overflow-hidden sm:aspect-[2/1]">
-              <FlightScene timeline={timeline} p={p} lunar={lunar} lostAt={result.lostAt} ended={ended} />
+              <FlightScene timeline={timeline} p={p} pRef={pRef} lunar={lunar} station={dest.orbitClass === "ISS"} lostAt={result.lostAt} ended={ended} onReady={onReady} />
               <FlightHud timeline={timeline} index={index} p={p} day={day} ended={ended} lost={!!result.lostAt && ended} calm={calm} live={liveItems} />
             </div>
             <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
