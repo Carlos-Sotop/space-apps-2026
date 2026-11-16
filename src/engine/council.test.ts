@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { catalog as game } from "@/data";
 import { catalog, orbitalDesign } from "./fixtures";
-import { computeResources, councilReview, defaultDesign, designMoves, validateDesign } from "./index";
+import { autoDesign, batteryShortWh, computeResources, councilReview, defaultDesign, designMoves, readinessReview, validateDesign } from "./index";
+import { fmt } from "./design";
 import type { Coalition, MissionDesign } from "./types";
 
 const COUNCILS: Coalition["partnerIds"][] = [
@@ -13,6 +14,7 @@ const COUNCILS: Coalition["partnerIds"][] = [
 
 const FIX = /\b(Add|Drop|Swap to|Launch on|No part on offer|No room for|Agree with|Pick|Choose|Deselect|Room for)\b|stays in reserve/;
 const lowerFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
+const RANK: Record<string, number> = { "no-go": 0, "go-with-condition": 1, go: 2 };
 
 /** Designs a player really makes: the default, a loaded one, one missing comms, one on a rocket that is too small. */
 function variants(d: MissionDesign): MissionDesign[] {
@@ -117,5 +119,59 @@ describe("council lines", () => {
     expect(councilReview(d, game).some((r) => r.message.includes("Room for"))).toBe(true);
     const blocked = councilReview({ ...d, launchVehicleId: "electron" }, game);
     expect(blocked.some((r) => r.message.includes("Room for"))).toBe(false);
+  });
+});
+
+/**
+ * The refusal card leads with `plain`: what is wrong and how far it is from passing, in one
+ * sentence a first-time player understands. Without it the card only showed a verdict stamp.
+ */
+describe("plain-language refusals", () => {
+  const coalition: Coalition = { leadId: "nasa", partnerIds: ["esa", "jaxa", "csa"] };
+
+  it("names the energy still missing for the dark period", () => {
+    const d = autoDesign("moon-base-zero", coalition, game);
+    const storage = d.moduleIds.filter((id) => (game.modules.find((m) => m.id === id)?.storageWh ?? 0) > 0);
+    expect(storage.length).toBeGreaterThan(0);
+    const smallest = storage.sort((a, b) => (game.modules.find((m) => m.id === a)!.storageWh ?? 0) - (game.modules.find((m) => m.id === b)!.storageWh ?? 0))[0];
+    const short = { ...d, moduleIds: d.moduleIds.filter((id) => id !== smallest) };
+    const issues = validateDesign(short, game);
+    expect(issues.map((i) => i.id)).toContain("battery-small");
+    const power = readinessReview(short, game).find((v) => v.check === "power")!;
+    expect(power.verdict).not.toBe("go");
+    expect(power.plain).toMatch(/^Batteries (die|run short) in the dark: short by [\d,]+ Wh$/);
+    // the number in the sentence is the real shortfall the validator found
+    expect(power.plain).toContain(fmt(batteryShortWh(issues)));
+  });
+
+  it("every refusal leads with one short sentence, and a GO never carries a gap", () => {
+    for (const partnerIds of COUNCILS) {
+      for (const missionId of ["orbital-lab", "earth-guardian", "moon-base-zero"] as const) {
+        const d = defaultDesign(missionId, { leadId: "nasa", partnerIds }, game);
+        for (const design of variants(d)) {
+          for (const v of readinessReview(design, game)) {
+            expect(v.plain.length).toBeGreaterThan(0);
+            expect(v.plain.length).toBeLessThanOrEqual(110);
+            expect(v.plain[0]).toBe(v.plain[0].toUpperCase());
+            expect(v.plain).not.toMatch(/[.:]$/);
+            // the two lines the card shows carry the number that has to change; the objectives
+            // seat names the goal instead, because a missing capability has no shortfall
+            if (v.verdict !== "go" && v.check !== "objectives") expect(`${v.plain} ${v.numbers}`).toMatch(/\d/);
+          }
+        }
+      }
+    }
+  });
+
+  it("a fix the card applies really clears the seat that asked for it", () => {
+    const d = defaultDesign("moon-base-zero", { leadId: "nasa", partnerIds: ["esa", "jaxa", "csa"] }, game);
+    const votes = readinessReview(d, game);
+    for (const v of votes) {
+      if (!v.fix) continue;
+      const after = readinessReview({ ...d, ...v.fix.patch }, game).find((x) => x.actorId === v.actorId)!;
+      expect(RANK[after.verdict]).toBeGreaterThanOrEqual(RANK[v.verdict]);
+      // "Show me where" needs a step to open
+      expect(v.fix.goTo).toBeDefined();
+    }
   });
 });
