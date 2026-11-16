@@ -51,6 +51,7 @@ function Inner() {
           <AnimatePresence mode="wait">
             <motion.div key={step} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.22 }}>
               <StepHeader eyebrow={`Step ${idx + 1} of ${STEPS.length}`} title={STEPS[idx].title} subtitle={STEPS[idx].hint} />
+              <p className="-mt-3 mb-4 max-w-2xl text-xs text-faint">You can go back to any step at any time: add parts, take a partner's open tech or rideshare deal, then come back.</p>
               <div className="mb-5" data-coach="control.issues-panel"><WarningsPanel issues={issues} /></div>
               {STEP_CONCEPTS[step] && (
                 <div className="mb-4 flex flex-wrap gap-2">
