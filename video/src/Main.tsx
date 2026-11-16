@@ -32,23 +32,35 @@ type SoundtrackProps = {
 
 export const Soundtrack: React.FC<SoundtrackProps> = ({ music: musicName, vo: VO, sfx: SFX, total: TOTAL, musicStartSec = MUSIC_START_SEC, duck: duckGain = 0.12, idle = 0.45, lifts = [] }) => {
   const music = audioSrc(musicName);
-  // where the voice is speaking: the take's speech runs (scripts/assets.mjs) or, without them, the whole file
-  const voIntervals = VO.flatMap(([name, at]) => {
-    const a = audio(name);
-    if (!a) return [];
-    return a.speech?.length
-      ? a.speech.map(([x, y]) => [at + Math.round(x * FPS), at + Math.round(y * FPS)] as const)
-      : [[at, at + Math.round(a.seconds * FPS)] as const];
-  });
-  // the duck lands 8 frames before each word so a soft first consonant is never under a music swell
-  const voActive = (f: number) => voIntervals.some(([a, z]) => f >= a - 8 && f <= z + 3);
+  // Where the voice speaks, from the take's speech runs (scripts/assets.mjs) or the whole file.
+  // runs(merge, pre, post): pauses shorter than `merge` seconds count as speech; edges padded in frames.
+  const runs = (merge: number, pre: number, post: number) =>
+    VO.flatMap(([name, at]) => {
+      const a = audio(name);
+      if (!a) return [];
+      const list: [number, number][] = a.speech?.length ? [] : [[0, a.seconds]];
+      for (const [x, y] of a.speech ?? []) {
+        const last = list[list.length - 1];
+        if (last && x - last[1] < merge) last[1] = y;
+        else list.push([x, y]);
+      }
+      return list.map(([x, y]) => [at + Math.round(x * FPS) - pre, at + Math.round(y * FPS) + post] as const);
+    });
+  // the music stays down through sentence pauses (under 0.9 s) and is down 8 frames before each word;
+  // lifts follow the exact pauses, and end on their own before the next word
+  const speaking = runs(0.9, 8, 3);
+  const pauses = runs(0, 2, 2);
+  const inRuns = (iv: (readonly [number, number])[], f: number) => iv.some(([a, z]) => f >= a && f <= z);
+  const voActive = (f: number) => inRuns(speaking, f);
+  const share = (iv: (readonly [number, number])[], f: number) => {
+    let n = 0;
+    for (let d = -4; d <= 4; d++) n += inRuns(iv, f + d) ? 1 : 0;
+    return n / 9;
+  };
   const volume = (f: number) => {
-    // share of the 9 frames around f where the voice speaks: an ~8-frame ramp in and out of the duck
-    let duck = 0;
-    for (let d = -4; d <= 4; d++) duck += voActive(f + d) ? 1 : 0;
-    duck /= 9;
-    // lifts only where the voice is silent
-    const lift = Math.max(0, ...lifts.map(([a, z, gain]) => gain * Math.min(ramp(f, a, a + 6), ramp(f, z - 12, z, 1, 0)))) * (1 - duck);
+    // ~8-frame ramp in and out of the duck
+    const duck = share(speaking, f);
+    const lift = Math.max(0, ...lifts.map(([a, z, gain]) => gain * Math.min(ramp(f, a, a + 6), ramp(f, z - 12, z, 1, 0)))) * (1 - share(pauses, f));
     const base = Math.max(interpolate(duck, [0, 1], [idle, duckGain]), lift);
     return base * interpolate(f, [0, 20], [0, 1], clamp) * interpolate(f, [TOTAL - 24, TOTAL], [1, 0], clamp);
   };

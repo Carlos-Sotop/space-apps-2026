@@ -25,7 +25,7 @@ const LOUDNORM = "loudnorm=I=-14:TP=-1.5:LRA=11";
 // the audio. Both get Dayon's web loudness, loudnorm I=-14 TP=-1.5 LRA=11, as AAC 320 kb/s.
 const VIDEOS = [
   { id: "30s", poster: 345, copy: true },
-  { id: "3min", poster: 980 },
+  { id: "3min", poster: 1125 },
 ];
 
 // AudioToolbox AAC (macOS) holds a constant bitrate; ffmpeg's own AAC encoder averages under the target
