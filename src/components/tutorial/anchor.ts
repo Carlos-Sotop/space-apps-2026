@@ -48,19 +48,27 @@ export function useAnchorBox(anchor: string | undefined, active: boolean): { box
   return { box, vp };
 }
 
-/** Scroll the anchor into view once per key, unless the player prefers no motion. */
-export function useScrollToAnchor(anchor: string | undefined, key: string, active: boolean) {
-  const done = useRef("");
+/** Attempts per tip: the page keeps growing while 3D and live data land, so one scroll can miss. */
+const SCROLL_TRIES = 3;
+
+/**
+ * Keep the anchor on screen: scroll to it when it is out of view, give up after a few tries so a
+ * target that cannot be reached never fights the player's own scrolling.
+ */
+export function useScrollToAnchor(anchor: string | undefined, key: string, active: boolean, box: Box | null, vp: Viewport) {
+  const tries = useRef({ key: "", n: 0 });
   useEffect(() => {
-    if (!active || !anchor || done.current === key) return;
+    if (!active || !anchor || !box) return;
+    if (tries.current.key !== key) tries.current = { key, n: 0 };
+    if (tries.current.n >= SCROLL_TRIES) return;
+    if (box.height > vp.h * 0.7) return;
+    if (box.top >= 0 && box.top + box.height <= vp.h) return;
     const el = findAnchor(anchor);
     if (!el) return;
-    done.current = key;
-    const r = el.getBoundingClientRect();
-    if (r.height > window.innerHeight * 0.7) return;
+    tries.current.n += 1;
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     el.scrollIntoView({ block: "center", behavior: reduce ? "auto" : "smooth" });
-  }, [anchor, key, active]);
+  }, [anchor, key, active, box, vp.h]);
 }
 
 export interface Placement {
@@ -81,7 +89,7 @@ export function place(box: Box | null, vp: Viewport, size: { w: number; h: numbe
   const docked: Placement = { side: "docked", style: narrow ? { left: 12, bottom: DOCK, width } : { right: 12, bottom: DOCK, width }, arrow: null };
   if (!box || tall || narrow) {
     // on a phone the bubble stays docked, but the arrow still points up at the target
-    if (narrow && box && !tall) return { ...docked, arrow: clamp(box.left + box.width / 2 - 12, 18, width - 18) };
+    if (narrow && box) return { ...docked, arrow: clamp(box.left + box.width / 2 - 12, 18, width - 18) };
     return docked;
   }
   const clampLeft = (x: number) => clamp(x, 12, Math.max(12, vp.w - width - 12));
