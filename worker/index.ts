@@ -193,6 +193,35 @@ async function handleLive(request: Request, env: Env, ctx: ExecutionContext, rou
   }
 }
 
+/**
+ * Static assets ignore Range requests, so a browser cannot seek a video they serve. /video/* runs through here
+ * (wrangler.jsonc run_worker_first) and answers Range with 206 Partial Content.
+ */
+export async function serveVideo(request: Request, assets: Fetcher): Promise<Response> {
+  const res = await assets.fetch(new Request(request.url, { method: "GET" }));
+  if (!res.ok) return res;
+  const headers = new Headers(res.headers);
+  headers.set("accept-ranges", "bytes");
+  headers.set("cache-control", "public, max-age=3600");
+  const range = /^bytes=(\d*)-(\d*)$/.exec((request.headers.get("range") ?? "").trim());
+  if (!range || (range[1] === "" && range[2] === "")) return new Response(request.method === "HEAD" ? null : res.body, { status: 200, headers });
+  const buf = await res.arrayBuffer();
+  const size = buf.byteLength;
+  let start: number;
+  let end: number;
+  if (range[1] === "") {
+    start = Math.max(0, size - Number(range[2]));
+    end = size - 1;
+  } else {
+    start = Number(range[1]);
+    end = range[2] === "" ? size - 1 : Math.min(Number(range[2]), size - 1);
+  }
+  if (start >= size || start > end) return new Response(null, { status: 416, headers: { "content-range": `bytes */${size}` } });
+  headers.set("content-range", `bytes ${start}-${end}/${size}`);
+  headers.set("content-length", String(end - start + 1));
+  return new Response(request.method === "HEAD" ? null : buf.slice(start, end + 1), { status: 206, headers });
+}
+
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     try {
@@ -206,6 +235,7 @@ export default {
         if (route) return await handleLive(request, env, ctx, route);
         return json({ error: "not found" }, 0, 404);
       }
+      if (env.ASSETS && url.pathname.startsWith("/video/")) return await serveVideo(request, env.ASSETS);
       if (env.ASSETS) return await env.ASSETS.fetch(request);
       return new Response("Not found", { status: 404 });
     } catch {

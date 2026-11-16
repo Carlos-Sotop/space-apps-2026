@@ -147,7 +147,7 @@ export function validateDesign(design: MissionDesign, catalog: Catalog): Issue[]
     const obj = getObjective(mission, id);
     const missingCats = (obj.requires.categories ?? []).filter((c) => !modules.some((m) => m.category === c));
     const anyOf = obj.requires.moduleIds ?? [];
-    const missingIds = anyOf.length && !anyOf.some((x) => design.moduleIds.includes(x)) ? [`one of ${anyOf.join(" / ")}`] : [];
+    const missingIds = anyOf.length && !anyOf.some((x) => design.moduleIds.includes(x)) ? [`one of: ${anyOf.map((x) => modules.find((m) => m.id === x)?.name ?? catalog.modules.find((m) => m.id === x)?.name ?? x).join(", ")}`] : [];
     if (missingCats.length || missingIds.length)
       add({
         id: `secondary-unmet-${id}`,
