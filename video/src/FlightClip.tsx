@@ -5,7 +5,7 @@ import { ThreeCanvas } from "@remotion/three";
 import "./gameTextures";
 // SCENE SWITCH, one line. When FlightSceneCore exists in ../src/three/FlightScene3D.tsx, replace the next line with:
 //   import { FlightSceneCore as FlightScene } from "@/three/FlightScene3D";
-import { StubFlightScene as FlightScene } from "./FlightStub";
+import { FlightSceneCore as FlightScene } from "@/three/FlightScene3D";
 import type { LiveSpaceWeather } from "@/engine/types";
 import { getMission } from "@/lib/catalog";
 import { fmtKm } from "@/lib/format";

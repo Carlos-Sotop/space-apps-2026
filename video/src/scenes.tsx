@@ -186,7 +186,8 @@ export const Flight: React.FC = () => {
       <AbsoluteFill style={{ alignItems: "center", justifyContent: "center", perspective: 2400 }}>
         <div style={{ transform: `scale(${push * (0.94 + enter * 0.06)}) rotateX(${(1 - enter) * 8}deg) rotateY(${Math.sin(f * 0.04) * 1.5}deg)`, marginTop: -30 }}>
           <GlassFrame w={1500} h={844} glow={C.cyan} strength={0.9}>
-            <FlightClip />
+            {/* 44 frames: the end of the countdown, liftoff and the rise, played 1.6x */}
+            <FlightClip from={0.012} rate={1.6 * FLIGHT_RATE} />
           </GlassFrame>
         </div>
       </AbsoluteFill>
