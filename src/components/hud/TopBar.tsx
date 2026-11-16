@@ -1,7 +1,10 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Icon } from "@/components/ui/Icon";
 import { LogoMark } from "@/components/brand/Logo";
 import { useTutorial } from "@/components/tutorial";
+import { LevelPicker } from "@/components/tutorial/LevelPicker";
+import { Modal } from "@/components/ui/Modal";
+import { useGame } from "@/store/game";
 import { JourneyBar } from "./JourneyBar";
 import { NasaLiveChip } from "./NasaLiveChip";
 
@@ -14,6 +17,8 @@ interface Props {
 
 export function TopBar({ title, onBack, backLabel = "Back", right }: Props) {
   const tutorial = useTutorial();
+  const setLevel = useGame((s) => s.setLevel);
+  const [levels, setLevels] = useState(false);
   return (
     <>
     <header className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-4 py-4 sm:px-6">
@@ -33,11 +38,20 @@ export function TopBar({ title, onBack, backLabel = "Back", right }: Props) {
         >
           <Icon name="sparkle" size={15} /> <span className="hidden sm:inline">Tutorial</span>
         </button>
+        <button
+          type="button" onClick={() => setLevels(true)} aria-label="Change level"
+          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-line bg-glass text-muted transition hover:text-fg"
+        >
+          <Icon name="star" size={15} />
+        </button>
         <NasaLiveChip />
         {right}
       </div>
     </header>
     <JourneyBar />
+    <Modal open={levels} onClose={() => setLevels(false)} title="Who's flying today?" wide>
+      <LevelPicker onPick={(l) => { setLevel(l); setLevels(false); }} />
+    </Modal>
     </>
   );
 }

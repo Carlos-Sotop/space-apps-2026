@@ -1,8 +1,11 @@
+import { useState } from "react";
 import type { ResourceGauge, ResourceStatus } from "@/engine/types";
 import { fmtResource, RESOURCE_LABEL } from "@/lib/format";
 import { Icon } from "./Icon";
 
 const COLOR: Record<ResourceStatus, string> = { ok: "var(--ok)", tight: "var(--tight)", over: "var(--over)" };
+/** The gauge in one word, for players who are here for the mission and not the arithmetic. */
+const WORD: Record<ResourceStatus, string> = { ok: "OK", tight: "Tight", over: "Over" };
 
 function Lines({ title, lines, g }: { title: string; lines: ResourceGauge["usedBy"]; g: ResourceGauge }) {
   if (!lines.length) return null;
@@ -23,11 +26,14 @@ function Lines({ title, lines, g }: { title: string; lines: ResourceGauge["usedB
  * Horizontal used-versus-capacity bar with a hover or focus tooltip that explains the numbers.
  * `flash` blinks it cyan once, so a change the player did not make by hand is still visible.
  */
-export function Gauge({ gauge: g, compact, alignRight, flash }: { gauge: ResourceGauge; compact?: boolean; alignRight?: boolean; flash?: boolean }) {
+export function Gauge({ gauge: g, compact, alignRight, flash, words }: { gauge: ResourceGauge; compact?: boolean; alignRight?: boolean; flash?: boolean; words?: boolean }) {
   const ratio = g.capacity > 0 ? g.used / g.capacity : g.used > 0 ? 1 : 0;
   const pct = Math.min(1, ratio) * 100;
   const color = COLOR[g.status];
   const verb = g.key === "comms" ? "needed" : "used";
+  // in words mode the numbers are one tap away, never gone
+  const [open, setOpen] = useState(false);
+  const showNumbers = !words || open;
   return (
     <div
       tabIndex={0}
@@ -43,15 +49,23 @@ export function Gauge({ gauge: g, compact, alignRight, flash }: { gauge: Resourc
           <Icon name={g.key} size={13} />
           {RESOURCE_LABEL[g.key]}
         </span>
-        {g.status !== "ok" && <span style={{ color }} className="font-medium">{g.status === "over" ? "Over" : "Tight"}</span>}
+        {g.status !== "ok" && !words && <span style={{ color }} className="font-medium">{g.status === "over" ? "Over" : "Tight"}</span>}
       </div>
       <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/10">
         <div className="h-full rounded-full transition-[width,background-color] duration-300 ease-out" style={{ width: `${pct}%`, background: color, boxShadow: `0 0 10px ${color}` }} />
       </div>
-      <div className={`num mt-1 flex justify-between text-xs ${compact ? "" : "sm:text-[13px]"}`}>
-        <span style={{ color: g.status === "ok" ? "var(--fg)" : color }}>{fmtResource(g.key, g.used)}</span>
-        <span className="text-faint">/ {fmtResource(g.key, g.capacity)}</span>
-      </div>
+      {showNumbers ? (
+        <div className={`num mt-1 flex justify-between text-xs ${compact ? "" : "sm:text-[13px]"}`}>
+          <span style={{ color: g.status === "ok" ? "var(--fg)" : color }}>{fmtResource(g.key, g.used)}</span>
+          <span className="text-faint">/ {fmtResource(g.key, g.capacity)}</span>
+        </div>
+      ) : (
+        <button type="button" onClick={() => setOpen(true)} aria-label={`Show ${RESOURCE_LABEL[g.key]} numbers`}
+          className={`mt-1 flex w-full items-center gap-1 text-left text-xs ${compact ? "" : "sm:text-[13px]"}`} style={{ color }}>
+          <span className="font-medium">{WORD[g.status]}</span>
+          <Icon name="plus" size={11} className="opacity-50" />
+        </button>
+      )}
       <div className={`pointer-events-none absolute ${alignRight ? "right-0" : "left-0"} top-full z-40 mt-2 hidden w-60 max-w-[80vw] rounded-xl border border-line bg-[#0d0f26]/95 p-3 shadow-2xl backdrop-blur-xl group-hover:block group-focus-visible:block`}>
         <Lines title={g.key === "comms" ? "Needed" : "Used by"} lines={g.usedBy} g={g} />
         <Lines title="Provided by" lines={g.providedBy} g={g} />

@@ -22,11 +22,11 @@ function SceneFailed({ onFail }: { onFail: () => void }) {
 }
 
 const MissionSceneCanvas = lazy(() => import("@/three/missions/MissionScenes").then((m) => ({ default: m.MissionSceneCanvas })));
-import { useCatalog, useGame } from "@/store/game";
+import { useCatalog, useGame, type PlayerLevel } from "@/store/game";
 import { useLiveRoute } from "@/live/useLive";
 import { fmtDays, fmtKm } from "@/lib/format";
 import { missionClient } from "@/lib/edition";
-import type { Mission, ModuleCategory, Objective, OrbitClass } from "@/engine/types";
+import type { Mission, MissionId, ModuleCategory, Objective, OrbitClass } from "@/engine/types";
 
 function MissionLive({ id }: { id: string }) {
   const iss = useLiveRoute("iss");
@@ -156,6 +156,11 @@ function Fact({ icon, children }: { icon: IconName; children: ReactNode }) {
   );
 }
 
+/** Where each level is pointed first. Every mission stays open to everyone. */
+const SUGGESTED: Record<PlayerLevel, MissionId> = {
+  cadet: "orbital-lab", explorer: "earth-guardian", scientist: "earth-guardian", director: "moon-base-zero",
+};
+
 export default function MissionSelect() {
   const catalog = useCatalog();
   const select = useGame((s) => s.selectMission);
@@ -165,6 +170,9 @@ export default function MissionSelect() {
   const webgl = useMemo(hasWebgl, []);
   /** the card the pointer or the keyboard is on: it dollies its camera in and lifts */
   const [active, setActive] = useState<string | null>(null);
+  // the level points at one mission to start from; it never hides or locks the others
+  const level = useGame((s) => s.level);
+  const suggested = SUGGESTED[level];
   /** the 3D canvas crashed: fall back to the SVG art on every card */
   const [sceneFailed, setSceneFailed] = useState(false);
   const missions = useMemo(() => [...catalog.missions].sort((a, b) => rank(a.id) - rank(b.id)), [catalog.missions]);
@@ -186,7 +194,7 @@ export default function MissionSelect() {
               label={`Select ${m.name}`}
               data-coach="missions.card"
               className={`group flex flex-col overflow-hidden lg:min-h-[calc(100dvh-10rem)] ${
-                on ? "-translate-y-1 ring-2 ring-cyan shadow-select" : ""
+                on ? "-translate-y-1 ring-2 ring-cyan shadow-select" : suggested === m.id ? "ring-1 ring-cyan/45" : ""
               }`}
               onPointerEnter={() => setActive(m.id)}
               onPointerLeave={() => setActive((c) => (c === m.id ? null : c))}
@@ -236,6 +244,7 @@ export default function MissionSelect() {
                 </div>
 
                 <div className="flex min-h-[1.75rem] flex-wrap items-center gap-2">
+                  {suggested === m.id && <Badge tone="cyan">{level === "cadet" ? "Start here" : "For you"}</Badge>}
                   {missionClient(m.id) && <Badge tone="violet">Commissioned by {missionClient(m.id)}</Badge>}
                   <MissionLive id={m.id} />
                 </div>
