@@ -16,6 +16,21 @@ const EQUAL: Values = { science: 1 / 3, safety: 1 / 3, cost: 1 / 3 };
 
 export type LiveStatus = "idle" | "loading" | "live" | "snapshot";
 export type PlayMode = "guided" | "quick";
+/** Who is flying today: how much the game explains, and how much it fills in. */
+export type PlayerLevel = "cadet" | "explorer" | "scientist" | "director";
+
+export const LEVELS: PlayerLevel[] = ["cadet", "explorer", "scientist", "director"];
+
+/** What each level turns on. Not new rules: the ones the game already has, pre-set. */
+export const LEVEL_SETUP: Record<PlayerLevel, { mode: PlayMode; tutorial: boolean }> = {
+  cadet: { mode: "quick", tutorial: true },
+  explorer: { mode: "guided", tutorial: true },
+  scientist: { mode: "quick", tutorial: false },
+  director: { mode: "quick", tutorial: false },
+};
+
+/** Levels that show a gauge as a colour and a word first, with the number on tap. */
+export const wordsFirst = (level: PlayerLevel) => level === "cadet" || level === "explorer";
 /** Onboarding overlay: the 3-frame intro, then the Guided / Quick choice */
 export type Onboarding = null | "frames" | "mode";
 
@@ -38,6 +53,7 @@ interface GameState {
   opsSeed: number;
   opsLive: OpsLive | null;
   playMode: PlayMode;
+  level: PlayerLevel;
   /** Rocky coach marks on or off */
   tutorial: boolean;
   onboarding: Onboarding;
@@ -70,10 +86,15 @@ interface GameState {
   setOnboarding: (o: Onboarding) => void;
   /** Pick a play mode, close the onboarding overlay and go to mission select */
   choosePlayMode: (m: PlayMode) => void;
+  /** Pick a level: sets the play mode and the tutorial with it, then goes to mission select */
+  chooseLevel: (l: PlayerLevel) => void;
+  setLevel: (l: PlayerLevel) => void;
   setTutorial: (on: boolean) => void;
 }
 
 const newSeed = () => 1 + Math.floor(Math.random() * 2_000_000_000);
+
+const setupOf = (l: PlayerLevel): { playMode: PlayMode; tutorial: boolean } => ({ playMode: LEVEL_SETUP[l].mode, tutorial: LEVEL_SETUP[l].tutorial });
 
 /** Catalog the engine sees: the shipped data plus blueprints the player published. */
 export function catalogWith(published: Blueprint[]): Catalog {
@@ -116,6 +137,7 @@ export const useGame = create<GameState>()(
       opsSeed: 1,
       opsLive: null,
       playMode: "guided",
+      level: "explorer",
       tutorial: false,
       onboarding: null,
 
@@ -194,9 +216,13 @@ export const useGame = create<GameState>()(
       beginOnboarding: () => set({ onboarding: "frames" }),
       setOnboarding: (onboarding) => set({ onboarding }),
       choosePlayMode: (playMode) => set({ playMode, tutorial: playMode === "guided", onboarding: null, screen: "missions" }),
+      chooseLevel: (level) => set({ level, ...setupOf(level), onboarding: null, screen: "missions" }),
+      setLevel: (level) => set({ level, ...setupOf(level) }),
       setTutorial: (tutorial) => set({ tutorial }),
 
       devJump: (params) => {
+        const level = params.get("level") as PlayerLevel | null;
+        if (level && LEVELS.includes(level)) set({ level, ...setupOf(level) });
         const mode = params.get("mode");
         if (mode === "guided" || mode === "quick") set({ playMode: mode, tutorial: mode === "guided" });
         const ob = params.get("onboarding");
@@ -222,7 +248,7 @@ export const useGame = create<GameState>()(
       name: "spacedao-v1",
       version: 1,
       storage: createJSONStorage(() => safeStorage),
-      partialize: (s) => ({ playMode: s.playMode, tutorial: s.tutorial, missionId: s.missionId, leadId: s.leadId, partnerIds: s.partnerIds, playerValues: s.playerValues, design: s.design, published: s.published }),
+      partialize: (s) => ({ playMode: s.playMode, level: s.level, tutorial: s.tutorial, missionId: s.missionId, leadId: s.leadId, partnerIds: s.partnerIds, playerValues: s.playerValues, design: s.design, published: s.published }),
       // Drop saved state that no longer matches the catalog (data lanes replace catalog files often).
       merge: (saved, current) => {
         const p = (saved ?? {}) as Partial<GameState>;
@@ -231,6 +257,7 @@ export const useGame = create<GameState>()(
         return {
           ...current,
           playMode: p.playMode === "quick" ? "quick" : "guided",
+          level: p.level && LEVELS.includes(p.level) ? p.level : "explorer",
           tutorial: p.tutorial === true,
           missionId: p.missionId && getMission(p.missionId) ? p.missionId : null,
           leadId: p.leadId && known(p.leadId, actorIds) ? p.leadId : null,

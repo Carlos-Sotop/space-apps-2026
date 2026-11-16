@@ -8,9 +8,11 @@ interface Props {
   title: string;
   children: ReactNode;
   actions?: ReactNode;
+  /** room for a row of cards instead of a paragraph */
+  wide?: boolean;
 }
 
-export function Modal({ open, onClose, title, children, actions }: Props) {
+export function Modal({ open, onClose, title, children, actions, wide }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
@@ -28,7 +30,7 @@ export function Modal({ open, onClose, title, children, actions }: Props) {
           <motion.div className="absolute inset-0 bg-black/60" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} />
           <motion.div
             ref={ref} tabIndex={-1} role="dialog" aria-modal="true" aria-label={title}
-            className="glass-strong relative w-full max-w-lg bg-[#0b0d24]/95 p-6 outline-none"
+            className={`glass-strong relative max-h-[92dvh] w-full overflow-y-auto bg-[#0b0d24]/95 p-6 outline-none ${wide ? "max-w-5xl" : "max-w-lg"}`}
             initial={{ opacity: 0, y: 12, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 8 }} transition={{ duration: 0.22 }}
           >
             <div className="mb-3 flex items-start justify-between gap-4">

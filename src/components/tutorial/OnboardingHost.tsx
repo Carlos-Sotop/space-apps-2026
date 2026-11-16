@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Button, Icon, Modal, type IconName } from "@/components/ui";
 import { useGame } from "@/store/game";
+import { LevelPicker } from "./LevelPicker";
 import { Rocky } from "./Rocky";
 
 function FrameNetwork() {
@@ -108,35 +109,25 @@ function Frames() {
   );
 }
 
-function ModeModal() {
+/** The level choice: it sets the play mode and the tutorial, and picks the Rocky for the whole run. */
+function LevelModal() {
   const open = useGame((s) => s.onboarding === "mode");
   const setOnboarding = useGame((s) => s.setOnboarding);
-  const choose = useGame((s) => s.choosePlayMode);
+  const chooseLevel = useGame((s) => s.chooseLevel);
   return (
-    <Modal open={open} onClose={() => setOnboarding(null)} title="How do you want to play?">
-      <div className="grid gap-3 sm:grid-cols-2">
-        <button type="button" onClick={() => choose("guided")} className="glass flex flex-col items-center gap-2 p-4 text-center transition hover:border-cyan hover:shadow-select">
-          <Rocky pose="wave" size={72} />
-          <span className="font-display text-sm">Guided by Rocky</span>
-          <span className="text-sm text-muted">Tips on every screen.</span>
-        </button>
-        <button type="button" onClick={() => choose("quick")} className="glass flex flex-col items-center gap-2 p-4 text-center transition hover:border-cyan hover:shadow-select">
-          <span className="grid h-[90px] place-items-center text-cyan"><Icon name="power" size={56} /></span>
-          <span className="font-display text-sm">Quick play</span>
-          <span className="text-sm text-muted">Pre-filled picks, about 3 minutes.</span>
-        </button>
-      </div>
+    <Modal open={open} onClose={() => setOnboarding(null)} title="Who's flying today?" wide>
+      <LevelPicker onPick={chooseLevel} />
     </Modal>
   );
 }
 
-/** Mounted once in App: the 3-frame intro, then the Guided / Quick choice. */
+/** Mounted once in App: the 3-frame intro, then "Who's flying today?". */
 export function OnboardingHost() {
   const frames = useGame((s) => s.onboarding === "frames");
   return (
     <>
       <AnimatePresence>{frames && <Frames key="frames" />}</AnimatePresence>
-      <ModeModal />
+      <LevelModal />
     </>
   );
 }
