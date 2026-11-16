@@ -110,6 +110,8 @@ export function buildLayout(lunar: boolean): Layout {
 
 /** Progress marks along the flight, from the mission's own timeline. */
 export interface Marks {
+  /** engine start, at the top of the launch phase */
+  ignite: number;
   lift: number; sep: number; relight: number; orbit: number;
   t0: number; t1: number; r0: number; r1: number; ops: number; end: number;
   /** lunar: burn to the Moon, touchdown */
@@ -232,7 +234,7 @@ export class FlightPath {
     const land = lunar ? Math.max(tli + 0.02, R[0] + (R[1] - R[0]) * 0.85) : R[1];
     const sep = A[0] + (A[1] - A[0]) * 0.7;
     this.marks = {
-      lift, sep, relight: sep + 0.3 / FLIGHT_SECONDS, orbit,
+      ignite: L[0], lift, sep, relight: sep + 0.3 / FLIGHT_SECONDS, orbit,
       t0: Tr[0], t1: Tr[1], r0: R[0], r1: R[1], ops, end: endProgress(timeline, opts.lostAt), tli, land,
     };
 
@@ -263,7 +265,11 @@ export class FlightPath {
     const m = this.marks, L = this.layout;
     const q = Math.min(p, m.end);
     s.lost = m.end < 1 && p >= m.end - 1e-6;
-    s.spin = L.spinAtLift + EARTH_SPIN * (q - m.lift);
+    // The Earth holds still through the countdown, so the pad, the rocket and the ground camera share one
+    // frame; it eases into its slow turn during the climb and keeps it from orbit on.
+    const x = (q - m.lift) / Math.max(1e-6, m.orbit - m.lift);
+    const turned = x <= 0 ? 0 : x < 1 ? x * x * x - (x * x * x * x) / 2 : 0.5 + (x - 1);
+    s.spin = L.spinAtLift + EARTH_SPIN * turned * (m.orbit - m.lift);
     s.inOps = q >= m.ops;
     s.landed = false;
     s.dustAge = -Infinity;
@@ -274,13 +280,11 @@ export class FlightPath {
     s.climb = between(q, m.lift, m.orbit);
 
     if (q < m.lift) {
-      // on the pad, turning with the Earth until liftoff
-      const a = EARTH_SPIN * (q - m.lift);
-      this.a.copy(L.P).applyAxisAngle(Y, a);
-      s.pos.copy(L.earth).addScaledVector(this.a, this.r0);
-      s.nose.copy(this.a);
-      s.vel.crossVectors(Y, this.a).normalize();
-      s.out.copy(this.a);
+      // on the pad: standing on its launch site, which sits under P until the Earth starts to turn
+      s.pos.copy(L.earth).addScaledVector(L.P, this.r0);
+      s.nose.copy(L.P);
+      s.vel.copy(L.P);
+      s.out.copy(L.P);
       s.speed = 0;
     } else if (q < m.orbit) {
       this.climbAt((q - m.lift) / (m.orbit - m.lift), s);
