@@ -1,7 +1,7 @@
 export { makeRng } from "./rng";
 export { defaultDesign } from "./design";
 export { effectiveModifiers, applyStat, blueprintFit, reciprocityDue, type BlueprintFit } from "./modifiers";
-export { computeResources } from "./resources";
+export { computeResources, massOverKg } from "./resources";
 export { validateDesign } from "./validate";
 export {
   batteryShortWh, councilValues, councilReview, readinessReview, readinessSeats, readinessAllGo, readinessChanges, allowedCalls, seatVerdict, pollAllGo,

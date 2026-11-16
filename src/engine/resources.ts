@@ -62,6 +62,33 @@ function gauge(
   return { key, used, capacity, status: statusOf(used, capacity), usedBy, providedBy };
 }
 
+/**
+ * Payload mass the rocket delivers to the destination, after the carrier's own mass and within its
+ * payload limit, with the lines that explain it. Below zero when the carrier alone is too heavy.
+ */
+function deliverableKg(r: ResolvedDesign, mods: Modifier[], mid: MissionId): { kg: number; lines: ResourceLine[] } {
+  const { vehicle, destination, carrier } = r;
+  if (!vehicle || !destination) return { kg: 0, lines: [] };
+  const base = vehicle.capacityKg[destination.orbitClass] ?? 0;
+  const rocketCap = applyStat(base * destination.capacityFactor, "launchCapacity", mods, { missionId: mid });
+  const lines: ResourceLine[] = [{ label: `${vehicle.name} to ${destination.orbitClass}`, amount: rocketCap }];
+  if (!carrier) return { kg: rocketCap, lines };
+  const carrierMass = moduleMassKg(carrier, mods, mid);
+  lines.push({ label: `minus ${carrier.name} (carrier mass)`, amount: -carrierMass });
+  lines.push({ label: `${carrier.name} payload limit (the smaller limit applies)`, amount: carrier.payloadCapacityKg ?? 0 });
+  return { kg: Math.min(carrier.payloadCapacityKg ?? 0, rocketCap - carrierMass), lines };
+}
+
+/**
+ * Kilograms the design is over what its rocket delivers, 0 when it fits. The mass gauge stops its
+ * capacity at zero; this also counts a carrier heavier than the rocket can lift.
+ */
+export function massOverKg(design: MissionDesign, catalog: Catalog): number {
+  const room = deliverableKg(resolveDesign(design, catalog), effectiveModifiers(design, catalog), design.missionId).kg;
+  const over = computeResources(design, catalog).mass.used - room;
+  return over > 1e-9 ? over : 0;
+}
+
 export function computeResources(design: MissionDesign, catalog: Catalog): ResourceReport {
   const r = resolveDesign(design, catalog);
   const mods = effectiveModifiers(design, catalog);
@@ -82,24 +109,9 @@ export function computeResources(design: MissionDesign, catalog: Catalog): Resou
     ...integration("massKg"),
   ];
   const massUsed = massUsedBy.reduce((s, l) => s + l.amount, 0);
-  const massProvided: ResourceLine[] = [];
-  let massCap = 0;
-  if (vehicle && destination) {
-    const base = vehicle.capacityKg[destination.orbitClass] ?? 0;
-    const rocketCap = applyStat(base * destination.capacityFactor, "launchCapacity", mods, { missionId: mid });
-    massProvided.push({ label: `${vehicle.name} to ${destination.orbitClass}`, amount: rocketCap });
-    massCap = rocketCap;
-    if (carrier) {
-      const carrierMass = moduleMassKg(carrier, mods, mid);
-      massProvided.push({ label: `minus ${carrier.name} (carrier mass)`, amount: -carrierMass });
-      massProvided.push({
-        label: `${carrier.name} payload limit (the smaller limit applies)`,
-        amount: carrier.payloadCapacityKg ?? 0,
-      });
-      massCap = Math.min(carrier.payloadCapacityKg ?? 0, rocketCap - carrierMass);
-    }
-    massCap = Math.max(0, massCap);
-  }
+  const deliverable = deliverableKg(r, mods, mid);
+  const massProvided = deliverable.lines;
+  const massCap = Math.max(0, deliverable.kg);
 
   // power
   const powerProvided: ResourceLine[] = modules

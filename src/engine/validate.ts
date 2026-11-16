@@ -1,7 +1,7 @@
 import { MAX_SECONDARY, type Catalog, type Domain, type Issue, type MissionDesign, type ResourceKey } from "./types";
 import { categoryDomain, fmt, getBlueprint, getLaunchVehicle, getModule, getObjective, resolveDesign } from "./design";
 import { applyStat, blueprintFit, effectiveModifiers } from "./modifiers";
-import { computeResources, moduleCostMUsd, moduleMassKg, modulePowerW } from "./resources";
+import { computeResources, massOverKg, moduleCostMUsd, moduleMassKg, modulePowerW } from "./resources";
 
 export const RESOURCE_DOMAIN: Record<ResourceKey, Domain> = {
   mass: "launch",
@@ -87,17 +87,25 @@ export function validateDesign(design: MissionDesign, catalog: Catalog): Issue[]
     (a, b) => modulePowerW(b, mods, mid) - modulePowerW(a, mods, mid),
   )[0];
 
-  if (reaches && rep.mass.status === "over")
+  if (reaches && rep.mass.status === "over") {
+    const over = massOverKg(design, catalog);
+    // the carrier alone outweighs what the rocket lifts: dropping payload cannot fix that
+    const carrier = over > rep.mass.used + 1e-9 ? r.carrier : undefined;
     add({
       id: "mass-over",
       resource: "mass",
       domain: "launch",
       severity: "blocker",
-      text: `The payload weighs ${fmt(rep.mass.used)} kg but only ${fmt(rep.mass.capacity)} kg can be delivered.`,
-      fix: heaviest
-        ? `Drop the ${heaviest.name} (-${fmt(moduleMassKg(heaviest, mods, mid))} kg) or choose a bigger launch vehicle.`
-        : "Choose a bigger launch vehicle.",
+      text: carrier
+        ? `The ${carrier.name} alone weighs more than the ${vehicle!.name} can send to ${destination!.orbitClass}: ${fmt(over)} kg over.`
+        : `The payload weighs ${fmt(rep.mass.used)} kg but only ${fmt(rep.mass.capacity)} kg can be delivered.`,
+      fix: carrier
+        ? `Choose a bigger launch vehicle or a lighter ${carrier.category}.`
+        : heaviest
+          ? `Drop the ${heaviest.name} (-${fmt(moduleMassKg(heaviest, mods, mid))} kg) or choose a bigger launch vehicle.`
+          : "Choose a bigger launch vehicle.",
     });
+  }
   if (rep.budget.status === "over")
     add({
       id: "budget-over",

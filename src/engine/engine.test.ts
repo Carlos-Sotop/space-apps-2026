@@ -8,6 +8,7 @@ import {
   defaultDesign,
   effectiveModifiers,
   forecast,
+  massOverKg,
   makeRng,
   simulateFlight,
   validateDesign,
@@ -104,6 +105,17 @@ describe("resources", () => {
     const r = computeResources(orbitalDesign({ moduleIds: ["solar"], launchVehicleId: "leo-only" }), catalog);
     expect(r.mass.capacity).toBe(300);
   });
+  it("massOverKg is 0 when the design fits", () => {
+    expect(massOverKg(orbitalDesign(), catalog)).toBe(0);
+    expect(massOverKg(moonDesign(), catalog)).toBe(0);
+  });
+  it("massOverKg counts a carrier heavier than the rocket lifts, where the gauge stops at zero", () => {
+    // the 400 kg lander on a rocket that sends 150 kg to the Moon
+    const d = moonDesign({ launchVehicleId: "small-rocket" });
+    const mass = computeResources(d, catalog).mass;
+    expect(mass.capacity).toBe(0);
+    expect(massOverKg(d, catalog)).toBeCloseTo(mass.used + 400 - 150);
+  });
   it("rideshares add mass, power, data and treasury", () => {
     const r = computeResources(orbitalDesign({ rideshareIds: ["cubesat"] }), catalog);
     expect(r.mass.used).toBe(60);
@@ -146,6 +158,12 @@ describe("validation", () => {
     const mass = issues.find((i) => i.id === "mass-over");
     expect(mass?.severity).toBe("blocker");
     expect(mass?.fix).toContain("hyperspectral");
+  });
+  it("a carrier heavier than the rocket lifts is named, instead of asking to drop payload", () => {
+    const mass = validateDesign(moonDesign({ launchVehicleId: "small-rocket" }), catalog).find((i) => i.id === "mass-over");
+    expect(mass?.severity).toBe("blocker");
+    expect(mass?.text).toContain("lander alone weighs more than the Small Rocket");
+    expect(mass?.fix).toBe("Choose a bigger launch vehicle or a lighter lander.");
   });
   it("tight margin is a warning", () => {
     const d = orbitalDesign({ moduleIds: ["bus", "solar", "battery", "radio", "camera", "hyperspectral", "hyperspectral", "hyperspectral", "hyperspectral"] });

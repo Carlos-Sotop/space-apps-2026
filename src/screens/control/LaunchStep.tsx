@@ -1,4 +1,4 @@
-import { computeResources } from "@/engine";
+import { massOverKg } from "@/engine";
 import type { Destination, LaunchVehicle } from "@/engine/types";
 import { Badge, GlassCard, Icon, InfoButton, MonogramBadge } from "@/components/ui";
 import { getActor, missionVehicles } from "@/lib/catalog";
@@ -32,7 +32,10 @@ function DestInfo({ d }: { d: Destination }) {
   );
 }
 
-function VehicleCard({ v, reason }: { v: LaunchVehicle; reason: string | null }) {
+/** Why a rocket does not fit this design. Only a rocket that cannot reach the orbit is locked. */
+interface Fit { locked: boolean; text: string }
+
+function VehicleCard({ v, fit }: { v: LaunchVehicle; fit: Fit | null }) {
   const { design, mission } = useDesign();
   const patch = useGame((s) => s.patchDesign);
   const dest = mission.destinations.find((d) => d.id === design.destinationId) ?? mission.destinations[0];
@@ -46,7 +49,7 @@ function VehicleCard({ v, reason }: { v: LaunchVehicle; reason: string | null })
     { key: "rel", label: "Reliability", value: fmtPct(v.reliability, 1) },
   ];
   return (
-    <GlassCard selected={selected} disabled={!!reason && !selected} onSelect={() => patch({ launchVehicleId: v.id })} label={`Select ${v.name}`} className="p-4" data-coach="launch.rocket">
+    <GlassCard selected={selected} disabled={!!fit?.locked && !selected} onSelect={() => patch({ launchVehicleId: v.id })} label={`Select ${v.name}`} className="p-4" data-coach="launch.rocket">
       <div className="flex items-start gap-3">
         <MonogramBadge actor={actor} fallbackName={v.providerId} size={38} />
         <div className="min-w-0 flex-1">
@@ -63,7 +66,7 @@ function VehicleCard({ v, reason }: { v: LaunchVehicle; reason: string | null })
         ))}
       </dl>
       <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10" role="img" aria-label={`Reliability ${fmtPct(v.reliability, 1)}`}><div className="h-full rounded-full bg-brand" style={{ width: `${v.reliability * 100}%` }} /></div>
-      {reason && <p className="mt-2 flex items-center gap-1.5 text-xs text-over"><Icon name="lock" size={12} /> {reason}</p>}
+      {fit && <p className="mt-2 flex items-center gap-1.5 text-xs text-over"><Icon name={fit.locked ? "lock" : "warning"} size={12} /> {fit.text}</p>}
     </GlassCard>
   );
 }
@@ -72,18 +75,20 @@ export function LaunchStep() {
   const { design, mission, catalog } = useDesign();
   const patch = useGame((s) => s.patchDesign);
 
-  const reasonFor = (v: LaunchVehicle): string | null => {
-    const g = computeResources({ ...design, launchVehicleId: v.id }, catalog).mass;
-    if (g.capacity <= 0) return "Cannot reach this orbit";
-    if (g.used > g.capacity) return `Too heavy by ${fmtKg(g.used - g.capacity)}`;
-    return null;
+  const dest = mission.destinations.find((d) => d.id === design.destinationId) ?? mission.destinations[0];
+
+  // A rocket too small for today's spacecraft stays pickable: the mass gauge turns red and says why.
+  const fitFor = (v: LaunchVehicle): Fit | null => {
+    if (!((v.capacityKg[dest.orbitClass] ?? 0) > 0)) return { locked: true, text: "Cannot reach this orbit" };
+    const over = massOverKg({ ...design, launchVehicleId: v.id }, catalog);
+    return over > 0 ? { locked: false, text: `Too heavy by ${fmtKg(over)}` } : null;
   };
 
   return (
     <div className="space-y-8">
       <div>
         <h2 className="font-display mb-4 text-lg sm:text-xl">Where will your mission go?</h2>
-        <div className="mb-4"><DestinationVisual dest={mission.destinations.find((d) => d.id === design.destinationId) ?? mission.destinations[0]} /></div>
+        <div className="mb-4"><DestinationVisual dest={dest} /></div>
         <div className="grid gap-4 md:grid-cols-3" data-coach="launch.destinations">
           {mission.destinations.map((d) => (
             <GlassCard key={d.id} selected={design.destinationId === d.id} onSelect={() => patch({ destinationId: d.id })} label={`Select ${d.name}`} className="p-4">
@@ -105,7 +110,7 @@ export function LaunchStep() {
       <div>
         <h2 className="font-display mb-4 text-lg sm:text-xl">Pick a rocket</h2>
         <div className="grid gap-4 sm:grid-cols-2" data-coach="launch.rockets">
-          {missionVehicles(mission).map((v) => <VehicleCard key={v.id} v={v} reason={reasonFor(v)} />)}
+          {missionVehicles(mission).map((v) => <VehicleCard key={v.id} v={v} fit={fitFor(v)} />)}
         </div>
       </div>
     </div>
