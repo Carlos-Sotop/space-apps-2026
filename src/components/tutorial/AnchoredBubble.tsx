@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { motion } from "motion/react";
+import { useGame } from "@/store/game";
 import { Rocky, type RockyPose } from "./Rocky";
 import { place, useAnchorBox, useScrollToAnchor, type Box, type Side, type Viewport } from "./anchor";
 
@@ -55,8 +56,10 @@ interface Props {
  * the arrow still points up at the target. The target is scrolled into view and stays lit.
  */
 export function AnchoredBubble({ anchor, pose, tipKey, spotlight, maxWidth = 380, children }: Props) {
+  // the Rocky the player picked at "Who's flying today?" guides the whole run
+  const variant = useGame((s) => s.level);
   const { box, vp } = useAnchorBox(anchor, true);
-  useScrollToAnchor(anchor, tipKey, true);
+  useScrollToAnchor(anchor, tipKey, true, box, vp);
   const ref = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: maxWidth, h: 150 });
 
@@ -76,11 +79,13 @@ export function AnchoredBubble({ anchor, pose, tipKey, spotlight, maxWidth = 380
 
   const { side, style, arrow } = place(box, vp, size);
   const narrow = vp.w < 640;
+  // a target that fills the screen is not worth lighting: dimming the thin frame around it only adds noise
+  const huge = !!box && (box.height > vp.h * 0.7 || (box.width > vp.w * 0.92 && box.height > vp.h * 0.5));
   const pointLeft = !!box && side !== "docked" && box.left + box.width / 2 < (style.left ?? 0) + style.width / 2 - 40;
 
   return (
     <>
-      {spotlight && box && <Spotlight box={box} vp={vp} />}
+      {spotlight && box && !huge && <Spotlight box={box} vp={vp} />}
       <motion.div
         key={tipKey}
         role="status" aria-live="polite"
@@ -88,7 +93,7 @@ export function AnchoredBubble({ anchor, pose, tipKey, spotlight, maxWidth = 380
         style={style}
         initial={{ opacity: 0, y: 8, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 6 }} transition={{ duration: 0.22 }}
       >
-        <Rocky pose={pose} size={narrow ? 56 : 72} flip={pointLeft} className="-mb-1 shrink-0" />
+        <Rocky pose={pose} variant={variant} size={narrow ? 56 : 72} flip={pointLeft} className="-mb-1 shrink-0" />
         <div ref={ref} className="glass-strong relative min-w-0 flex-1 rounded-[var(--radius-card)] p-3.5">
           {arrow !== null && <Arrow side={side} at={arrow} />}
           {children}

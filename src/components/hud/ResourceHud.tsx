@@ -3,7 +3,7 @@ import { computeResources, validateDesign } from "@/engine";
 import type { Issue, MissionDesign, ResourceKey } from "@/engine/types";
 import { Gauge } from "@/components/ui/Gauge";
 import { Icon } from "@/components/ui/Icon";
-import { useCatalog } from "@/store/game";
+import { useCatalog, useGame, wordsFirst } from "@/store/game";
 import { useGuide } from "@/store/guide";
 
 const ORDER: ResourceKey[] = ["mass", "power", "budget", "data", "comms", "lifetime"];
@@ -11,6 +11,7 @@ const ORDER: ResourceKey[] = ["mass", "power", "budget", "data", "comms", "lifet
 export function ResourceHud({ design }: { design: MissionDesign }) {
   const catalog = useCatalog();
   const report = useMemo(() => computeResources(design, catalog), [design, catalog]);
+  const words = wordsFirst(useGame((s) => s.level));
   const flash = useGuide((s) => s.flash);
   const clearFlash = useGuide((s) => s.clearFlash);
   // the blink runs once; clearing it lets the next fix blink again
@@ -22,7 +23,7 @@ export function ResourceHud({ design }: { design: MissionDesign }) {
   return (
     <div data-coach="control.gauges" className="grid grid-cols-2 gap-x-5 gap-y-3 sm:grid-cols-3 lg:grid-cols-6">
       {ORDER.map((k, i) => (
-        <Gauge key={flash?.keys.includes(k) ? `${k}-${flash.at}` : k} gauge={report[k]} alignRight={i % 3 === 2 || i >= 4} flash={flash?.keys.includes(k)} />
+        <Gauge key={flash?.keys.includes(k) ? `${k}-${flash.at}` : k} gauge={report[k]} alignRight={i % 3 === 2 || i >= 4} flash={flash?.keys.includes(k)} words={words} />
       ))}
     </div>
   );
