@@ -3,8 +3,7 @@ import { AbsoluteFill, Easing, useCurrentFrame, useVideoConfig } from "remotion"
 import { ThreeCanvas } from "@remotion/three";
 // Keep gameTextures above the scene import: it points the game's TEX at video/public/textures before the scene loads.
 import "./gameTextures";
-// SCENE SWITCH, one line. When FlightSceneCore exists in ../src/three/FlightScene3D.tsx, replace the next line with:
-//   import { FlightSceneCore as FlightScene } from "@/three/FlightScene3D";
+// the game's own flight scene, a pure function of the progress and clock refs below
 import { FlightSceneCore as FlightScene } from "@/three/FlightScene3D";
 import type { LiveSpaceWeather } from "@/engine/types";
 import { getMission } from "@/lib/catalog";
