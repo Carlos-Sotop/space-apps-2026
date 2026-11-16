@@ -11,10 +11,17 @@ const bez = (a: Pt, b: Pt, c: Pt, d: Pt, t: number): Pt => {
 
 export interface FlightSceneProps {
   timeline: Timeline;
+  /** progress, as React state (updated about 10 times a second) */
   p: number;
+  /** the same progress, live every frame: the 3D view reads this one so it moves at the display rate */
+  pRef?: { readonly current: number };
   lunar: boolean;
+  /** the craft flies to a space station and docks with it */
+  station?: boolean;
   lostAt?: FlightPhaseId;
   ended: boolean;
+  /** called once the view has drawn, so the flight starts on the pad instead of behind a loading screen */
+  onReady?: () => void;
 }
 
 const ASCENT_FRACTION_PHASES: FlightPhaseId[] = ["launch", "ascent", "orbit-insertion", "transfer", "arrival"];
