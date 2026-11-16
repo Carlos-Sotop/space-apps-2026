@@ -14,7 +14,8 @@ const grad = `linear-gradient(90deg, ${C.violetBright}, ${C.cyan})`;
 
 // ---------------- clip stage with cross-dissolves and gentle drift ----------------
 // each clip starts from its own first frame when its item appears (from), not from the scene start
-type Item = { name: string; from: number; to: number; label?: string; zoom?: Camera };
+// render: draws the item instead of the capture named `name` (the 3D flight)
+type Item = { name: string; from: number; to: number; label?: string; zoom?: Camera; render?: () => React.ReactNode };
 export const ClipShow: React.FC<{ items: Item[]; w?: number; top?: number; left?: number; glow?: string; fadeLast?: boolean; labelTop?: number }> = ({ items, w = 1500, top = 110, left, glow = C.violetBright, fadeLast, labelTop }) => {
   const f = useCurrentFrame();
   const h = (w * 9) / 16;
@@ -37,7 +38,7 @@ export const ClipShow: React.FC<{ items: Item[]; w?: number; top?: number; left?
             >
               <GlassFrame w={w} h={h} glow={i % 2 ? C.cyan : glow} strength={0.8}>
                 <Sequence from={it.from} layout="none">
-                  <ClipView name={it.name} zoom={it.zoom} />
+                  {it.render ? it.render() : <ClipView name={it.name} zoom={it.zoom} />}
                 </Sequence>
               </GlassFrame>
             </div>

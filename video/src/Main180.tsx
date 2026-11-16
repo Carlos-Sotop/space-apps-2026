@@ -6,6 +6,7 @@ import { Globe } from "./Globe";
 import { Hud, Reveal, SealRow } from "./scenes";
 import { Closing180, ClipShow, DataChips, Facts, Network, Pillars, Treaty, Trust, cue } from "./scenes180";
 import { EndFade, Scene, Soundtrack } from "./Main";
+import { FlightClip } from "./FlightClip";
 import { Subtitles } from "./Subtitles";
 import { captions180 } from "./captions180";
 
@@ -133,7 +134,7 @@ export const SpaceDAO180: React.FC = () => (
     </Scene>
     <Scene span={T180.s07}>
       <SceneFade dur={len("s07")} inF={14} outF={12}>
-        <ClipShow items={[{ name: "flight", from: 0, to: at("s07", "On the Moon") + 4, label: "FLIGHT / REAL SPACE WEATHER" }, { name: "ops", from: at("s07", "On the Moon") - 12, to: len("s07"), label: "MOON OPERATIONS" }]} />
+        <ClipShow items={[{ name: "flight", from: 0, to: at("s07", "On the Moon") + 4, label: "FLIGHT / REAL SPACE WEATHER", render: () => <FlightClip /> }, { name: "ops", from: at("s07", "On the Moon") - 12, to: len("s07"), label: "MOON OPERATIONS" }]} />
       </SceneFade>
     </Scene>
     <Scene span={T180.s08}>

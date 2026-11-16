@@ -1,6 +1,7 @@
 import React from "react";
 import { AbsoluteFill, Easing, interpolate, Sequence, useCurrentFrame } from "remotion";
-import { C, MONO, SANS, T } from "./theme";
+import { C, FPS, MONO, SANS, T } from "./theme";
+import { FLIGHT_RATE, FlightClip } from "./FlightClip";
 import { ClipView, Flash, GlassFrame, Label, Mono, SceneFade, Shockwave, Wordmark, clamp, keys, ramp, useSpring, type Camera } from "./components";
 
 // ---------------- 1-3: globe hud ----------------
@@ -185,7 +186,7 @@ export const Flight: React.FC = () => {
       <AbsoluteFill style={{ alignItems: "center", justifyContent: "center", perspective: 2400 }}>
         <div style={{ transform: `scale(${push * (0.94 + enter * 0.06)}) rotateX(${(1 - enter) * 8}deg) rotateY(${Math.sin(f * 0.04) * 1.5}deg)`, marginTop: -30 }}>
           <GlassFrame w={1500} h={844} glow={C.cyan} strength={0.9}>
-            <ClipView name="flight" />
+            <FlightClip />
           </GlassFrame>
         </div>
       </AbsoluteFill>
@@ -199,10 +200,12 @@ export const Flight: React.FC = () => {
 // ---------------- 8: montage ----------------
 // trim: the clip frame each cut starts on (cuts last CUT_LEN frames); in order under
 // "Design | your mission with | live NASA | data. | Play | SpaceDAO."
-const CUTS: { name: string; label: string; trim: number; zoom?: Camera }[] = [
+// flight: the cut renders the game's 3D flight (FlightClip) instead of a capture, trim frames into it, cropped in on
+// the live NASA chips (zoom, focus as fractions of the view)
+const CUTS: { name: string; label: string; trim: number; zoom?: Camera; flight?: { zoom: number; focus: [number, number] } }[] = [
   { name: "missions", label: "MISSION SELECT", trim: 0 },
   { name: "ops", label: "MOON OPERATIONS", trim: 160 },
-  { name: "flight", label: "LIVE NASA DATA", trim: 240, zoom: { zoom: 1.9, focus: [380, 490] } },
+  { name: "flight", label: "LIVE NASA DATA", trim: 240, flight: { zoom: 1.6, focus: [0, 1] } },
   { name: "debrief", label: "DEBRIEF NETWORK", trim: 60 },
   { name: "rocky", label: "ROCKY", trim: 20 },
   { name: "intro", label: "PLAY", trim: 20 },
@@ -225,7 +228,11 @@ export const Montage: React.FC = () => {
         <div style={{ transform: `scale(${1.1 - 0.1 * punch + local * 0.0012}) rotateY(${dir * (4 - 4 * punch)}deg) rotateZ(${dir * (1.2 - 1.2 * punch)}deg)`, marginTop: -30 }}>
           <GlassFrame w={w} h={h} glow={i % 2 ? C.cyan : C.violetBright} strength={0.9}>
             <Sequence key={i} from={i * CUT_LEN} layout="none">
-              <ClipView name={cut.name} trimBefore={cut.trim} zoom={cut.zoom} />
+              {cut.flight ? (
+                <FlightClip from={(cut.trim / FPS) * FLIGHT_RATE} zoom={cut.flight.zoom} focus={cut.flight.focus} />
+              ) : (
+                <ClipView name={cut.name} trimBefore={cut.trim} zoom={cut.zoom} />
+              )}
             </Sequence>
           </GlassFrame>
         </div>
