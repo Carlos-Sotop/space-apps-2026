@@ -8,7 +8,12 @@
     "skipLibCheck": true,
     "noEmit": true,
     "resolveJsonModule": true,
-    "moduleResolution": "bundler"
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "paths": {
+      "@/*": ["../src/*"],
+      "*": ["./node_modules/@types/*", "./node_modules/*"]
+    }
   },
   "include": ["src"]
 }
