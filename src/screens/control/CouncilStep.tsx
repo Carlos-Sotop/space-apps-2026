@@ -2,11 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import { motion } from "motion/react";
 import { sfx } from "@/components/audio";
 import { Icon, InfoButton } from "@/components/ui";
-import { forecast, pollAllGo, readinessChanges, readinessReview, readinessSeats, READINESS_SOURCES, RISK_RUNS, VERDICT_LABEL, type ReadinessVoteDetail, type SeatCall } from "@/engine";
-import type { Catalog, DesignStep, Forecast, LiveContext, MissionDesign } from "@/engine/types";
-import { getActor } from "@/lib/catalog";
+import { computeResources, forecast, pollAllGo, readinessChanges, readinessReview, readinessSeats, READINESS_SOURCES, RISK_RUNS, VERDICT_LABEL, type ReadinessVoteDetail, type SeatCall } from "@/engine";
+import type { Catalog, DesignPatch, DesignStep, Forecast, LiveContext, MissionDesign, ResourceKey } from "@/engine/types";
+import { getActor, getModule } from "@/lib/catalog";
 import { fmtPct } from "@/lib/format";
 import { useGame } from "@/store/game";
+import { useGuide } from "@/store/guide";
 import type { StepId } from "@/store/steps";
 import { useDesign } from "./useDesign";
 import { ReviewFeed } from "./ReviewFeed";
@@ -16,6 +17,20 @@ import { SignPanel } from "./SignPanel";
 const riskColor = (p: number) => (p >= 0.7 ? "var(--ok)" : p >= 0.5 ? "var(--tight)" : "var(--over)");
 
 const STEP_OF: Record<DesignStep, StepId> = { charter: "values", objectives: "objectives", launch: "launch", build: "build", opentech: "opentech", rideshare: "rideshare" };
+
+const RESOURCES: ResourceKey[] = ["mass", "power", "budget", "data", "comms", "lifetime"];
+
+/** The gauges a change really moved, so only those blink. */
+function movedGauges(before: MissionDesign, after: MissionDesign, catalog: Catalog): ResourceKey[] {
+  const a = computeResources(before, catalog);
+  const b = computeResources(after, catalog);
+  return RESOURCES.filter((k) => Math.abs(b[k].used - a[k].used) > 0.05 || Math.abs(b[k].capacity - a[k].capacity) > 0.05);
+}
+
+/** The module a patch adds, so "Show me where" can point straight at its card. */
+function addedModuleId(design: MissionDesign, patch: DesignPatch): string | undefined {
+  return patch.moduleIds?.find((id) => !design.moduleIds.includes(id));
+}
 
 /** The latest risk assessment: simulated after the first paint, kept while the next one runs. */
 function useRisk(design: MissionDesign, catalog: Catalog, live: LiveContext | null): { risk: Forecast | null; fresh: boolean } {
@@ -64,11 +79,26 @@ function RiskAssessment({ risk, fresh }: { risk: Forecast | null; fresh: boolean
   );
 }
 
+/** One short line on why this part answers that seat's check. */
+function hint(check: ReadinessVoteDetail["check"], name: string): string {
+  switch (check) {
+    case "power": return `The ${name} covers the dark period.`;
+    case "mass": return `The ${name} keeps the mass within the rocket.`;
+    case "comms": return `The ${name} gets the data home.`;
+    case "budget": return `The ${name} brings the cost back in line.`;
+    case "reliability": return `The ${name} raises the odds of arriving.`;
+    case "objectives": return `The ${name} is what the goal needs.`;
+    default: return `The ${name} answers this check.`;
+  }
+}
+
 export function CouncilStep() {
   const { design, catalog } = useDesign();
   const live = useGame((s) => s.live);
   const patchDesign = useGame((s) => s.patchDesign);
   const setStep = useGame((s) => s.setStep);
+  const showMe = useGuide((s) => s.showMe);
+  const flashGauges = useGuide((s) => s.flashGauges);
   const { risk, fresh } = useRisk(design, catalog, live);
   const votes = useMemo(() => (risk ? readinessReview(design, catalog, risk) : null), [design, catalog, risk]);
   const seats = useMemo(() => Object.fromEntries(readinessSeats(design.coalition, catalog).map((s) => [s.actorId, s.checks])), [design.coalition, catalog]);
@@ -87,14 +117,31 @@ export function CouncilStep() {
   const onFix = (v: ReadinessVoteDetail) => {
     if (!v.fix) return;
     sfx("confirm");
+    flashGauges(movedGauges(design, { ...design, ...v.fix.patch }, catalog));
     patchDesign(v.fix.patch);
     setGoTo(v.fix.goTo ?? null);
   };
   const onNegotiate = (v: ReadinessVoteDetail) => {
     if (!v.concession) return;
     sfx("confirm");
+    flashGauges(movedGauges(design, { ...design, ...v.concession.patch }, catalog));
     patchDesign(v.concession.patch);
     setGoTo(null);
+  };
+  // "Show me where": go to the step that owns the fix, and let Rocky point at the part to add.
+  const onShowMe = (v: ReadinessVoteDetail) => {
+    if (!v.fix?.goTo) return;
+    sfx("click");
+    const step = STEP_OF[v.fix.goTo];
+    const moduleId = addedModuleId(design, v.fix.patch);
+    const name = moduleId ? getModule(moduleId)?.name : undefined;
+    showMe({
+      step,
+      moduleId,
+      pose: "point",
+      text: name ? `${hint(v.check, name)} Tap to add it.` : `The change belongs in this step. ${v.fix.label}.`,
+    });
+    setStep(step);
   };
 
   // Team play: players hold the first seats, lead first, and call GO or NO-GO themselves.
@@ -120,7 +167,7 @@ export function CouncilStep() {
     <div className="space-y-5">
       <RiskAssessment risk={risk} fresh={fresh} />
       <ReviewFeed votes={votes} seats={seats} changes={changes} playerCount={playerCount} players={players} calls={calls}
-        onPlayers={onPlayers} onCall={onCall} onFix={onFix} onNegotiate={onNegotiate} />
+        onPlayers={onPlayers} onCall={onCall} onFix={onFix} onNegotiate={onNegotiate} onShowMe={onShowMe} />
       {goTo && changes.length > 0 && (
         <button type="button" className="inline-flex items-center gap-1.5 text-xs underline-offset-2 hover:underline" style={{ color: "var(--cyan)" }} onClick={() => setStep(STEP_OF[goTo])}>
           See the change in {STEP_OF[goTo] === "values" ? "Values" : goTo.charAt(0).toUpperCase() + goTo.slice(1)} <Icon name="arrow" size={13} />

@@ -35,10 +35,12 @@ function Stamp({ verdict }: { verdict: ReadinessVerdict }) {
   );
 }
 
+const lowerFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
+
 function VoteInfo({ vote, checks }: { vote: ReadinessVoteDetail; checks: ReadinessCheck[] }) {
   return (
     <div className="space-y-3 text-sm text-fg/90">
-      <p>{vote.reason}. <span className="num text-muted">{vote.numbers}</span></p>
+      <p>{vote.plain}. <span className="num text-muted">{vote.numbers}</span></p>
       <p className="text-muted">This seat checks {checks.map((c) => CHECK_LABEL[c].toLowerCase()).join(" and ")} and reports the worst one.</p>
       {vote.fix && <p><span className="text-faint">Fix it:</span> {vote.fix.label}</p>}
       {vote.concession && <p><span className="text-faint">Negotiate:</span> {vote.concession.label} ({vote.concession.cost})</p>}
@@ -56,9 +58,10 @@ interface SeatProps {
   onCall: (actorId: string, call: SeatCall | undefined) => void;
   onFix: (v: ReadinessVoteDetail) => void;
   onNegotiate: (v: ReadinessVoteDetail) => void;
+  onShowMe: (v: ReadinessVoteDetail) => void;
 }
 
-function VoteCard({ vote, checks, revealed, player, call, onCall, onFix, onNegotiate }: SeatProps) {
+function VoteCard({ vote, checks, revealed, player, call, onCall, onFix, onNegotiate, onShowMe }: SeatProps) {
   const a = getActor(vote.actorId);
   const sources: Source[] = vote.source ? [vote.source] : [];
   const verdict = player ? seatVerdict(vote, [vote.actorId], call ? { [vote.actorId]: call } : {}) : vote.verdict;
@@ -94,21 +97,36 @@ function VoteCard({ vote, checks, revealed, player, call, onCall, onFix, onNegot
           </>
         ) : null}
       </div>
-      <p className={`truncate text-sm ${revealed ? "text-fg" : "text-transparent"}`} title={vote.reason}>{waiting ? `Player ${player}, your call: ${vote.reason.charAt(0).toLowerCase()}${vote.reason.slice(1)}` : vote.reason}</p>
+      {/* why, in one sentence, with the gap to close: "Not enough battery for the dark period: short by 2,990 Wh" */}
+      <p className={`text-sm leading-snug ${revealed ? "text-fg" : "text-transparent"}`}>
+        {waiting ? `Player ${player}, your call: ${lowerFirst(vote.plain)}` : vote.plain}
+      </p>
       <p className={`num truncate text-xs ${revealed ? "text-muted" : "text-transparent"}`} title={vote.numbers}>{vote.numbers}</p>
       {revealed && vote.verdict !== "go" && (vote.fix || vote.concession) && (
-        <div className="mt-3 flex min-w-0 items-center gap-2">
+        <div className="mt-3 space-y-2">
           {vote.fix && (
-            <Button size="sm" variant="primary" title={vote.fix.label} onClick={() => onFix(vote)}>
-              <Icon name="build" size={14} /> Fix it
-            </Button>
+            <>
+              <Button variant="primary" className="w-full justify-center" onClick={() => onFix(vote)}>
+                <Icon name="build" size={16} /> Fix it for me
+              </Button>
+              <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                {vote.fix.goTo && (
+                  <Button size="sm" onClick={() => onShowMe(vote)}>
+                    <Icon name="arrow" size={14} /> Show me where
+                  </Button>
+                )}
+                <span className="min-w-0 flex-1 truncate text-[11px] text-faint" title={vote.fix.label}>{vote.fix.label}</span>
+              </div>
+            </>
           )}
           {vote.concession && (
-            <Button size="sm" title={`${vote.concession.label} (${vote.concession.cost})`} onClick={() => onNegotiate(vote)}>
-              <Icon name="link" size={14} /> Negotiate
-            </Button>
+            <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+              <Button size="sm" onClick={() => onNegotiate(vote)}>
+                <Icon name="link" size={14} /> Negotiate
+              </Button>
+              <span className="min-w-0 flex-1 truncate text-[11px] text-faint" title={`${vote.concession.label} (${vote.concession.cost})`}>{vote.concession.label}: {vote.concession.cost}</span>
+            </div>
           )}
-          <span className="min-w-0 truncate text-[11px] text-faint" title={vote.fix?.label ?? vote.concession?.label}>{vote.fix?.label ?? `${vote.concession!.label}: ${vote.concession!.cost}`}</span>
         </div>
       )}
     </li>
@@ -125,7 +143,7 @@ const POLL_INFO = (
 );
 
 /** The Go / No-Go poll: seats answer one after the other; a seat with a player waits for that player's call. */
-export function ReviewFeed({ votes, seats, changes, playerCount, players, calls, onPlayers, onCall, onFix, onNegotiate }: {
+export function ReviewFeed({ votes, seats, changes, playerCount, players, calls, onPlayers, onCall, onFix, onNegotiate, onShowMe }: {
   votes: ReadinessVoteDetail[] | null;
   seats: Record<string, ReadinessCheck[]>;
   changes: string[];
@@ -137,6 +155,7 @@ export function ReviewFeed({ votes, seats, changes, playerCount, players, calls,
   onCall: (actorId: string, call: SeatCall | undefined) => void;
   onFix: (v: ReadinessVoteDetail) => void;
   onNegotiate: (v: ReadinessVoteDetail) => void;
+  onShowMe: (v: ReadinessVoteDetail) => void;
 }) {
   const [shown, setShown] = useState(0);
   const calm = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -179,7 +198,7 @@ export function ReviewFeed({ votes, seats, changes, playerCount, players, calls,
           const seat = players.indexOf(v.actorId);
           return (
             <VoteCard key={v.actorId} vote={v} checks={seats[v.actorId] ?? [v.check]} revealed={i < shown || v.actorId === waitingFor}
-              player={seat >= 0 ? seat + 1 : undefined} call={calls[v.actorId]} onCall={onCall} onFix={onFix} onNegotiate={onNegotiate} />
+              player={seat >= 0 ? seat + 1 : undefined} call={calls[v.actorId]} onCall={onCall} onFix={onFix} onNegotiate={onNegotiate} onShowMe={onShowMe} />
           );
         })}
       </ul>
