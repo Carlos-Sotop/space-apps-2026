@@ -20,7 +20,7 @@ import type {
 } from "./types";
 import { designMoves, fmt, getActor, getMission, strongCapabilities, type DesignMove } from "./design";
 import { forecast } from "./forecast";
-import { computeResources } from "./resources";
+import { computeResources, massOverKg } from "./resources";
 import { validateDesign } from "./validate";
 
 /**
@@ -625,7 +625,7 @@ function massCheck(c: ReadyContext): Outcome {
     return {
       ...base, verdict: "no-go", hard: true, issue: blocker, reason: heavy ? "Too heavy for the rocket" : firstSentence(blocker.text),
       numbers: sentence(issueFact(blocker, c.rep, c.design, c.catalog)),
-      gap: blocker.id === "mass-over" ? `${fmt(g.used - g.capacity)} kg over the limit` : undefined,
+      gap: blocker.id === "mass-over" ? `${fmt(massOverKg(c.design, c.catalog))} kg over the limit` : undefined,
     };
   }
   if (m < READY_MARGIN) return { ...base, verdict: "go-with-condition", hard: false, issue: mine.find((i) => i.id === "mass-tight"), reason: "Under 10% mass margin: masses grow late", gap: thinMargin(m) };
