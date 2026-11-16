@@ -5,207 +5,40 @@ import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import { Line, Stars } from "@react-three/drei";
+import type { Line2 } from "three-stdlib";
 import * as THREE from "three";
-import type { FlightSceneProps } from "@/screens/FlightSceneSvg";
-import { Earth, Moon } from "@/scene/bodies";
-import { phaseAt } from "@/screens/flightTimeline";
-import { StationModel } from "./missions/parts";
 import type { FlightPhaseId } from "@/engine/types";
+import type { FlightSceneProps } from "@/screens/FlightSceneSvg";
+import type { Timeline } from "@/screens/flightTimeline";
+import { Earth, Moon } from "@/scene/bodies";
+import { StationModel } from "./missions/parts";
+import { EARTH_R, FLIGHT_SECONDS, FlightPath, MOON_C, MOON_R, newPose, newState } from "./flightPath";
+import { BELL1_Y, BELL2_Y, Stage1Model, UpperStageModel, makeParticleMaterial, makePlumeGeometry, makePlumeMaterial, usePlumeFade, useSoftDot } from "./rocket";
 
-/** Units: Earth radius = 1. Distances and the Moon are NOT to scale (the screen says so). */
-const EARTH_R = 1;
-const LEO_R = 1.35;
-const TILT = 0.35;
-const LEO_END_ANGLE = 1.9;
-const EARTH_C = new THREE.Vector3(0, 0, 0);
-const LUNAR_EARTH_C = new THREE.Vector3(-4.3, -0.4, 0);
-const MOON_C = new THREE.Vector3(4.3, 0.5, 0);
-const MOON_R = 0.3;
-/** Matches the key light, so the terminator falls where the scene is lit from. */
-const SUN = new THREE.Vector3(6, 3, 6).normalize();
-/**
- * Arc the craft still has to close to reach the station after it is in orbit. Negative: it
- * catches up by moving towards the side of the ring that stands clear of the limb, so the
- * docking happens where the camera can see it instead of behind the planet.
- */
-const CHASE_ARC = -0.75;
-/** Point in the ascent where the first stage lets go. */
-const STAGE_SEP = 0.45;
-
-/** How much of the path each phase covers (visual weight, not mission days). */
-const EARTH_W: Partial<Record<FlightPhaseId, number>> = { launch: 0.3, ascent: 0.4, "orbit-insertion": 0.3 };
-const LUNAR_W: Partial<Record<FlightPhaseId, number>> = { launch: 0.1, ascent: 0.15, "orbit-insertion": 0.1, transfer: 0.45, arrival: 0.2 };
-
-const smooth = (t: number) => { const x = Math.min(1, Math.max(0, t)); return x * x * (3 - 2 * x); };
-const bez3 = (a: THREE.Vector3, c: THREE.Vector3, b: THREE.Vector3, t: number) => {
-  const u = 1 - t;
-  return new THREE.Vector3().addScaledVector(a, u * u).addScaledVector(c, 2 * u * t).addScaledVector(b, t * t);
-};
-
-/** Point on a circle-ish orbit around `center`, in a plane tilted about the x axis. */
-function around(center: THREE.Vector3, r: number, angle: number): THREE.Vector3 {
-  const x = r * Math.sin(angle), y = r * Math.cos(angle);
-  return new THREE.Vector3(x, y * Math.cos(TILT), y * Math.sin(TILT)).add(center);
+export interface FlightCoreProps {
+  timeline: Timeline;
+  lunar: boolean;
+  /** the craft flies to a space station and docks with it */
+  station?: boolean;
+  lostAt?: FlightPhaseId;
+  /** flight progress 0 to 1, read every frame: the scene never re-renders to move */
+  progress: { readonly current: number };
+  /**
+   * Scene time in seconds. When given (the video), every frame is a pure function of progress and
+   * this clock: no damping and no wall clock. Without it (the game) the R3F clock drives the flicker.
+   */
+  clock?: { readonly current: number };
+  /** called once, on the first frame drawn */
+  onReady?: () => void;
+  /** prefers-reduced-motion: no shake, no smoke, only the positions */
+  calm?: boolean;
 }
 
-/** Launch site on top, rising and curving into low Earth orbit. h goes 0..1. */
-function ascent(center: THREE.Vector3, h: number): THREE.Vector3 {
-  const r = EARTH_R + 0.01 + (LEO_R - EARTH_R - 0.01) * smooth(h / 0.9);
-  return around(center, r, LEO_LAST * Math.pow(Math.min(1, Math.max(0, h)), 1.6));
-}
-const LEO_LAST = LEO_END_ANGLE;
-
-/** Position along the pre-operations path, g goes 0..1. */
-function pathAt(g: number, lunar: boolean): THREE.Vector3 {
-  const gg = Math.min(1, Math.max(0, g));
-  if (!lunar) return ascent(EARTH_C, gg);
-  const leo = 0.35, tli = 0.8;
-  if (gg <= leo) return ascent(LUNAR_EARTH_C, gg / leo);
-  const E = ascent(LUNAR_EARTH_C, 1);
-  const A = new THREE.Vector3(3.2, 1.4, 0);
-  if (gg <= tli) return bez3(E, new THREE.Vector3(2.64, 3.32, -1.2), A, smooth((gg - leo) / (tli - leo)) * 0.5 + ((gg - leo) / (tli - leo)) * 0.5);
-  const S = MOON_C.clone().add(new THREE.Vector3(0.0, -MOON_R - 0.012, 0));
-  return bez3(A, new THREE.Vector3(3.55, 0.2, 0.75), S, smooth((gg - tli) / (1 - tli)));
-}
-
-function Rocket({ pos, dir, scale, flame, ghost }: { pos: THREE.Vector3; dir: THREE.Vector3; scale: number; flame: boolean; ghost?: boolean }) {
-  const q = useMemo(() => new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize()), [dir]);
-  return (
-    <group position={pos} quaternion={q} scale={scale}>
-      <mesh><cylinderGeometry args={[0.014, 0.017, 0.085, 12]} /><meshStandardMaterial color="#f1f5f9" emissive="#334155" /></mesh>
-      <mesh position={[0, 0.058, 0]}><coneGeometry args={[0.014, 0.036, 12]} /><meshStandardMaterial color="#a78bfa" emissive="#6d28d9" /></mesh>
-      <mesh position={[0, 0, 0]} visible={!ghost}><sphereGeometry args={[0.045, 12, 12]} /><meshBasicMaterial color="#a78bfa" transparent opacity={0.18} depthWrite={false} blending={THREE.AdditiveBlending} /></mesh>
-      {flame && <pointLight position={[0, -0.08, 0]} color="#fbbf24" intensity={0.6} distance={1.4} />}
-    </group>
-  );
-}
-
-/**
- * The spent first stage, after separation: it tumbles away behind the rocket and fades.
- * Real staging throws the booster clear with small thrusters, which is the puff at t=0.
- */
-function SpentStage({ at, back, scale, age }: { at: THREE.Vector3; back: THREE.Vector3; scale: number; age: number }) {
-  if (age <= 0 || age > 1.6) return null;
-  const drift = at.clone().addScaledVector(back, age * 0.55 * scale).addScaledVector(new THREE.Vector3(0, -1, 0), age * age * 0.12 * scale);
-  const fade = Math.max(0, 1 - age / 1.6);
-  return (
-    <group position={drift} rotation={[age * 3.1, age * 1.7, age * 2.3]} scale={scale}>
-      <mesh>
-        <cylinderGeometry args={[0.014, 0.015, 0.05, 10]} />
-        <meshStandardMaterial color="#cbd5e1" transparent opacity={fade} />
-      </mesh>
-      {age < 0.35 && (
-        <mesh>
-          <sphereGeometry args={[0.05 + age * 0.12, 10, 10]} />
-          <meshBasicMaterial color="#e2e8f0" transparent opacity={0.35 * (1 - age / 0.35)} depthWrite={false} blending={THREE.AdditiveBlending} />
-        </mesh>
-      )}
-    </group>
-  );
-}
-
-/**
- * The exhaust: a hot core tapering into a cooler flare, with a little flicker. A rocket
- * plume is a continuous column, not a string of beads, and at this distance the shape is
- * what reads.
- */
-function Plume({ pos, dir, scale, t }: { pos: THREE.Vector3; dir: THREE.Vector3; scale: number; t: number }) {
-  const back = useMemo(() => dir.clone().normalize().multiplyScalar(-1), [dir]);
-  const q = useMemo(() => new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), back), [back]);
-  const flick = 1 + 0.12 * Math.sin(t * 34) + 0.06 * Math.sin(t * 57);
-  const len = 0.42 * scale * flick;
-  const mid = pos.clone().addScaledVector(back, len / 2 + 0.03 * scale);
-
-  return (
-    <group position={mid} quaternion={q}>
-      {/* cool outer flare */}
-      <mesh>
-        <coneGeometry args={[0.07 * scale * flick, len, 18, 1, true]} />
-        <meshBasicMaterial color="#fb7185" transparent opacity={0.3} side={THREE.DoubleSide} depthWrite={false} blending={THREE.AdditiveBlending} />
-      </mesh>
-      {/* hot core */}
-      <mesh position={[0, len * 0.12, 0]}>
-        <coneGeometry args={[0.038 * scale * flick, len * 0.72, 16, 1, true]} />
-        <meshBasicMaterial color="#fde68a" transparent opacity={0.75} side={THREE.DoubleSide} depthWrite={false} blending={THREE.AdditiveBlending} />
-      </mesh>
-      {/* the glow at the throat, which is what the camera sees first */}
-      <mesh position={[0, len * 0.46, 0]}>
-        <sphereGeometry args={[0.05 * scale, 12, 12]} />
-        <meshBasicMaterial color="#fff7e0" transparent opacity={0.85} depthWrite={false} blending={THREE.AdditiveBlending} />
-      </mesh>
-    </group>
-  );
-}
-
-/** The real bodies, from the NASA maps in public/textures (see CREDITS there). */
-function Planet({ center, radius, kind }: { center: THREE.Vector3; radius: number; kind: "earth" | "moon" }) {
-  return (
-    <group position={center}>
-      {kind === "earth" ? <Earth radius={radius} sunDir={SUN} spin={0.012} /> : <Moon radius={radius} spin={0.004} />}
-    </group>
-  );
-}
-
-/**
- * Dust thrown up by the landing engine. On the Moon there is no air, so the grains fly in
- * straight, low arcs along the surface and fall back instead of billowing: that is what this draws.
- */
-function Dust({ at, up, age, radius }: { at: THREE.Vector3; up: THREE.Vector3; age: number; radius: number }) {
-  const N = 300;
-  const basis = useMemo(() => {
-    const u = up.clone().normalize();
-    const a1 = new THREE.Vector3(1, 0, 0).cross(u);
-    const e1 = (a1.lengthSq() < 1e-6 ? new THREE.Vector3(0, 0, 1).cross(u) : a1).normalize();
-    const e2 = u.clone().cross(e1).normalize();
-    return { u, e1, e2 };
-  }, [up]);
-  const seeds = useMemo(
-    () => Array.from({ length: N }, (_, i) => {
-      const a = (i * 2.399963) % (Math.PI * 2);
-      const s = 0.25 + ((i * 37) % 100) / 100 * 0.8;
-      const lift = 0.16 + ((i * 53) % 100) / 100 * 0.5;
-      const delay = ((i * 29) % 100) / 100 * 0.3;
-      return { ca: Math.cos(a), sa: Math.sin(a), s, lift, delay };
-    }),
-    [],
-  );
-  const positions = useMemo(() => {
-    const arr = new Float32Array(N * 3);
-    const p = new THREE.Vector3();
-    seeds.forEach((d, i) => {
-      const tau = Math.max(0, age - d.delay);
-      const reach = d.s * tau * radius * 0.95;
-      const h = Math.max(0, d.lift * tau - 0.34 * tau * tau) * radius * 1.5;
-      p.copy(at).addScaledVector(basis.e1, d.ca * reach).addScaledVector(basis.e2, d.sa * reach).addScaledVector(basis.u, h);
-      arr[i * 3] = p.x;
-      arr[i * 3 + 1] = p.y;
-      arr[i * 3 + 2] = p.z;
-    });
-    return arr;
-    // rebuilt as the burst grows, quantised so it costs at most one array a frame
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [Math.round(age * 80), at.x, at.y, at.z, radius, seeds, basis]);
-
-  const fade = Math.max(0, Math.min(1, 1.45 - age)) * Math.min(1, age * 5);
-  if (fade <= 0.01) return null;
-  return (
-    <points key="dust">
-      <bufferGeometry>
-        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
-      </bufferGeometry>
-      <pointsMaterial size={0.03} sizeAttenuation color="#e2e6f0" transparent opacity={0.6 * fade} depthWrite={false} />
-    </points>
-  );
-}
-
-function Ring({ center, r }: { center: THREE.Vector3; r: number }) {
-  const pts = useMemo(() => Array.from({ length: 121 }, (_, i) => around(center, r, (i / 120) * Math.PI * 2)), [center, r]);
-  return <Line points={pts} color="#8b5cf6" lineWidth={1} transparent opacity={0.4} dashed dashSize={0.06} gapSize={0.07} />;
-}
+const PATH_N = 240;
 
 /** Text label drawn to a canvas texture (drei <Html> re-mounts a React root every frame here). */
-function Label({ text, position }: { text: string; position: THREE.Vector3 }) {
-  const tex = useMemo(() => {
+function useLabel(text: string) {
+  return useMemo(() => {
     const c = document.createElement("canvas");
     c.width = 256; c.height = 64;
     const g = c.getContext("2d");
@@ -214,11 +47,411 @@ function Label({ text, position }: { text: string; position: THREE.Vector3 }) {
     t.colorSpace = THREE.SRGBColorSpace;
     return t;
   }, [text]);
-  return <sprite position={position} scale={[0.9, 0.225, 1]}><spriteMaterial map={tex} transparent depthWrite={false} /></sprite>;
 }
 
-/** Bloom, so the plume, the rocket glow and the city-free night side carry real light. */
-function Bloom({ strength }: { strength: number }) {
+/**
+ * The flight scene without its Canvas: the game puts it in an R3F Canvas, the video in Remotion's
+ * ThreeCanvas. Everything moves by mutation inside one useFrame, from preallocated objects.
+ */
+export function FlightSceneCore({ timeline, lunar, station, lostAt, progress, clock, onReady, calm }: FlightCoreProps) {
+  const path = useMemo(() => new FlightPath(timeline, { lunar, station, lostAt }), [timeline, lunar, station, lostAt]);
+  const L = path.layout;
+  const plan = useMemo(() => path.plannedPath(PATH_N), [path]);
+  const ring = useMemo(() => path.ring(), [path]);
+  const st = useMemo(newState, []);
+  const pose = useMemo(newPose, []);
+  const dot = useSoftDot();
+  const plumeGeo = useMemo(makePlumeGeometry, []);
+  const coreGeo = useMemo(() => { const g = new THREE.CylinderGeometry(0.5, 0.12, 1, 24, 8, true); g.translate(0, -0.5, 0); return g; }, []);
+  const plumeFade = usePlumeFade();
+  const outerMat = useMemo(() => makePlumeMaterial("#ff7a3d", plumeFade, 0.55), [plumeFade]);
+  const coreMat = useMemo(() => makePlumeMaterial("#fff1c2", plumeFade, 0.95), [plumeFade]);
+  const sparkMat = useMemo(() => makeParticleMaterial(dot, "#ffb066", true), [dot]);
+  const smokeMat = useMemo(() => makeParticleMaterial(dot, "#d9dde8", false), [dot]);
+  const earthLabel = useLabel("Earth");
+  const moonLabel = useLabel("Moon");
+  const moonQ = useMemo(() => new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, -1, 0), L.landDir), [L]);
+
+  const spinRef = useRef<THREE.Group>(null);
+  const rocket = useRef<THREE.Group>(null);
+  const stage1 = useRef<THREE.Group>(null);
+  const plume = useRef<THREE.Group>(null);
+  const outer = useRef<THREE.Mesh>(null);
+  const core = useRef<THREE.Mesh>(null);
+  const throat = useRef<THREE.Sprite>(null);
+  const throatMat = useRef<THREE.SpriteMaterial>(null);
+  const smoke = useRef<THREE.Points>(null);
+  const rim = useRef<THREE.DirectionalLight>(null);
+  const rimTarget = useRef<THREE.Object3D>(null);
+  const flameLight = useRef<THREE.PointLight>(null);
+  const spent = useRef<THREE.Group>(null);
+  const stationRef = useRef<THREE.Group>(null);
+  const lostRef = useRef<THREE.Group>(null);
+  const trail = useRef<Line2>(null);
+  const planLine = useRef<Line2>(null);
+  const earthSprite = useRef<THREE.SpriteMaterial>(null);
+  const moonSprite = useRef<THREE.SpriteMaterial>(null);
+  const dust = useRef<THREE.Points>(null);
+  const dustMat = useRef<THREE.PointsMaterial>(null);
+  const bloom = useRef<UnrealBloomPass | null>(null);
+
+  const scratchFade = useMemo(() => ({ value: 1 }), []);
+  // per-frame scratch
+  const scratch = useMemo(() => ({
+    m: new THREE.Matrix4(), x: new THREE.Vector3(), z: new THREE.Vector3(), v: new THREE.Vector3(),
+    offPos: new THREE.Vector3(), offLook: new THREE.Vector3(), lastPos: new THREE.Vector3(), lastLook: new THREE.Vector3(),
+    lastP: -1, ready: false,
+    fadeMesh: (o: THREE.Object3D) => {
+      const m = (o as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined;
+      if (m && "opacity" in m) { m.transparent = true; m.opacity = scratchFade.value; }
+    },
+  }), [scratchFade]);
+
+  // smoke from the pad: the exhaust hits the ground and rolls out sideways, then thins out
+  const SMOKE_N = 170;
+  const smokeSeeds = useMemo(() => Array.from({ length: SMOKE_N }, (_, i) => {
+    const f = (i * 0.6180339887) % 1, g = (i * 0.7548776662) % 1, h = (i * 0.5698402910) % 1;
+    const late = i > 110;
+    return { a: f * Math.PI * 2, speed: 0.05 + 0.08 * g, rise: 0.004 + 0.012 * h, delay: late ? 0.8 + 1.6 * g : 0.04 + 0.75 * h, grow: 0.7 + 0.6 * f };
+  }), []);
+  const smokeData = useMemo(() => ({ pos: new Float32Array(SMOKE_N * 3), size: new Float32Array(SMOKE_N), alpha: new Float32Array(SMOKE_N) }), []);
+  // hot gas in the plume: grains born at the nozzle that stream back, spread and cool
+  const SPARK_N = 56;
+  const sparkData = useMemo(() => ({ pos: new Float32Array(SPARK_N * 3), size: new Float32Array(SPARK_N), alpha: new Float32Array(SPARK_N) }), []);
+  const sparks = useRef<THREE.Points>(null);
+
+  // dust thrown up by the landing engine: low straight arcs, no air on the Moon
+  const DUST_N = 300;
+  const dustSeeds = useMemo(() => Array.from({ length: DUST_N }, (_, i) => {
+    const a = (i * 2.399963) % (Math.PI * 2);
+    return { ca: Math.cos(a), sa: Math.sin(a), s: 0.25 + (((i * 37) % 100) / 100) * 0.8, lift: 0.16 + (((i * 53) % 100) / 100) * 0.5, delay: (((i * 29) % 100) / 100) * 0.3 };
+  }), []);
+  const dustPositions = useMemo(() => new Float32Array(DUST_N * 3), []);
+  const dustBasis = useMemo(() => {
+    const u = L.landDir.clone();
+    const e1 = new THREE.Vector3().crossVectors(L.N, u).normalize();
+    const e2 = new THREE.Vector3().crossVectors(u, e1).normalize();
+    return { u, e1, e2, at: MOON_C.clone().addScaledVector(u, MOON_R) };
+  }, [L]);
+
+  const camera = useThree((s) => s.camera) as THREE.PerspectiveCamera;
+  useEffect(() => {
+    camera.fov = 45; camera.near = 0.004; camera.far = 220;
+    camera.updateProjectionMatrix();
+  }, [camera]);
+  useEffect(() => { if (rim.current && rimTarget.current) rim.current.target = rimTarget.current; }, []);
+
+  useFrame((state, rawDt) => {
+    const dt = Math.min(0.1, Math.max(0, rawDt));
+    const p = progress.current;
+    const t = clock ? clock.current : state.clock.elapsedTime;
+    const s = path.sample(p, st);
+    const aspect = state.size.width / Math.max(1, state.size.height);
+    path.camera(p, s, aspect, pose);
+    const size = pose.size;
+
+    // Skip and replays jump the progress: ease the camera across instead of cutting (game only).
+    const S = scratch;
+    if (!clock) {
+      if (S.lastP >= 0 && Math.abs(p - S.lastP) > 0.03) {
+        S.offPos.copy(S.lastPos).sub(pose.pos);
+        S.offLook.copy(S.lastLook).sub(pose.look);
+      }
+      const k = Math.exp(-3.5 * dt);
+      S.offPos.multiplyScalar(k);
+      S.offLook.multiplyScalar(k);
+      pose.pos.add(S.offPos);
+      pose.look.add(S.offLook);
+    }
+    S.lastP = p;
+    S.lastPos.copy(pose.pos);
+    S.lastLook.copy(pose.look);
+
+    // ignition rumble: 2 to 3 pixels of shake that dies away as the rocket climbs
+    const tIgn = (Math.min(p, path.marks.end) - path.marks.ignite) * FLIGHT_SECONDS;
+    if (!calm && tIgn > 0 && s.climb < 0.35) {
+      const env = Math.min(1, tIgn / 0.3) * (1 - Math.min(1, s.climb / 0.35)) * s.burn;
+      const px = (2 * pose.pos.distanceTo(pose.look) * Math.tan((22.5 * Math.PI) / 180)) / Math.max(1, state.size.height);
+      const amp = 2.5 * px * env;
+      S.v.subVectors(pose.look, pose.pos).cross(pose.up).normalize();
+      const nx = Math.sin(t * 47.3) * 0.6 + Math.sin(t * 83.1 + 1.7) * 0.4;
+      const ny = Math.sin(t * 53.9 + 0.5) * 0.6 + Math.sin(t * 91.7 + 2.3) * 0.4;
+      pose.pos.addScaledVector(S.v, nx * amp).addScaledVector(pose.up, ny * amp);
+      pose.look.addScaledVector(S.v, nx * amp).addScaledVector(pose.up, ny * amp);
+    }
+
+    const cam = state.camera;
+    cam.position.copy(pose.pos);
+    cam.up.copy(pose.up);
+    cam.lookAt(pose.look);
+
+    if (spinRef.current) spinRef.current.rotation.y = s.spin;
+
+    // rocket: base on the path, nose along the velocity, the orbit normal as its side (no roll flips)
+    const r = rocket.current;
+    if (r) {
+      r.visible = !s.lost;
+      r.position.copy(s.pos);
+      S.x.copy(L.N).negate().addScaledVector(s.nose, L.N.dot(s.nose)).normalize();
+      S.z.crossVectors(S.x, s.nose);
+      S.m.makeBasis(S.x, s.nose, S.z);
+      r.quaternion.setFromRotationMatrix(S.m);
+      r.scale.setScalar(size);
+    }
+    if (stage1.current) stage1.current.visible = s.stage1;
+
+    // plume: a child of the rocket, so it can never come loose; it sits on whichever engine is firing
+    const burn = s.burn;
+    if (plume.current) {
+      plume.current.visible = burn > 0.01 && !s.lost;
+      plume.current.position.y = s.stage1 ? BELL1_Y : BELL2_Y;
+      const nozzle = s.stage1 ? 0.058 : 0.044;
+      const flick = 1 + 0.06 * Math.sin(t * 31) + 0.04 * Math.sin(t * 57 + 1.3);
+      // short against the pad, longer and wider as the air thins
+      const ground = 0.6 + 0.4 * Math.min(1, s.climb * 6);
+      const len = (1.0 + 2.6 * s.climb) * ground * Math.min(1, burn * 1.4) * flick;
+      const wide = 2 * nozzle * (1 + 0.9 * s.climb);
+      outer.current?.scale.set(wide, len, wide);
+      core.current?.scale.set(2 * nozzle * 0.85, len * 0.42, 2 * nozzle * 0.85);
+      outerMat.opacity = 0.55 * Math.min(1, burn * 1.5);
+      coreMat.opacity = 0.95 * Math.min(1, burn * 1.5);
+      // the flash at ignition, then the glow at the throat
+      const flash = Math.exp(-(((tIgn - 0.12) / 0.12) ** 2)) * 1.3;
+      if (throat.current) throat.current.scale.setScalar((0.5 + flash) * Math.max(0.2, burn));
+      const sk = sparks.current;
+      if (sk) {
+        sk.visible = !calm;
+        if (sk.visible) {
+          const D = sparkData;
+          for (let i = 0; i < SPARK_N; i++) {
+            const ph = (t * 2.6 + i / SPARK_N + ((i * 0.618) % 1) * 0.3) % 1;
+            const a = i * 2.399963, spread = nozzle * (0.4 + 1.6 * ph) * (1 + 0.8 * s.climb);
+            D.pos[i * 3] = Math.cos(a) * spread * ((i * 0.37) % 1);
+            D.pos[i * 3 + 1] = -ph * len * 1.1;
+            D.pos[i * 3 + 2] = Math.sin(a) * spread * ((i * 0.37) % 1);
+            D.size[i] = size * (0.05 + 0.12 * ph);
+            D.alpha[i] = (1 - ph) * (1 - ph) * 0.8 * Math.min(1, burn * 1.5);
+          }
+          const g = sk.geometry;
+          (g.attributes.position as THREE.BufferAttribute).needsUpdate = true;
+          (g.attributes.size as THREE.BufferAttribute).needsUpdate = true;
+          (g.attributes.alpha as THREE.BufferAttribute).needsUpdate = true;
+          sparkMat.uniforms.scale.value = (state.size.height * state.viewport.dpr) / (2 * Math.tan((22.5 * Math.PI) / 180));
+        }
+      }
+      if (throatMat.current) throatMat.current.opacity = Math.min(1, 0.7 * burn + flash);
+    }
+    if (flameLight.current) {
+      flameLight.current.intensity = 0.5 * burn;
+      flameLight.current.distance = size * 6;
+      flameLight.current.position.y = (s.stage1 ? BELL1_Y : BELL2_Y) - 0.15;
+    }
+
+    // rim light: cyan, from behind the rocket as the camera sees it, so it stands out from the dark
+    if (rim.current && rimTarget.current) {
+      rimTarget.current.position.copy(s.pos);
+      rim.current.position.copy(s.pos).sub(pose.pos).normalize().addScaledVector(pose.up, 0.5).add(s.pos);
+    }
+
+    // smoke rolling out from the pad
+    const sm = smoke.current;
+    if (sm) {
+      sm.visible = !calm && tIgn > 0 && tIgn < 6.5 && !s.lost;
+      if (sm.visible) {
+        const D = smokeData;
+        S.x.copy(L.earth).addScaledVector(L.P, EARTH_R);
+        for (let i = 0; i < SMOKE_N; i++) {
+          const sd = smokeSeeds[i];
+          const tau = tIgn - sd.delay;
+          if (tau <= 0) { D.alpha[i] = 0; continue; }
+          const dist = sd.speed * 1.6 * (1 - Math.exp(-tau / 1.3));
+          const ca = Math.cos(sd.a), sa = Math.sin(sd.a);
+          S.v.copy(S.x).addScaledVector(L.T, ca * dist).addScaledVector(L.N, sa * dist).addScaledVector(L.P, 0.003 + sd.rise * Math.pow(tau, 0.8));
+          D.pos[i * 3] = S.v.x; D.pos[i * 3 + 1] = S.v.y; D.pos[i * 3 + 2] = S.v.z;
+          D.size[i] = (0.012 + 0.03 * Math.min(1, tau / 3)) * sd.grow;
+          const inA = Math.min(1, tau / 0.25), outA = 1 - Math.min(1, Math.max(0, (tau - 1.8) / 1.8));
+          D.alpha[i] = 0.5 * inA * outA;
+        }
+        const g = sm.geometry;
+        (g.attributes.position as THREE.BufferAttribute).needsUpdate = true;
+        (g.attributes.size as THREE.BufferAttribute).needsUpdate = true;
+        (g.attributes.alpha as THREE.BufferAttribute).needsUpdate = true;
+        smokeMat.uniforms.scale.value = (state.size.height * state.viewport.dpr) / (2 * Math.tan((22.5 * Math.PI) / 180));
+      }
+    }
+
+    // the first stage, once it lets go: it drifts back, falls and tumbles, then fades
+    const sp = spent.current;
+    if (sp) {
+      const age = s.sepAge;
+      sp.visible = !s.lost && age >= 0 && age < 2.4;
+      if (sp.visible) {
+        const travel = s.sepSpeed * age * 0.55;
+        sp.position.copy(s.sepPos).addScaledVector(s.sepVel, travel).addScaledVector(s.sepOut, -0.004 * age * age);
+        S.x.copy(L.N).negate();
+        S.m.makeBasis(S.x, s.sepVel, S.z.crossVectors(S.x, s.sepVel));
+        sp.quaternion.setFromRotationMatrix(S.m);
+        sp.rotateX(age * 0.9);
+        sp.rotateZ(age * 0.5);
+        sp.scale.setScalar(size);
+        scratchFade.value = Math.max(0, 1 - age / 2.4);
+        sp.traverse(S.fadeMesh);
+      }
+    }
+
+    // the station: ahead on the same orbit while the craft catches up, then docked
+    const stn = stationRef.current;
+    if (stn) {
+      stn.visible = s.stationOn && !s.lost;
+      if (stn.visible) {
+        stn.position.copy(s.stationPos);
+        S.x.crossVectors(s.stationOut, s.stationVel);
+        S.m.makeBasis(S.x, s.stationOut, s.stationVel);
+        stn.quaternion.setFromRotationMatrix(S.m);
+        stn.scale.setScalar(size * 1.6);
+      }
+    }
+
+    // the planned path and the flown trail (the trail is the plan, revealed up to the rocket)
+    const idx = Math.floor(path.pathIndex(p, PATH_N));
+    if (trail.current) {
+      trail.current.geometry.instanceCount = Math.max(0, idx);
+      // in Earth orbit the ring is the track; the climb's trail goes once the craft is on it
+      trail.current.visible = idx > 0 && (lunar || p < path.marks.t0);
+    }
+    if (planLine.current) planLine.current.visible = lunar ? !s.landed : p < path.marks.orbit;
+
+    if (lostRef.current) {
+      lostRef.current.visible = s.lost;
+      if (s.lost) {
+        lostRef.current.position.copy(s.pos);
+        lostRef.current.scale.setScalar((size / 0.06) * (1 + 0.15 * Math.sin(t * 6)));
+      }
+    }
+    // body names only once the view is wide
+    const label = Math.min(1, Math.max(0, (pose.wide - 0.45) / 0.5));
+    if (earthSprite.current) earthSprite.current.opacity = label;
+    if (moonSprite.current) moonSprite.current.opacity = label;
+
+    // landing dust
+    const d = dust.current;
+    if (d && lunar) {
+      // seconds from touchdown: the grains start to lift just before it, then settle
+      const age = s.dustAge;
+      const fade = age < 0 ? Math.max(0, 1 + age / 0.5) * 0.5 : Math.max(0, Math.min(1, 1.6 - age * 0.4));
+      d.visible = !s.lost && Number.isFinite(age) && fade > 0.01;
+      if (d.visible) {
+        const tau0 = Math.max(0, age + 0.5) * 0.55;
+        const B = dustBasis;
+        for (let i = 0; i < DUST_N; i++) {
+          const sd = dustSeeds[i];
+          const tau = Math.max(0, tau0 - sd.delay);
+          const reach = sd.s * tau * MOON_R * 0.95;
+          const h = Math.max(0, sd.lift * tau - 0.34 * tau * tau) * MOON_R * 1.5;
+          S.v.copy(B.at).addScaledVector(B.e1, sd.ca * reach).addScaledVector(B.e2, sd.sa * reach).addScaledVector(B.u, h);
+          dustPositions[i * 3] = S.v.x; dustPositions[i * 3 + 1] = S.v.y; dustPositions[i * 3 + 2] = S.v.z;
+        }
+        (d.geometry.attributes.position as THREE.BufferAttribute).needsUpdate = true;
+        if (dustMat.current) dustMat.current.opacity = 0.6 * fade;
+      }
+    }
+
+    if (bloom.current) bloom.current.strength = 0.5 + 0.15 * burn;
+
+    if (!S.ready) { S.ready = true; onReady?.(); }
+  });
+
+  const earthLabelPos = useMemo(() => L.earth.clone().add(new THREE.Vector3(0, -EARTH_R - 0.3, 0)), [L]);
+  const moonLabelPos = useMemo(() => MOON_C.clone().add(new THREE.Vector3(0, MOON_R + 0.3, 0)), []);
+
+  return (
+    <>
+      <Bloom passRef={bloom} />
+      <color attach="background" args={["#04060f"]} />
+      <ambientLight intensity={0.45} />
+      <directionalLight position={L.sun.clone().multiplyScalar(10)} intensity={2.2} />
+      <Stars radius={60} depth={30} count={1500} factor={3} fade speed={0} />
+
+      <group position={L.earth}>
+        <group ref={spinRef}>
+          <Earth radius={EARTH_R} sunDir={L.sun} spin={0} />
+        </group>
+      </group>
+      <Line points={ring} color="#8b5cf6" lineWidth={1} transparent opacity={0.4} dashed dashSize={0.06} gapSize={0.07} />
+      <sprite position={earthLabelPos} scale={[0.9, 0.225, 1]}><spriteMaterial ref={earthSprite} map={earthLabel} transparent depthWrite={false} opacity={0} /></sprite>
+      {lunar && (
+        <>
+          <group position={MOON_C} quaternion={moonQ}>
+            <Moon radius={MOON_R} spin={0} />
+          </group>
+          <sprite position={moonLabelPos} scale={[0.9, 0.225, 1]}><spriteMaterial ref={moonSprite} map={moonLabel} transparent depthWrite={false} opacity={0} /></sprite>
+          <points ref={dust} visible={false} frustumCulled={false}>
+            <bufferGeometry>
+              <bufferAttribute attach="attributes-position" args={[dustPositions, 3]} />
+            </bufferGeometry>
+            <pointsMaterial ref={dustMat} size={0.0035} sizeAttenuation color="#e2e6f0" transparent opacity={0.6} depthWrite={false} />
+          </points>
+        </>
+      )}
+
+      {/* where the flight is going, and the part already flown */}
+      <Line ref={planLine} points={plan} color="#67e8f9" lineWidth={1} transparent opacity={0.22} dashed dashSize={0.05} gapSize={0.05} />
+      <Line ref={trail} points={plan} color="#a78bfa" lineWidth={2} transparent opacity={0.85} />
+
+      {station && (
+        <group ref={stationRef} visible={false}>
+          <group rotation={[0, Math.PI / 2, 0]}>
+            <StationModel scale={1} />
+          </group>
+        </group>
+      )}
+
+      {/* the first stage after it lets go */}
+      <group ref={spent} visible={false}>
+        <Stage1Model />
+      </group>
+
+      {/* the rocket: origin at the top of the first stage, nose up its local y */}
+      <group ref={rocket}>
+        <Stage1Model ref={stage1} />
+        <UpperStageModel />
+        <group ref={plume}>
+          <mesh ref={outer} geometry={plumeGeo} material={outerMat} frustumCulled={false} />
+          <mesh ref={core} geometry={coreGeo} material={coreMat} frustumCulled={false} />
+          <points ref={sparks} frustumCulled={false} material={sparkMat}>
+            <bufferGeometry>
+              <bufferAttribute attach="attributes-position" args={[sparkData.pos, 3]} />
+              <bufferAttribute attach="attributes-size" args={[sparkData.size, 1]} />
+              <bufferAttribute attach="attributes-alpha" args={[sparkData.alpha, 1]} />
+            </bufferGeometry>
+          </points>
+          <sprite ref={throat}>
+            <spriteMaterial ref={throatMat} map={dot} color="#fff1d0" transparent depthWrite={false} blending={THREE.AdditiveBlending} />
+          </sprite>
+        </group>
+        <pointLight ref={flameLight} color="#fbbf24" intensity={0} distance={1} />
+      </group>
+      <directionalLight ref={rim} color="#22d3ee" intensity={2.4} />
+      <object3D ref={rimTarget} />
+
+      <points ref={smoke} visible={false} frustumCulled={false} material={smokeMat}>
+        <bufferGeometry>
+          <bufferAttribute attach="attributes-position" args={[smokeData.pos, 3]} />
+          <bufferAttribute attach="attributes-size" args={[smokeData.size, 1]} />
+          <bufferAttribute attach="attributes-alpha" args={[smokeData.alpha, 1]} />
+        </bufferGeometry>
+      </points>
+
+      <group ref={lostRef} visible={false}>
+        <mesh><sphereGeometry args={[0.12, 16, 16]} /><meshBasicMaterial color="#fb7185" transparent opacity={0.55} blending={THREE.AdditiveBlending} depthWrite={false} /></mesh>
+        <mesh><sphereGeometry args={[0.05, 12, 12]} /><meshBasicMaterial color="#fff" /></mesh>
+      </group>
+    </>
+  );
+}
+
+/** Bloom, so the plume and the lit limb carry real light. The pass is exposed so its strength can follow the engine. */
+function Bloom({ passRef }: { passRef: React.RefObject<UnrealBloomPass | null> }) {
   const gl = useThree((st) => st.gl);
   const scene = useThree((st) => st.scene);
   const camera = useThree((st) => st.camera);
@@ -226,198 +459,34 @@ function Bloom({ strength }: { strength: number }) {
   const composer = useMemo(() => {
     const c = new EffectComposer(gl);
     c.addPass(new RenderPass(scene, camera));
-    c.addPass(new UnrealBloomPass(new THREE.Vector2(size.width, size.height), strength, 0.7, 0.72));
+    const pass = new UnrealBloomPass(new THREE.Vector2(size.width, size.height), 0.5, 0.7, 0.72);
+    c.addPass(pass);
     c.addPass(new OutputPass());
-    return c;
-  }, [gl, scene, camera, strength, size.width, size.height]);
-  useEffect(() => () => composer.dispose(), [composer]);
-  useEffect(() => composer.setSize(size.width, size.height), [composer, size]);
-  useFrame(() => composer.render(), 1);
+    return { c, pass };
+  }, [gl, scene, camera, size.width, size.height]);
+  useEffect(() => {
+    passRef.current = composer.pass;
+    return () => composer.c.dispose();
+  }, [composer, passRef]);
+  useEffect(() => composer.c.setSize(size.width, size.height), [composer, size]);
+  useFrame(() => composer.c.render(), 1);
   return null;
 }
 
-function Rig({ pos, look }: { pos: THREE.Vector3; look: THREE.Vector3 }) {
-  const cur = useRef(new THREE.Vector3(0, 1.3, 4.8));
-  const aim = useRef(new THREE.Vector3());
-  useFrame(({ camera }, dt) => {
-    const k = 1 - Math.exp(-3 * Math.min(dt, 0.1));
-    cur.current.lerp(pos, k);
-    aim.current.lerp(look, k);
-    camera.position.copy(cur.current);
-    camera.lookAt(aim.current);
-  });
-  return null;
-}
-
-function Scene({ timeline, p, lunar, lostAt, ended }: FlightSceneProps) {
-  const t = performance.now() / 1000;
-  const { index, frac } = phaseAt(timeline, p);
-  const phaseId = timeline.phases[index].id;
-  const opsIndex = timeline.phases.findIndex((ph) => ph.id === "operations");
-  const inOps = opsIndex >= 0 && index >= opsIndex;
-  const earthC = lunar ? LUNAR_EARTH_C : EARTH_C;
-  const earthLabel = useMemo(() => earthC.clone().add(new THREE.Vector3(0, -EARTH_R - 0.3, 0)), [earthC]);
-  const moonLabel = useMemo(() => MOON_C.clone().add(new THREE.Vector3(0, MOON_R + 0.3, 0)), []);
-
-  // visual progress along the pre-operations path
-  const weights = lunar ? LUNAR_W : EARTH_W;
-  const pre = timeline.phases.slice(0, opsIndex < 0 ? undefined : opsIndex);
-  const total = pre.reduce((a, ph) => a + (weights[ph.id] ?? 0), 0) || 1;
-  let acc = 0;
-  for (let i = 0; i < Math.min(index, pre.length); i++) acc += weights[pre[i].id] ?? 0;
-  const g = inOps ? 1 : Math.min(1, (acc + (weights[phaseId] ?? 0) * frac) / total);
-
-  const opsFrac = inOps ? Math.min(1, Math.max(0, (p - timeline.starts[opsIndex]) / (1 - timeline.starts[opsIndex] || 1))) : 0;
-  const orbitAngle = LEO_END_ANGLE + opsFrac * Math.PI * 5;
-
-  // Station missions chase their target once they are in orbit, then dock. The chase runs
-  // across whatever "transfer" and "arrival" phases the mission actually has.
-  const transferIdx = timeline.phases.findIndex((ph) => ph.id === "transfer");
-  const arrivalIdx = timeline.phases.findIndex((ph) => ph.id === "arrival");
-  const chaseFrom = transferIdx >= 0 ? timeline.starts[transferIdx] : arrivalIdx >= 0 ? timeline.starts[arrivalIdx] : 1;
-  const chaseTo = opsIndex >= 0 ? timeline.starts[opsIndex] : 1;
-  const chase = !lunar && chaseTo > chaseFrom ? Math.min(1, Math.max(0, (p - chaseFrom) / (chaseTo - chaseFrom))) : 0;
-  const chasing = !lunar && !inOps && chase > 0;
-  /** where the target sits: ahead on the ring while chasing, alongside once docked */
-  const stationAngle = inOps ? orbitAngle + 0.07 : LEO_END_ANGLE + CHASE_ARC;
-  const docked = inOps && !lunar;
-
-  let pos: THREE.Vector3, dir: THREE.Vector3;
-  if (chasing) {
-    const a = LEO_END_ANGLE + smooth(chase) * CHASE_ARC;
-    pos = around(earthC, LEO_R, a);
-    dir = around(earthC, LEO_R, a + 0.02).sub(pos);
-  } else if (inOps && !lunar) {
-    pos = around(earthC, LEO_R, orbitAngle);
-    dir = around(earthC, LEO_R, orbitAngle + 0.02).sub(pos);
-  } else if (inOps && lunar) {
-    pos = pathAt(1, true);
-    dir = new THREE.Vector3(0, -1, 0);
-  } else {
-    pos = pathAt(g, lunar);
-    dir = pathAt(g + 0.004, lunar).sub(pathAt(g - 0.004, lunar));
-    if (dir.lengthSq() < 1e-9) dir = new THREE.Vector3(0, 1, 0);
-  }
-
-  const lost = ended && !!lostAt;
-  // the burst starts at touchdown and dies out over the first moments on the surface
-  // dust builds through the last of the descent and settles over the first part of the stay
-  const dustAge = !lunar
-    ? 0
-    : phaseId === "arrival"
-      ? Math.max(0, (frac - 0.7) / 0.3) * 0.5
-      : inOps
-        ? 0.5 + opsFrac * 2.2
-        : 0;
-  // the first stage lets go part way up the climb and falls behind
-  const sepAge = phaseId === "ascent" && frac > STAGE_SEP ? (frac - STAGE_SEP) * 3.2 : phaseId === "orbit-insertion" ? 1.65 : 0;
-  const sepAt = useMemo(() => {
-    const gSep = lunar ? 0.35 * STAGE_SEP : STAGE_SEP;
-    return { at: pathAt(gSep, lunar), back: pathAt(gSep - 0.01, lunar).sub(pathAt(gSep + 0.01, lunar)).normalize() };
-  }, [lunar]);
-
-  const burning = !ended && !inOps && (phaseId === "launch" || phaseId === "ascent" || phaseId === "orbit-insertion" || (phaseId === "transfer" && frac < 0.12) || (lunar && phaseId === "arrival" && frac > 0.4));
-  // narrow screens (phones): back the camera off so the whole scene fits across, and draw the rocket bigger
-  const { width, height } = useThree((st) => st.size);
-  const aspect = width / Math.max(1, height);
-  const fit = (need: number, base: number) => Math.max(base, need / (Math.tan((22.5 * Math.PI) / 180) * aspect));
-  const rocketScale = (lunar ? 1.7 : 1.2) * Math.max(1, Math.min(2, 1.6 / aspect));
-
-  const plan = useMemo(() => {
-    if (inOps) return [] as THREE.Vector3[];
-    return Array.from({ length: 61 }, (_, i) => pathAt(i / 60, lunar));
-  }, [lunar, inOps]);
-
-  const trail = useMemo(() => {
-    if (inOps && !lunar) return [] as THREE.Vector3[];
-    const n = 80, top = inOps ? 1 : g;
-    return Array.from({ length: n + 1 }, (_, i) => pathAt((top * i) / n, lunar));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [Math.round(g * 400), lunar, inOps]);
-
-  // camera: wide by default, close during launch and the Moon landing
-  const dist = lunar ? fit(6.2, 10.8) : fit(2.0, 4.8);
-  const wide = lunar ? new THREE.Vector3(0, dist * 0.2, dist) : new THREE.Vector3(0, dist * 0.27, dist);
-  const wideLook = lunar ? new THREE.Vector3(0, 0, 0) : new THREE.Vector3(0, 0.1, 0);
-  const atMoon = lunar && (phaseId === "arrival" || inOps);
-  const near = pos.clone().add(atMoon ? new THREE.Vector3(-0.4, -0.1, 2.6) : new THREE.Vector3(0.7, 0.35, 1.3));
-  const nearLook = atMoon ? pos.clone().lerp(MOON_C, 0.5) : pos;
-  let w = 0;
-  if (!ended || inOps) {
-    if (phaseId === "launch") w = 1;
-    else if (phaseId === "ascent") w = 1 - frac;
-    else if (lunar && phaseId === "arrival") w = smooth(frac * 2);
-    else if (lunar && inOps) w = 1;
-  }
-  const camPos = wide.clone().lerp(near, w);
-  const camLook = wideLook.clone().lerp(nearLook, w);
-
-  return (
-    <>
-      <Rig pos={camPos} look={camLook} />
-      <Bloom strength={burning ? 0.85 : 0.5} />
-      <color attach="background" args={["#04060f"]} />
-      <ambientLight intensity={0.45} />
-      <directionalLight position={[6, 3, 6]} intensity={2.2} />
-      <Stars radius={60} depth={30} count={1500} factor={3} fade speed={0.4} />
-
-      <Planet center={earthC} radius={EARTH_R} kind="earth" />
-      <Ring center={earthC} r={LEO_R} />
-      <Label text="Earth" position={earthLabel} />
-      {lunar && (
-        <>
-          <Planet center={MOON_C} radius={MOON_R} kind="moon" />
-          {dustAge > 0 && !lost && (
-            <Dust at={pathAt(1, true)} up={pathAt(1, true).clone().sub(MOON_C).normalize()} age={dustAge} radius={MOON_R} />
-          )}
-          <Label text="Moon" position={moonLabel} />
-        </>
-      )}
-
-      {/* where the flight is going, before it gets there */}
-      {plan.length > 1 && <Line points={plan} color="#67e8f9" lineWidth={1} transparent opacity={0.22} dashed dashSize={0.08} gapSize={0.08} />}
-      {trail.length > 1 && <Line points={trail} color="#a78bfa" lineWidth={2} transparent opacity={0.85} />}
-
-      {/* the station this mission flies to, and docks with */}
-      {!lunar && (chasing || docked) && (
-        <group position={around(earthC, LEO_R, stationAngle)} rotation={[0, -stationAngle, TILT]}>
-          <StationModel scale={0.34 * rocketScale} />
-        </group>
-      )}
-
-      {sepAge > 0 && !lost && <SpentStage at={sepAt.at} back={sepAt.back} scale={rocketScale} age={sepAge} />}
-
-      {lost ? (
-        <group position={pos}>
-          <mesh scale={1 + 0.15 * Math.sin(t * 6)}><sphereGeometry args={[0.12, 16, 16]} /><meshBasicMaterial color="#fb7185" transparent opacity={0.55} blending={THREE.AdditiveBlending} depthWrite={false} /></mesh>
-          <mesh><sphereGeometry args={[0.05, 12, 12]} /><meshBasicMaterial color="#fff" /></mesh>
-        </group>
-      ) : (
-        <>
-          <Rocket pos={pos} dir={dir} scale={rocketScale} flame={burning} />
-          {burning && <Plume pos={pos} dir={dir} scale={rocketScale} t={t} />}
-          {inOps && (
-            <mesh position={pos} scale={(lunar ? 0.45 : 1) * (1 + 0.35 * Math.abs(Math.sin(t * 2)))}>
-              <sphereGeometry args={[0.09, 16, 16]} />
-              <meshBasicMaterial color="#22d3ee" transparent opacity={0.25} depthWrite={false} blending={THREE.AdditiveBlending} />
-            </mesh>
-          )}
-        </>
-      )}
-    </>
-  );
-}
-
-/** 3D flight view: rocket, plume, transfer arc, orbit or Moon landing, driven by the flight timeline progress `p`. */
+/** 3D flight view for the game: the core in a Canvas, driven by the flight's progress ref. */
 export default function FlightScene3D(props: FlightSceneProps) {
+  const fallback = useRef(props.p);
+  fallback.current = props.p;
+  const progress = props.pRef ?? fallback;
   return (
     <div className="relative h-full w-full">
-      <Canvas dpr={[1, 2]} camera={{ position: [0, 1.3, 4.8], fov: 45 }} gl={{ antialias: true }} aria-label={props.lunar ? "Flight from Earth to the Moon" : "Flight into Earth orbit"} role="img">
+      <Canvas dpr={[1, 2]} camera={{ position: [0, 1.3, 4.8], fov: 45, near: 0.004, far: 220 }} gl={{ antialias: true }} aria-label={props.lunar ? "Flight from Earth to the Moon" : "Flight into Earth orbit"} role="img">
         <Suspense fallback={null}>
-          <Scene {...props} />
+          <FlightSceneCore timeline={props.timeline} lunar={props.lunar} station={props.station} lostAt={props.lostAt} progress={progress} onReady={props.onReady} />
         </Suspense>
       </Canvas>
       <div className="pointer-events-none absolute bottom-2.5 right-14 text-[10px] uppercase tracking-wider text-white/40">{props.lunar ? "Not to scale" : "Earth orbit, not to scale"}</div>
     </div>
   );
 }
+

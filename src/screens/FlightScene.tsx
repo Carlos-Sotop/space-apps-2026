@@ -1,4 +1,4 @@
-import { Component, lazy, Suspense, useMemo, type ReactNode } from "react";
+import { Component, lazy, Suspense, useEffect, useMemo, type ReactNode } from "react";
 import { FlightSceneSvg, type FlightSceneProps } from "./FlightSceneSvg";
 
 const FlightScene3D = lazy(() => import("@/three/FlightScene3D"));
@@ -23,6 +23,9 @@ class Boundary extends Component<{ fallback: ReactNode; children: ReactNode }, {
 /** 3D flight (react-three-fiber). Falls back to the 2D arc for reduced motion, no WebGL or any 3D error. */
 export function FlightScene(props: FlightSceneProps) {
   const use3d = useMemo(() => !prefersReducedMotion() && hasWebGL(), []);
+  const { onReady } = props;
+  // the 2D arc is drawn at once; the 3D view says so itself on its first frame
+  useEffect(() => { if (!use3d) onReady?.(); }, [use3d, onReady]);
   const flat = <FlightSceneSvg {...props} />;
   if (!use3d) return flat;
   return (
