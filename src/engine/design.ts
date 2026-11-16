@@ -67,6 +67,9 @@ export function resolveDesign(design: MissionDesign, catalog: Catalog): Resolved
   return { mission, vehicle, destination, modules, carrier, payload, rideshares, members };
 }
 
+/** A lander or bus that carries the rest of the spacecraft. */
+export const isCarrierModule = (m: Module): boolean => (m.category === "lander" || m.category === "bus") && m.payloadCapacityKg !== undefined;
+
 /** Capabilities where an actor is strongest: strength 2 or more, or its best one. */
 export function strongCapabilities(actor: Actor): Capability[] {
   const entries = Object.entries(actor.capabilities) as [Capability, number][];
@@ -120,23 +123,25 @@ export function defaultDesign(missionId: MissionId, coalition: Coalition, catalo
   return copyDesign(design, coalition);
 }
 
-function searchDefaultDesign(missionId: MissionId, coalition: Coalition, catalog: Catalog): MissionDesign {
-  const mission = getMission(catalog, missionId);
-  const lead = getActor(catalog, coalition.leadId);
-  const values = councilValues(coalition, lead.priorities, catalog).values;
+/** Landers and buses on offer in a mission: the modules that carry the rest. */
+export function missionCarriers(mission: Mission, catalog: Catalog): Module[] {
+  return mission.moduleIds.map((id) => getModule(catalog, id)).filter(isCarrierModule);
+}
+
+/**
+ * Module sets the starting design tries on one carrier (or none): the cheapest module of each category
+ * the mission needs, plus every alternative where the cheapest often starves the mission (a slow radio,
+ * a small array, no night heating), pairs of comms modules (a fast radio plus ground stations or a
+ * relay), each option for the primary objective, and thermal with and without.
+ */
+export function coreModuleSets(mission: Mission, catalog: Catalog, carrier: Module | undefined): Module[][] {
   const offered = mission.moduleIds.map((id) => getModule(catalog, id));
-  const isCarrier = (m: Module) => (m.category === "lander" || m.category === "bus") && m.payloadCapacityKg !== undefined;
-  const carriers = offered.filter(isCarrier);
   const cats = [...new Set([...mission.requiredCategories, ...(mission.primaryObjective.requires.categories ?? [])])];
   const anyOf = offered.filter((m) => (mission.primaryObjective.requires.moduleIds ?? []).includes(m.id)).sort((a, b) => a.costMUsd - b.costMUsd);
-
-  // Categories where the cheapest option often starves the mission (a slow radio, a small array, no
-  // night heating): the starting design also tries each alternative there, and pairs of comms modules
-  // (a fast radio plus ground stations or a relay). Optional categories are tried with and without.
   const VARIED: ModuleCategory[] = ["comms", "power", "battery"];
   const OPTIONAL: ModuleCategory[] = ["thermal"];
   const inCat = (cat: ModuleCategory) =>
-    offered.filter((m) => m.category === cat && !isCarrier(m)).sort((a, b) => a.costMUsd - b.costMUsd);
+    offered.filter((m) => m.category === cat && !isCarrierModule(m)).sort((a, b) => a.costMUsd - b.costMUsd);
   const options = (cat: ModuleCategory): Module[][] => {
     const all = inCat(cat);
     if (!VARIED.includes(cat)) return all.slice(0, 1).map((m) => [m]);
@@ -154,6 +159,20 @@ function searchDefaultDesign(missionId: MissionId, coalition: Coalition, catalog
     [[]],
   );
   const instrumentChoices: (Module | undefined)[] = anyOf.length ? anyOf : [undefined];
+  const sets: Module[][] = [];
+  for (const combo of combos(cats.filter((c) => c !== carrier?.category)))
+    for (const instrument of instrumentChoices)
+      for (const extra of extras) sets.push([...(carrier ? [carrier] : []), ...combo, ...extra, ...(instrument ? [instrument] : [])]);
+  return sets;
+}
+
+function searchDefaultDesign(missionId: MissionId, coalition: Coalition, catalog: Catalog): MissionDesign {
+  const mission = getMission(catalog, missionId);
+  const lead = getActor(catalog, coalition.leadId);
+  const values = councilValues(coalition, lead.priorities, catalog).values;
+  const offered = mission.moduleIds.map((id) => getModule(catalog, id));
+  const carriers = missionCarriers(mission, catalog);
+  const setsFor = new Map((carriers.length ? carriers : [undefined]).map((c) => [c, coreModuleSets(mission, catalog, c)]));
 
   const make = (destinationId: string, launchVehicleId: string, mods: Module[]): MissionDesign => ({
     missionId, coalition, values, secondaryObjectiveIds: [], destinationId, launchVehicleId,
@@ -167,21 +186,18 @@ function searchDefaultDesign(missionId: MissionId, coalition: Coalition, catalog
     for (const vid of mission.launchVehicleIds) {
       // a rocket that cannot reach this orbit always blocks, so skip its whole subtree
       if (!((getLaunchVehicle(catalog, vid).capacityKg[dest.orbitClass] ?? 0) > 0)) continue;
-      for (const carrier of carriers.length ? carriers : [undefined])
-        for (const combo of combos(cats.filter((c) => c !== carrier?.category)))
-          for (const instrument of instrumentChoices)
-          for (const extra of extras) {
-            const mods = [...(carrier ? [carrier] : []), ...combo, ...extra, ...(instrument ? [instrument] : [])];
-            const design = make(dest.id, vid, mods);
-            const issues = validateDesign(design, catalog);
-            if (issues.some((i) => i.severity === "blocker")) continue;
-            // Prefer proven hardware: a cheap but unreliable rocket or carrier makes the first flight a coin toss.
-            const vehicle = catalog.launchVehicles.find((v) => v.id === vid);
-            const proven = (vehicle?.reliability ?? 0) >= 0.95 && (carrier?.reliability ?? 1) >= 0.9;
-            const starved = issues.filter((i) => STARVED.has(i.id)).length;
-            const cost = computeResources(design, catalog).budget.used + (proven ? 0 : 10_000) + starved * 1_000;
-            if (!best || cost < best.cost) best = { design, cost };
-          }
+      for (const [carrier, sets] of setsFor)
+        for (const mods of sets) {
+          const design = make(dest.id, vid, mods);
+          const issues = validateDesign(design, catalog);
+          if (issues.some((i) => i.severity === "blocker")) continue;
+          // Prefer proven hardware: a cheap but unreliable rocket or carrier makes the first flight a coin toss.
+          const vehicle = catalog.launchVehicles.find((v) => v.id === vid);
+          const proven = (vehicle?.reliability ?? 0) >= 0.95 && (carrier?.reliability ?? 1) >= 0.9;
+          const starved = issues.filter((i) => STARVED.has(i.id)).length;
+          const cost = computeResources(design, catalog).budget.used + (proven ? 0 : 10_000) + starved * 1_000;
+          if (!best || cost < best.cost) best = { design, cost };
+        }
     }
   if (best) return best.design;
 
@@ -240,7 +256,6 @@ export interface DesignMove {
   design: MissionDesign;
 }
 
-const isCarrierModule = (m: Module) => (m.category === "lander" || m.category === "bus") && m.payloadCapacityKg !== undefined;
 /** "ISS data link (Ku-band via TDRS)" -> "ISS data link": labels stay one line. */
 const shortName = (name: string) => name.replace(/\s*\([^)]*\)\s*$/, "");
 

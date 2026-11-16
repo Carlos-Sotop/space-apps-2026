@@ -50,6 +50,8 @@ const PATHS = {
   mute: "M4 10v4h4l5 4V6L8 10H4Zm12 0 5 4m0-4-5 4",
   dot: "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z",
   sparkle: "M12 3v5m0 8v5M3 12h5m8 0h5M6 6l3 3m6 6 3 3m0-12-3 3m-6 6-3 3",
+  menu: "M4 7h16M4 12h16M4 17h16",
+  network: "M12 12m-2 0a2 2 0 1 0 4 0 2 2 0 1 0-4 0M5 6m-2 0a2 2 0 1 0 4 0 2 2 0 1 0-4 0M19 6m-2 0a2 2 0 1 0 4 0 2 2 0 1 0-4 0M12 20m-2 0a2 2 0 1 0 4 0 2 2 0 1 0-4 0M6.5 7.5l4 3m7-3-4 3M12 14v4",
 } as const;
 
 export type IconName = keyof typeof PATHS;

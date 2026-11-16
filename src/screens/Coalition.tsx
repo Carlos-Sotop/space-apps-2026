@@ -1,14 +1,17 @@
+import { recommendedCoalitions } from "@/lib/coalition";
 import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { ActorCard } from "@/components/ActorCard";
 import { TopBar } from "@/components/hud/TopBar";
-import { Badge, Button, Icon, type IconName } from "@/components/ui";
+import { ActionBar, Badge, Button, Icon, RecommendedButton, StepHeader, type IconName } from "@/components/ui";
 import { MonogramBadge } from "@/components/ui/MonogramBadge";
 import type { ActorKind } from "@/engine/types";
 import { getActor, getMission } from "@/lib/catalog";
-import { COVERAGE, coverage, recommendedCoalitions, treasury } from "@/lib/coalition";
+import { COVERAGE, coverage, treasury } from "@/lib/coalition";
 import { fmtMUsd } from "@/lib/format";
 import { useCatalog, useGame } from "@/store/game";
+
+/** Best-fit partners per mission, in order of preference (the lead is skipped when it appears here). */
 
 type Filter = "all" | ActorKind;
 const FILTERS: { id: Filter; label: string }[] = [{ id: "all", label: "All" }, { id: "agency", label: "Agencies" }, { id: "company", label: "Companies" }];
@@ -58,21 +61,26 @@ export default function Coalition() {
   const [filter, setFilter] = useState<Filter>("all");
 
   const actors = useMemo(() => catalog.actors.filter((a) => filter === "all" || a.kind === filter), [catalog, filter]);
-  const recs = useMemo(() => (leadId ? recommendedCoalitions(mission, leadId) : []), [mission, leadId]);
+  const options = useMemo(() => (leadId ? recommendedCoalitions(mission, leadId) : []), [mission, leadId]);
   const ready = partnerIds.length === 3;
   const members = [leadId, ...partnerIds];
 
   return (
-    <div className="pb-28 lg:pb-10">
-      <TopBar title={sub === "lead" ? "Who do you represent?" : "Choose 3 partners"} onBack={() => (sub === "partners" ? setSub("lead") : go("missions"))} right={mission && <Badge tone="violet">{mission.name}</Badge>} />
-      <div className="mx-auto max-w-7xl px-4 sm:px-6">
+    <div>
+      <TopBar title="Your coalition" onBack={() => (sub === "partners" ? setSub("lead") : go("missions"))} right={mission && <Badge tone="violet">{mission.name}</Badge>} />
+      <div data-coach="coalition.main" className="mx-auto max-w-7xl px-4 sm:px-6">
+        <StepHeader
+          eyebrow={sub === "lead" ? "Step 1 of 2" : "Step 2 of 2"}
+          title={sub === "lead" ? "Who do you represent?" : "Choose 3 partners for your mission"}
+          subtitle={sub === "lead" ? "Your agency or company leads the council." : "Three partners complete your council of four."}
+        />
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <Tabs value={filter} onChange={setFilter} />
-          <span className="num text-sm text-muted">Step {sub === "lead" ? "A" : "B"} of 2</span>
+          {sub === "partners" && options.length > 0 && <div className="flex flex-wrap gap-2" data-coach="coalition.recommended">{options.map((o) => <RecommendedButton key={o.id} label={o.label} onClick={() => setPartners([...o.partnerIds])} />)}</div>}
         </div>
         <AnimatePresence mode="wait">
-          <motion.div key={sub} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.22 }} className={sub === "partners" ? "grid gap-6 lg:grid-cols-[1fr_320px]" : ""}>
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <motion.div key={sub} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.22 }} className="grid gap-6 lg:grid-cols-[1fr_320px]">
+            <div className="order-2 grid gap-4 sm:grid-cols-2 xl:grid-cols-3 lg:order-none" data-coach="coalition.cards">
               {actors.filter((a) => sub === "lead" || a.id !== leadId).map((a) => (
                 <ActorCard
                   key={a.id} actor={a}
@@ -82,8 +90,7 @@ export default function Coalition() {
                 />
               ))}
             </div>
-            {sub === "partners" && (
-              <aside className="glass-strong h-fit space-y-5 p-5 lg:sticky lg:top-4">
+            <aside data-coach="coalition.council" className="glass-strong order-1 h-fit space-y-5 p-5 lg:sticky lg:top-4 lg:order-none">
                 <div>
                   <div className="mb-2 text-xs uppercase tracking-widest text-faint">Your council</div>
                   <ul className="flex gap-3">
@@ -98,32 +105,26 @@ export default function Coalition() {
                     ))}
                   </ul>
                 </div>
-                <CoveragePanel />
-                {recs.length > 0 && (
-                  <div>
-                    <div className="mb-2 text-xs uppercase tracking-widest text-faint">Recommended coalitions</div>
-                    <div className="flex flex-wrap gap-2">
-                      {recs.map((r) => (
-                        <button key={r.id} type="button" onClick={() => setPartners(r.partnerIds)} className="rounded-full border border-violet/40 bg-violet/10 px-3 py-1 text-xs text-violet-bright transition hover:bg-violet/20">{r.label}</button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </aside>
-            )}
+                <div className="hidden lg:block"><CoveragePanel /></div>
+            </aside>
           </motion.div>
         </AnimatePresence>
       </div>
-      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-bg/85 px-4 py-3 backdrop-blur-xl lg:static lg:mx-auto lg:mt-8 lg:max-w-7xl lg:border-0 lg:bg-transparent lg:px-6 lg:py-0 lg:backdrop-blur-none">
-        <div className="flex items-center justify-between gap-3 lg:justify-end">
-          <span className="num text-sm text-muted lg:mr-4">{sub === "lead" ? (leadId ? getActor(leadId)?.shortName : "Pick one") : `${partnerIds.length} of 3 chosen`}</span>
-          {sub === "lead" ? (
-            <Button variant="primary" disabled={!leadId} onClick={() => setSub("partners")}>Continue <Icon name="arrow" size={16} /></Button>
-          ) : (
-            <Button variant="primary" disabled={!ready} onClick={startControl}>Enter mission control <Icon name="arrow" size={16} /></Button>
-          )}
-        </div>
-      </div>
+      <ActionBar
+        className="mt-8"
+        left={
+          <div className="flex min-w-0 items-center gap-2" data-coach="coalition.chosen">
+            {leadId ? <MonogramBadge actor={getActor(leadId)} fallbackName={leadId} size={28} showName /> : <span className="text-muted">Pick one</span>}
+            {sub === "partners" && <span className="num shrink-0 text-muted">{partnerIds.length} of 3 chosen</span>}
+          </div>
+        }
+      >
+        {sub === "lead" ? (
+          <Button variant="primary" data-coach="coalition.continue" disabled={!leadId} onClick={() => setSub("partners")}>Continue <Icon name="arrow" size={16} /></Button>
+        ) : (
+          <Button variant="primary" data-coach="coalition.continue" disabled={!ready} onClick={startControl}>Enter mission control <Icon name="arrow" size={16} /></Button>
+        )}
+      </ActionBar>
     </div>
   );
 }

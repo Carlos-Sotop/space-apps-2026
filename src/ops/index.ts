@@ -4,7 +4,8 @@ import type { OpsAction, OpsCtx, OpsInit, OpsState } from "./types";
 
 export * from "./types";
 export type { OpsScenario, StructureDef, ResearchSpec, ResearchEffect, ScenarioEvent } from "./scenario";
-export { createOps, applyAction, whyNot, validTiles } from "./core";
+export { createOps, applyAction, whyNot, validTiles, apCost, previewState } from "./core";
+export { WARNING_TURNS } from "./warnings";
 export { maxTurnsFor } from "./util";
 export { opsScore, finalScore, canRunOps } from "./score";
 export { getScenario } from "./scenarios";

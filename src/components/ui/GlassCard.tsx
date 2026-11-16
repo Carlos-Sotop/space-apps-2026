@@ -1,4 +1,5 @@
 import type { HTMLAttributes, ReactNode } from "react";
+import { sfx } from "@/components/audio";
 import { AnimatePresence, motion } from "motion/react";
 import { Icon } from "./Icon";
 
@@ -37,7 +38,7 @@ export function GlassCard({ onSelect, selected, disabled, label, className = "",
         )}
       </AnimatePresence>
       {selectable && (
-        <button type="button" aria-pressed={selected} aria-label={label} disabled={disabled} onClick={onSelect} className="absolute inset-0 z-0 rounded-[inherit] bg-transparent" />
+        <button type="button" aria-pressed={selected} aria-label={label} disabled={disabled} onClick={() => { sfx(selected ? "back" : "select"); onSelect?.(); }} className="absolute inset-0 z-0 rounded-[inherit] bg-transparent" />
       )}
       <div className={selectable ? "pointer-events-none relative z-[1] h-full" : "h-full"}>{children}</div>
     </div>

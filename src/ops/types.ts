@@ -233,6 +233,8 @@ export interface OpsState {
   actions: OpsAction[];
   /** what the last turn did, for the 3D scene and the UI to animate (set by every advance from C4 on) */
   lastReport?: OpsTurnReport;
+  /** effects of choices and scouting made during this turn; the next advance puts them in its report */
+  turnEffects?: OpsEffect[];
 }
 
 /* ---------------- Turn report (Sunday sprint contract, C0) ---------------- */

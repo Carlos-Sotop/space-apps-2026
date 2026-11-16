@@ -108,14 +108,18 @@ const sideDefs: Record<string, OpsGoal> = {
   "ol-fire-safety": goal({ id: "side-fire", kind: "side", objectiveId: "ol-fire-safety", title: "Run the combustion rig for 3 turns", target: 3, unit: "turns", points: 15 }),
   "ol-health": goal({ id: "side-health", kind: "side", objectiveId: "ol-health", title: "Run the biomonitor for 4 turns", target: 4, unit: "turns", points: 15 }),
   "ol-plants": goal({ id: "side-plants", kind: "side", objectiveId: "ol-plants", title: "Run the plant chamber for 4 turns", target: 4, unit: "turns", points: 15 }),
-  "ol-manufacturing": goal({ id: "side-make", kind: "side", objectiveId: "ol-manufacturing", title: "Run a bioprinter or fiber rig for 4 turns", target: 4, unit: "turns", points: 15 }),
+  "ol-manufacturing": goal({ id: "side-make", kind: "side", objectiveId: "ol-manufacturing", title: "Draw optical fiber for 4 turns", target: 4, unit: "turns", points: 15 }),
+  "ol-protein": goal({ id: "side-protein", kind: "side", objectiveId: "ol-protein", title: "Grow protein crystals for 3 turns", target: 3, unit: "turns", points: 15 }),
+  "ol-tissue": goal({ id: "side-tissue", kind: "side", objectiveId: "ol-tissue", title: "Grow human tissue for 4 turns", target: 4, unit: "turns", points: 15 }),
 };
 
 const sideProgress: Record<string, (s: Parameters<OpsScenario["goalProgress"]>[1]) => number> = {
   "side-fire": (s) => flag(s, "run:ol-combustion"),
   "side-health": (s) => flag(s, "run:ol-biomonitor"),
   "side-plants": (s) => flag(s, "run:ol-plant-chamber"),
-  "side-make": (s) => Math.max(flag(s, "run:ol-bioprinter"), flag(s, "run:ol-fiber")),
+  "side-make": (s) => flag(s, "run:ol-fiber"),
+  "side-protein": (s) => flag(s, "run:ol-protein-crystal"),
+  "side-tissue": (s) => flag(s, "run:ol-bioprinter"),
 };
 
 const isExperiment = (kind: string) => kind === "experiment" || kind === "dosimeter" || kind === "plant";
