@@ -25,8 +25,11 @@ const lastPlayed = new Map<SfxName, number>();
 
 const canPlay = () => typeof window !== "undefined" && typeof Audio !== "undefined";
 
+/** Music belongs to the game only: never on the landing page. */
+const inGame = () => typeof location !== "undefined" && location.pathname.startsWith("/play");
+
 function startMusic() {
-  if (!canPlay() || muted) return;
+  if (!canPlay() || muted || !unlocked || !inGame()) return;
   if (!music) {
     music = new Audio(MUSIC_SRC);
     music.loop = true;
@@ -46,6 +49,16 @@ if (canPlay()) {
   };
   window.addEventListener("pointerdown", unlock);
   window.addEventListener("keydown", unlock);
+
+  // A video's own soundtrack wins: duck the music while any <video> plays, bring it back after.
+  document.addEventListener("play", (e) => {
+    if (e.target instanceof HTMLVideoElement) music?.pause();
+  }, true);
+  const resumeAfterVideo = (e: Event) => {
+    if (e.target instanceof HTMLVideoElement) startMusic();
+  };
+  document.addEventListener("pause", resumeAfterVideo, true);
+  document.addEventListener("ended", resumeAfterVideo, true);
 }
 
 /** Play a short sound effect. Silent when muted, before the first gesture, or if the file fails. */
