@@ -275,8 +275,11 @@ function singleDelta(issue: Issue, before: ResourceReport, beforeStorage: number
 
 const num = (s: string) => Number(s.replace(/,/g, ""));
 
-/** Energy the dark period needs beyond what the batteries hold, read from the battery issue; 0 when covered. */
-function batteryShortWh(issues: Issue[]): number {
+/**
+ * Energy the dark period needs beyond what the batteries hold, read from the battery issue; 0 when
+ * covered. The Build step shows it while the player is still choosing parts.
+ */
+export function batteryShortWh(issues: Issue[]): number {
   const i = issues.find((x) => x.id === "battery-small");
   const m = i?.text.match(/hold ([\d,.]+) Wh.*needs about ([\d,.]+) Wh/);
   return m ? num(m[2]) - num(m[1]) : 0;
@@ -529,6 +532,8 @@ export type ReadinessVerdict = ReadinessVote["verdict"];
 /** A vote with the number it rests on, so a change can be explained: "mass margin rose from 4% to 18%". */
 export interface ReadinessVoteDetail extends ReadinessVote {
   metric: { label: string; value: number; unit: string };
+  /** one short sentence a first-time player understands, naming the gap to close */
+  plain: string;
   /** the member's own hardware that makes it accept a soft condition (barter) */
   acceptedFor?: string;
 }
@@ -573,6 +578,8 @@ interface Outcome {
   issue?: Issue;
   /** physics, not preference: no barter changes it */
   hard: boolean;
+  /** the distance to clear, in plain words: "short by 2,990 Wh", "240 kg over the limit" */
+  gap?: string;
 }
 
 interface ReadyContext {
@@ -588,6 +595,7 @@ const RANK: Record<ReadinessVerdict, number> = { "no-go": 0, "go-with-condition"
 const whole = (x: number) => `${Math.round(x * 100)}%`;
 const margin = (used: number, capacity: number) => (capacity > 0 ? (capacity - used) / capacity : used > 0 ? -1 : 1);
 const firstSentence = (s: string) => sentence(s.split(/\. /)[0]);
+const thinMargin = (m: number) => `${whole(m)} margin, ${whole(READY_MARGIN)} is the rule`;
 
 /** The check an issue belongs to. */
 function checkOf(issue: Issue): ReadinessCheck {
@@ -614,9 +622,13 @@ function massCheck(c: ReadyContext): Outcome {
   const blocker = mine.find((i) => i.severity === "blocker");
   if (blocker) {
     const heavy = blocker.id === "mass-over" || blocker.id === "launch-cannot-reach";
-    return { ...base, verdict: "no-go", hard: true, issue: blocker, reason: heavy ? "Too heavy for the rocket" : firstSentence(blocker.text), numbers: sentence(issueFact(blocker, c.rep, c.design, c.catalog)) };
+    return {
+      ...base, verdict: "no-go", hard: true, issue: blocker, reason: heavy ? "Too heavy for the rocket" : firstSentence(blocker.text),
+      numbers: sentence(issueFact(blocker, c.rep, c.design, c.catalog)),
+      gap: blocker.id === "mass-over" ? `${fmt(g.used - g.capacity)} kg over the limit` : undefined,
+    };
   }
-  if (m < READY_MARGIN) return { ...base, verdict: "go-with-condition", hard: false, issue: mine.find((i) => i.id === "mass-tight"), reason: "Under 10% mass margin: masses grow late" };
+  if (m < READY_MARGIN) return { ...base, verdict: "go-with-condition", hard: false, issue: mine.find((i) => i.id === "mass-tight"), reason: "Under 10% mass margin: masses grow late", gap: thinMargin(m) };
   return { ...base, verdict: "go", hard: false, reason: "Fits the rocket with margin" };
 }
 
@@ -631,13 +643,21 @@ function powerCheck(c: ReadyContext): Outcome {
   };
   const mine = mineFor("power", c.issues);
   const blocker = mine.find((i) => i.severity === "blocker");
-  if (blocker) return { ...base, verdict: "no-go", hard: true, issue: blocker, reason: blocker.id === "power-over" ? "Draws more than the station allows" : firstSentence(blocker.text) };
+  if (blocker) {
+    const missing = blocker.id.startsWith("missing-category-") ? blocker.id.slice("missing-category-".length) : undefined;
+    return {
+      ...base, verdict: "no-go", hard: true, issue: blocker,
+      reason: blocker.id === "power-over" ? "Draws more than the station allows" : missing ? `No ${missing} on board` : firstSentence(blocker.text),
+      gap: blocker.id === "power-over" ? `${fmt(g.used - g.capacity)} W over what it makes` : missing ? "this mission cannot fly without one" : undefined,
+    };
+  }
   const life = mine.find((i) => i.id === "lifetime-under");
   if (life) {
     const l = c.rep.lifetime;
     return {
       ...base, verdict: "no-go", hard: true, issue: life, reason: "Goes quiet before the mission ends",
       numbers: `lasts ${fmt(l.capacity)} of ${fmt(l.used)} days`, metric: { label: "design life", value: Math.round(l.capacity), unit: " days" },
+      gap: `${fmt(l.used - l.capacity)} days short`,
     };
   }
   const battery = mine.find((i) => i.id === "battery-small");
@@ -646,19 +666,24 @@ function powerCheck(c: ReadyContext): Outcome {
     const have = x ? num(x[1]) : 0;
     const need = x ? num(x[2]) : 1;
     const cover = need > 0 ? have / need : 1;
-    const out = { ...base, issue: battery, numbers: `batteries ${fmt(have)} of ${fmt(need)} Wh for the dark`, metric: { label: "night battery cover", value: Math.round(cover * 100), unit: "%" } };
+    const out = {
+      ...base, issue: battery, numbers: `batteries ${fmt(have)} of ${fmt(need)} Wh for the dark`,
+      metric: { label: "night battery cover", value: Math.round(cover * 100), unit: "%" },
+      gap: `short by ${fmt(need - have)} Wh`,
+    };
     return cover < NO_GO_NIGHT_COVER
       ? { ...out, verdict: "no-go", hard: true, reason: "Batteries die in the dark" }
       : { ...out, verdict: "go-with-condition", hard: false, reason: "Batteries run short in the dark" };
   }
-  if (m < 0) return { ...base, verdict: "no-go", hard: true, issue: mine.find((i) => i.id === "power-over"), reason: "Draws more power than it makes" };
-  if (m < READY_MARGIN) return { ...base, verdict: "go-with-condition", hard: false, issue: mine.find((i) => i.id === "power-tight"), reason: "Under 10% power margin" };
+  if (m < 0) return { ...base, verdict: "no-go", hard: true, issue: mine.find((i) => i.id === "power-over"), reason: "Draws more power than it makes", gap: `${fmt(g.used - g.capacity)} W over what it makes` };
+  if (m < READY_MARGIN) return { ...base, verdict: "go-with-condition", hard: false, issue: mine.find((i) => i.id === "power-tight"), reason: "Under 10% power margin", gap: thinMargin(m) };
   const lifeTight = mine.find((i) => i.id === "lifetime-tight");
   if (lifeTight) {
     const l = c.rep.lifetime;
     return {
       ...base, verdict: "go-with-condition", hard: false, issue: lifeTight, reason: "Design life barely covers the mission",
       numbers: `lasts ${fmt(l.capacity)} of ${fmt(l.used)} days`, metric: { label: "design life", value: Math.round(l.capacity), unit: " days" },
+      gap: `${fmt(l.capacity)} days of life for a ${fmt(l.used)}-day mission`,
     };
   }
   return { ...base, verdict: "go", hard: false, reason: "Power holds with margin" };
@@ -678,18 +703,24 @@ function commsCheck(c: ReadyContext): Outcome {
   const under = mine.find((i) => i.id === "comms-under");
   if (under) {
     const ratio = g.used > 0 ? g.capacity / g.used : 1;
+    const commsGap = `link covers ${whole(g.capacity)} of the day, ${whole(g.used)} needed`;
     return ratio < 0.5
-      ? { ...base, verdict: "no-go", hard: true, issue: under, reason: "Out of contact most of the time" }
-      : { ...base, verdict: "go-with-condition", hard: false, issue: under, reason: "Less link time than the team needs" };
+      ? { ...base, verdict: "no-go", hard: true, issue: under, reason: "Out of contact most of the time", gap: commsGap }
+      : { ...base, verdict: "go-with-condition", hard: false, issue: under, reason: "Less link time than the team needs", gap: commsGap };
   }
   const dataOver = mine.find((i) => i.id === "data-over");
   const dataBase = {
     numbers: `makes ${fmt(d.used)} Gb/day, sends ${fmt(d.capacity)} Gb/day`,
     metric: { label: "downlink margin", value: Math.round(margin(d.used, d.capacity) * 100), unit: "%" },
   };
-  if (dataOver) return { ...base, ...dataBase, verdict: "go-with-condition", hard: false, issue: dataOver, reason: "Data piles up on board" };
+  if (dataOver)
+    return { ...base, ...dataBase, verdict: "go-with-condition", hard: false, issue: dataOver, reason: "Data piles up on board", gap: `${fmt(d.used - d.capacity)} Gb/day more than it can send` };
   const tight = mine.find((i) => i.id === "comms-tight" || i.id === "data-tight");
-  if (tight) return { ...base, ...(tight.id === "data-tight" ? dataBase : {}), verdict: "go-with-condition", hard: false, issue: tight, reason: "Under 10% link margin" };
+  if (tight)
+    return {
+      ...base, ...(tight.id === "data-tight" ? dataBase : {}), verdict: "go-with-condition", hard: false, issue: tight,
+      reason: "Under 10% link margin", gap: thinMargin(margin(tight.id === "data-tight" ? d.used : g.used, tight.id === "data-tight" ? d.capacity : g.capacity)),
+    };
   return { ...base, verdict: "go", hard: false, reason: "The link covers what the team needs" };
 }
 
@@ -703,8 +734,8 @@ function budgetCheck(c: ReadyContext): Outcome {
   };
   const mine = mineFor("budget", c.issues);
   const blocker = mine.find((i) => i.severity === "blocker");
-  if (blocker) return { ...base, verdict: "no-go", hard: true, issue: blocker, reason: "Costs more than the treasury holds" };
-  if (m < READY_MARGIN) return { ...base, verdict: "go-with-condition", hard: false, issue: mine.find((i) => i.id === "budget-tight"), reason: "Under 10% reserve for surprises" };
+  if (blocker) return { ...base, verdict: "no-go", hard: true, issue: blocker, reason: "Costs more than the treasury holds", gap: `${money(g.used - g.capacity)} over the treasury` };
+  if (m < READY_MARGIN) return { ...base, verdict: "go-with-condition", hard: false, issue: mine.find((i) => i.id === "budget-tight"), reason: "Under 10% reserve for surprises", gap: `${whole(m)} in reserve, ${whole(READY_MARGIN)} is the rule` };
   return { ...base, verdict: "go", hard: false, reason: "Within the treasury, with reserve" };
 }
 
@@ -716,9 +747,10 @@ function reliabilityCheck(c: ReadyContext): Outcome {
     metric: { label: "success", value: Math.round(p * 100), unit: "%" },
     source: READINESS_SOURCES.risk,
   };
+  const odds = `${whole(p)} of flights succeed, ${whole(READY_SUCCESS)} is the bar`;
   if (c.issues.some((i) => i.severity === "blocker")) return { ...base, verdict: "no-go", hard: true, reason: "Can't fly until the red issues are fixed" };
-  if (p < NO_GO_SUCCESS) return { ...base, verdict: "no-go", hard: true, reason: "Fails more often than it succeeds" };
-  if (p < READY_SUCCESS) return { ...base, verdict: "go-with-condition", hard: false, reason: "Too many simulated flights fail" };
+  if (p < NO_GO_SUCCESS) return { ...base, verdict: "no-go", hard: true, reason: "Fails more often than it succeeds", gap: odds };
+  if (p < READY_SUCCESS) return { ...base, verdict: "go-with-condition", hard: false, reason: "Too many simulated flights fail", gap: odds };
   return { ...base, verdict: "go", hard: false, reason: "The odds look good" };
 }
 
@@ -736,11 +768,14 @@ function objectivesCheck(c: ReadyContext): Outcome {
   const blocker = mine.find((i) => i.severity === "blocker");
   if (blocker) {
     const reason = blocker.id === "primary-unmet" ? "The main goal can't be met" : blocker.id === "too-many-secondaries" ? "Too many extra goals" : firstSentence(blocker.text);
-    return { ...base, verdict: "no-go", hard: true, issue: blocker, reason, numbers: blocker.id === "primary-unmet" ? `main goal: ${mission.primaryObjective.title}` : base.numbers };
+    return {
+      ...base, verdict: "no-go", hard: true, issue: blocker, reason,
+      numbers: blocker.id === "primary-unmet" ? `main goal: ${mission.primaryObjective.title}` : base.numbers,
+    };
   }
   if (unmet.length) {
     const obj = mission.secondaryObjectives.find((o) => `secondary-unmet-${o.id}` === unmet[0].id);
-    return { ...base, verdict: "go-with-condition", hard: false, issue: unmet[0], reason: obj ? `Can't meet "${obj.title}" yet` : "An extra goal can't be met" };
+    return { ...base, verdict: "go-with-condition", hard: false, issue: unmet[0], reason: obj ? `Can't meet "${obj.title}" yet` : "An extra goal can't be met", gap: `${met} of ${chosen} extra goals covered` };
   }
   return { ...base, verdict: "go", hard: false, reason: chosen ? "Covers the main goal and every extra" : "Covers the main goal" };
 }
@@ -975,6 +1010,14 @@ function concessionFor(o: Outcome, ctx: ReviewContext, who: Actor): ReadinessVot
 }
 
 /**
+ * The one sentence the card leads with: what is wrong, then how far it is from passing.
+ * "Not enough battery for the dark period: short by 2,990 Wh".
+ */
+function plainLine(o: Outcome): string {
+  return sentence(o.gap ? `${o.reason}: ${o.gap}` : o.reason);
+}
+
+/**
  * The Go / No-Go poll: one vote per seat, lead first. Each seat reports its worst check; a soft
  * condition is accepted when the member's own hardware flies (ISS-style barter), or when nothing on
  * offer would fix it. Pass the risk assessment the player sees; without one it is simulated here.
@@ -1000,13 +1043,14 @@ export function readinessReview(design: MissionDesign, catalog: Catalog, risk?: 
     const who = getActor(catalog, actorId);
     const outcomes = checks.map((k) => CHECKS[k]!(c));
     const o = outcomes.reduce((a, b) => (RANK[b.verdict] < RANK[a.verdict] ? b : a));
-    const vote: ReadinessVoteDetail = { actorId, verdict: o.verdict, check: o.check, reason: o.reason, numbers: o.numbers, metric: o.metric, ...(o.source ? { source: o.source } : {}) };
+    const vote: ReadinessVoteDetail = { actorId, verdict: o.verdict, check: o.check, reason: o.reason, numbers: o.numbers, plain: plainLine(o), metric: o.metric, ...(o.source ? { source: o.source } : {}) };
     if (o.verdict === "go") return vote;
     const own = seat > 0 && !o.hard ? stake.get(actorId) : undefined;
-    if (own) return { ...vote, verdict: "go", reason: `Accepted: ${own}`, acceptedFor: own, source: READINESS_SOURCES.barter };
+    if (own) return { ...vote, verdict: "go", reason: `Accepted: ${own}`, acceptedFor: own, plain: sentence(`Accepted: ${own}`), source: READINESS_SOURCES.barter };
     const fix = fixFor(o, review(), who);
     const concession = seat > 0 ? concessionFor(o, review(), who) : undefined;
-    if (o.verdict === "go-with-condition" && !fix && !concession) return { ...vote, verdict: "go", reason: `${o.reason}, accepted: nothing on offer fixes it` };
+    if (o.verdict === "go-with-condition" && !fix && !concession)
+      return { ...vote, verdict: "go", reason: `${o.reason}, accepted: nothing on offer fixes it`, plain: sentence(`${o.reason}, accepted: nothing on offer fixes it`) };
     return { ...vote, ...(fix ? { fix } : {}), ...(concession ? { concession } : {}) };
   });
 }
